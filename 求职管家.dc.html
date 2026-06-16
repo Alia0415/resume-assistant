@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<style>
+  html,body{height:100%;margin:0;}
+  *{box-sizing:border-box;}
+  :root{--ac:#2f6fed;--ac-soft:#eaf1ff;--ac2:#1f9d6b;--ac2-soft:#e7f6ef;}
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#d7dde8;border-radius:9px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  input,textarea,select{font-family:'Noto Sans SC',system-ui,sans-serif;}
+  textarea{resize:vertical;}
+  @keyframes jmspin{to{transform:rotate(360deg);}}
+</style>
+</helmet>
+<div style="display:flex;height:100vh;overflow:hidden;background:#f5f7fb;font-family:'Noto Sans SC',system-ui,sans-serif;color:#18223a;">
+
+  <input id="jm-file" type="file" accept=".docx,.pdf,.txt" style="display:none;" onChange="{{ onFile }}">
+
+  <aside style="width:230px;flex-shrink:0;background:#ffffff;border-right:1px solid #ebeef4;display:flex;flex-direction:column;height:100vh;">
+    <div style="padding:20px 18px 14px;display:flex;align-items:center;gap:10px;">
+      <div style="width:34px;height:34px;border-radius:9px;background:var(--ac);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"></path></svg>
+      </div>
+      <div>
+        <div style="font-size:14.5px;font-weight:700;">求职管家</div>
+        <div style="font-size:11px;color:#93a0b8;margin-top:1px;">个人求职工作台</div>
+      </div>
+    </div>
+
+    <nav style="flex:1;overflow-y:auto;padding:6px 11px;">
+      <sc-for list="{{ nav }}" as="item" hint-placeholder-count="8">
+        <button onClick="{{ item.go }}" style="{{ item.style }}">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{ item.iconPath }}"></path></svg>
+          <span style="flex:1;">{{ item.label }}</span>
+          <sc-if value="{{ item.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:var(--ac);background:var(--ac-soft);border-radius:20px;padding:1px 7px;min-width:18px;text-align:center;">{{ item.badge }}</span></sc-if>
+        </button>
+      </sc-for>
+    </nav>
+
+    <button onClick="{{ goSettings }}" style="margin:0 11px 12px;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;background:#f7f9fc;border:1px solid #eef1f6;cursor:pointer;text-align:left;font-family:inherit;">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--ac2-soft);color:var(--ac2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">{{ profileInitial }}</div>
+      <div style="min-width:0;">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ profileName }}</div>
+        <div style="font-size:11px;color:#93a0b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ profileSub }}</div>
+      </div>
+    </button>
+  </aside>
+
+  <main id="jm-main" style="flex:1;min-width:0;height:100vh;overflow-y:auto;">
+    <header style="position:sticky;top:0;z-index:10;background:rgba(245,247,251,.88);backdrop-filter:blur(10px);border-bottom:1px solid #ebeef4;padding:17px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+      <div>
+        <h1 style="margin:0;font-size:19px;font-weight:700;">{{ pageTitle }}</h1>
+        <p style="margin:3px 0 0;font-size:13px;color:#6b7a96;">{{ pageSubtitle }}</p>
+      </div>
+      <sc-if value="{{ headerAction.show }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ headerAction.onClick }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+          {{ headerAction.label }}
+        </button>
+      </sc-if>
+    </header>
+
+    <div style="padding:24px 32px 60px;max-width:1180px;margin:0 auto;">
+
+      <!-- ============ 工作台 ============ -->
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+      <section data-screen-label="工作台">
+        <sc-if value="{{ dashEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#fff;border:1px solid #ebeef4;border-radius:16px;padding:56px 28px;text-align:center;">
+            <div style="width:60px;height:60px;border-radius:16px;background:var(--ac-soft);color:var(--ac);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"></path></svg>
+            </div>
+            <div style="font-size:17px;font-weight:700;">欢迎使用求职管家</div>
+            <div style="font-size:13.5px;color:#6b7a96;margin-top:8px;line-height:1.7;max-width:440px;margin-left:auto;margin-right:auto;">这是一个完全空白、为你自己准备的工具。所有数据都保存在本机浏览器里。<br>从上传一份你的真实简历，或添加一个想投的岗位开始。</div>
+            <div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap;">
+              <button onClick="{{ triggerUpload }}" style="background:var(--ac);color:#fff;border:none;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">上传简历</button>
+              <button onClick="{{ openJobModal }}" style="background:#fff;color:#3a485f;border:1px solid #e2e8f0;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">添加岗位</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ dashHasData }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;">
+            <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+              <button onClick="{{ s.go }}" style="text-align:left;background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:16px 18px;cursor:pointer;font-family:inherit;">
+                <div style="font-size:12.5px;color:#6b7a96;margin-bottom:8px;">{{ s.label }}</div>
+                <div style="font-size:26px;font-weight:800;line-height:1;color:#18223a;">{{ s.value }}<span style="font-size:13px;font-weight:500;color:#93a0b8;margin-left:4px;">{{ s.unit }}</span></div>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px 22px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <div style="font-size:15px;font-weight:700;">今日待办</div>
+                <button onClick="{{ goTodos }}" style="font-size:12.5px;color:var(--ac);background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;">全部待办</button>
+              </div>
+              <sc-if value="{{ todoEmpty }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:26px 0;text-align:center;color:#a6b0c2;font-size:13px;">暂无待办，保持节奏 👍</div>
+              </sc-if>
+              <div style="display:flex;flex-direction:column;gap:9px;">
+                <sc-for list="{{ todoItems }}" as="t" hint-placeholder-count="0">
+                  <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid #eef1f6;border-radius:11px;">
+                    <span style="width:8px;height:8px;border-radius:50%;background:{{ t.dot }};flex-shrink:0;"></span>
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:13.5px;font-weight:500;">{{ t.text }}</div>
+                      <div style="font-size:11.5px;color:#93a0b8;margin-top:2px;">{{ t.sub }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px 22px;">
+              <div style="font-size:15px;font-weight:700;margin-bottom:14px;">进行中的投递</div>
+              <sc-if value="{{ activeAppEmpty }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:26px 0;text-align:center;color:#a6b0c2;font-size:13px;">还没有进行中的投递</div>
+              </sc-if>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <sc-for list="{{ activeApps }}" as="a" hint-placeholder-count="0">
+                  <div style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f1f4f8;">
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ a.role }}</div>
+                      <div style="font-size:11.5px;color:#93a0b8;">{{ a.company }}</div>
+                    </div>
+                    <span style="{{ a.statusStyle }}">{{ a.status }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </section>
+      </sc-if>
+
+      <!-- ============ 简历 ============ -->
+      <sc-if value="{{ isResume }}" hint-placeholder-val="{{ false }}">
+      <section data-screen-label="简历">
+        <div style="display: flex; align-items: flex-start; gap: 11px; border: 1px solid #d4ecdf; border-radius: 12px; padding: 13px 16px; margin-bottom: 20px; background-color: #125bfb">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ac2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px; stroke: #ffffff"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <div style="font-size: 12.5px; color: #ffffff; line-height: 1.7">上传你的真实简历后，系统会提取其中的文字用于岗位匹配分析。AI 只基于这些真实文字给建议，<b>不会编造你没有的经历</b>，也不会替你重排版式。.docx / .txt 可自动解析，PDF 多数可解析。</div>
+        </div>
+
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px;">原始简历文件</div>
+        <div onDragOver="{{ onDragOver }}" onDrop="{{ onDrop }}" onClick="{{ triggerUpload }}" style="border:1.5px dashed #cbd5e6;border-radius:14px;padding:26px;text-align:center;background:#fbfcfe;margin-bottom:16px;cursor:pointer;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#93a0b8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:6px;"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"></path></svg>
+          <div style="font-size:13.5px;color:#3a485f;">把简历文件拖到这里，或 <span style="color:var(--ac);font-weight:600;">点击上传</span></div>
+          <div style="font-size:11.5px;color:#a6b0c2;margin-top:5px;">支持 .docx / .pdf / .txt · 文件只保存在你本机</div>
+        </div>
+
+        <sc-if value="{{ resumesEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="text-align:center;color:#a6b0c2;font-size:13px;padding:8px 0 24px;">还没有上传任何简历文件</div>
+        </sc-if>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:30px;">
+          <sc-for list="{{ resumeFiles }}" as="r" hint-placeholder-count="0">
+            <div style="display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #ebeef4;border-radius:13px;padding:14px 16px;">
+              <div style="width:42px;height:42px;border-radius:10px;background:#eaf1ff;color:var(--ac);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l4 4v16H6z M15 2v5h5"></path></svg>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.fileName }}</div>
+                <div style="font-size:11.5px;color:#93a0b8;margin-top:2px;">{{ r.meta }}</div>
+              </div>
+              <span style="{{ r.parseStyle }}">{{ r.parseLabel }}</span>
+              <button onClick="{{ r.download }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:500;font-family:inherit;cursor:pointer;">下载</button>
+              <button onClick="{{ r.del }}" style="background:none;color:#c0392b;border:none;padding:6px;cursor:pointer;font-family:inherit;font-size:12.5px;">删除</button>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div>
+            <div style="font-size:14px;font-weight:700;">简历版本</div>
+            <div style="font-size:12px;color:#93a0b8;margin-top:2px;">针对不同岗位方向保存的版本，投递时直接选用</div>
+          </div>
+          <button onClick="{{ openVersionModal }}" style="display:flex;align-items:center;gap:6px;background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>新建版本
+          </button>
+        </div>
+        <sc-if value="{{ versionsEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#fff;border:1px dashed #d6deea;border-radius:13px;padding:34px;text-align:center;color:#93a0b8;font-size:13px;">
+            还没有简历版本。可在「匹配分析」中确认 AI 修改建议后自动生成，也可手动新建。
+          </div>
+        </sc-if>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+          <sc-for list="{{ versionCards }}" as="v" hint-placeholder-count="0">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:13px;padding:17px 18px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <span style="font-size:14.5px;font-weight:700;">{{ v.name }}</span>
+                <span style="font-size:11.5px;color:#93a0b8;">{{ v.updated }}</span>
+              </div>
+              <div style="font-size:12px;color:#6b7a96;margin-bottom:3px;"><b style="color:#3a485f;font-weight:500;">对应岗位：</b>{{ v.targetJob }}</div>
+              <div style="font-size:12px;color:#6b7a96;line-height:1.6;"><b style="color:#3a485f;font-weight:500;">修改重点：</b>{{ v.focus }}</div>
+              <div style="display:flex;gap:8px;margin-top:13px;">
+                <button onClick="{{ v.export }}" style="background:var(--ac-soft);color:var(--ac);border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">导出文件</button>
+                <button onClick="{{ v.edit }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:500;font-family:inherit;cursor:pointer;">编辑</button>
+                <button onClick="{{ v.del }}" style="margin-left:auto;background:none;color:#c0392b;border:none;padding:6px;cursor:pointer;font-size:12.5px;font-family:inherit;">删除</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+      </sc-if>
+
+      <!-- ============ 岗位 ============ -->
+      <sc-if value="{{ isJobs }}" hint-placeholder-val="{{ false }}">
+      <section data-screen-label="岗位">
+        <sc-if value="{{ jobsEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#fff;border:1px solid #ebeef4;border-radius:16px;padding:54px 28px;text-align:center;">
+            <div style="width:56px;height:56px;border-radius:15px;background:var(--ac-soft);color:var(--ac);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+              <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13H3z M8 7V4h8v3"></path></svg>
+            </div>
+            <div style="font-size:16px;font-weight:700;">还没有添加岗位</div>
+            <div style="font-size:13px;color:#6b7a96;margin-top:7px;line-height:1.7;max-width:420px;margin:7px auto 0;">岗位都由你自己添加：粘贴一段 JD、填上公司和岗位名称即可。添加后就能做匹配分析。</div>
+            <button onClick="{{ openJobModal }}" style="margin-top:22px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">添加第一个岗位</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ jobsHas }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <div style="flex:1;position:relative;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a6b0c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-4-4"></path></svg>
+              <input value="{{ jobSearch }}" onInput="{{ setJobSearch }}" placeholder="搜索公司 / 岗位 / 城市" style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:10px 13px 10px 36px;font-size:13.5px;outline:none;background:#fff;">
+            </div>
+            <span style="font-size:12.5px;color:#93a0b8;">共 {{ jobCount }} 个</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+            <sc-for list="{{ jobCards }}" as="j" hint-placeholder-count="0">
+              <div style="background:#fff;border:1px solid #ebeef4;border-radius:13px;padding:17px 18px;">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;">
+                  <div style="min-width:0;">
+                    <div style="font-size:14.5px;font-weight:700;">{{ j.role }}</div>
+                    <div style="font-size:12.5px;color:#6b7a96;margin-top:2px;">{{ j.company }}{{ j.cityText }}</div>
+                  </div>
+                  <sc-if value="{{ j.analyzed }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:var(--ac2);background:var(--ac2-soft);border-radius:7px;padding:3px 9px;white-space:nowrap;">已分析 {{ j.score }}</span></sc-if>
+                  <sc-if value="{{ j.notAnalyzed }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:500;color:#93a0b8;background:#f3f6fb;border-radius:7px;padding:3px 9px;white-space:nowrap;">未分析</span></sc-if>
+                </div>
+                <sc-if value="{{ j.dir }}" hint-placeholder-val="{{ false }}"><span style="display:inline-block;font-size:11.5px;color:var(--ac);background:var(--ac-soft);border-radius:6px;padding:2px 9px;margin-bottom:8px;">{{ j.dir }}</span></sc-if>
+                <div style="font-size:12px;color:#8694ab;line-height:1.6;max-height:54px;overflow:hidden;">{{ j.jdPreview }}</div>
+                <div style="display:flex;gap:8px;margin-top:13px;align-items:center;">
+                  <button onClick="{{ j.analyze }}" style="background:var(--ac);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">匹配分析</button>
+                  <sc-if value="{{ j.hasLink }}" hint-placeholder-val="{{ false }}"><a href="{{ j.link }}" target="_blank" style="font-size:12.5px;color:#5b6b85;text-decoration:none;border:1px solid #e2e8f0;border-radius:8px;padding:7px 12px;">投递链接</a></sc-if>
+                  <button onClick="{{ j.edit }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:8px;padding:7px 12px;font-size:12.5px;font-family:inherit;cursor:pointer;">编辑</button>
+                  <button onClick="{{ j.del }}" style="margin-left:auto;background:none;color:#c0392b;border:none;padding:6px;cursor:pointer;font-size:12.5px;font-family:inherit;">删除</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </section>
+      </sc-if>
+
+      <!-- ============ 匹配分析 ============ -->
+      <sc-if value="{{ isMatch }}" hint-placeholder-val="{{ false }}">
+      <section data-screen-label="匹配分析">
+        <sc-if value="{{ matchNoJobs }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#fff;border:1px solid #ebeef4;border-radius:16px;padding:50px 28px;text-align:center;">
+            <div style="font-size:15px;font-weight:700;">先添加一个岗位</div>
+            <div style="font-size:13px;color:#6b7a96;margin-top:7px;">匹配分析需要真实的岗位 JD 和你的简历。</div>
+            <button onClick="{{ openJobModal }}" style="margin-top:18px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">添加岗位</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ matchReady }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:18px 20px;margin-bottom:16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+              <div>
+                <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">选择岗位</label>
+                <select value="{{ matchJobId }}" onChange="{{ setMatchJob }}" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px 11px;font-size:13.5px;background:#fff;cursor:pointer;">
+                  <sc-for list="{{ matchJobOptions }}" as="o" hint-placeholder-count="0"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">选择简历</label>
+                <select value="{{ matchResumeId }}" onChange="{{ setMatchResume }}" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px 11px;font-size:13.5px;background:#fff;cursor:pointer;">
+                  <sc-for list="{{ matchResumeOptions }}" as="o" hint-placeholder-count="0"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">改写部分（生成修改建议用）</label>
+                <select value="{{ targetSection }}" onChange="{{ setTargetSection }}" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px 11px;font-size:13.5px;background:#fff;cursor:pointer;">
+                  <sc-for list="{{ targetSectionOptions }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;">
+              <button onClick="{{ matchResume }}" style="background:var(--ac);color:#fff;border:none;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ matchBtnLabel }}</button>
+              <button onClick="{{ rewriteResume }}" style="background:var(--ac2-soft);color:var(--ac2);border:none;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ rewriteBtnLabel }}</button>
+              <button onClick="{{ generateNote }}" style="background:#fff;color:#3a485f;border:1px solid #e2e8f0;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ noteBtnLabel }}</button>
+            </div>
+            <div style="font-size:11.5px;color:#a6b0c2;margin-top:10px;line-height:1.6;">全部基于真实数据由 DeepSeek 分析：匹配度与修改建议都来自你的 JD 与简历；投递邮件仅供参考，请核对属实后再用。</div>
+          </div>
+
+          <sc-if value="{{ matchNoResume }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:12.5px;color:#9a6411;line-height:1.7;">
+              当前没有可用于分析的简历文字。请先在「简历」页上传一份能解析文字的简历（.docx / .txt），或在下方手动粘贴简历内容。
+              <textarea value="{{ form.manualResume }}" onInput="{{ setManualResume }}" placeholder="把你的简历文字粘贴到这里…" style="width:100%;margin-top:10px;height:120px;border:1px solid #e6d3a8;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;outline:none;background:#fff;"></textarea>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ aiError }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fdecec;border:1px solid #f5cfcf;border-radius:12px;padding:13px 16px;margin-bottom:16px;font-size:13px;color:#c0392b;">{{ aiError }}</div>
+          </sc-if>
+
+          <sc-if value="{{ aiLoading }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:44px;text-align:center;">
+              <div style="width:30px;height:30px;border:3px solid #e6eaf1;border-top-color:var(--ac);border-radius:50%;margin:0 auto 14px;animation:jmspin .8s linear infinite;"></div>
+              <div style="font-size:13.5px;color:#6b7a96;">AI 正在基于你的真实简历与该岗位 JD 进行分析…</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ hasMatch }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:22px;display:flex;gap:24px;align-items:center;">
+              <div style="position:relative;width:112px;height:112px;flex-shrink:0;">
+                <svg width="112" height="112" viewBox="0 0 112 112">
+                  <circle cx="56" cy="56" r="46" fill="none" stroke="#eef1f6" stroke-width="11"></circle>
+                  <circle cx="56" cy="56" r="46" fill="none" stroke="var(--ac)" stroke-width="11" stroke-linecap="round" stroke-dasharray="{{ ringDash }}" transform="rotate(-90 56 56)"></circle>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                  <div style="font-size:30px;font-weight:800;line-height:1;">{{ matchScore }}</div>
+                  <div style="font-size:11px;color:#93a0b8;margin-top:2px;">匹配参考</div>
+                </div>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;color:#3a485f;line-height:1.7;">matchScore 仅为辅助参考，不代表录用概率。下方区分「来自简历」与「来自 JD」的内容，请据实判断。</div>
+                <div style="font-size:11.5px;color:#a6b0c2;margin-top:10px;">分析时间 {{ matchTime }}</div>
+              </div>
+            </div>
+
+            <sc-if value="{{ hasJdKeywords }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px 22px;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:12px;">JD 关键词<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">来自岗位 JD 解析</span></div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <sc-for list="{{ jdKeywords }}" as="k" hint-placeholder-count="0"><span style="font-size:12.5px;border-radius:8px;padding:6px 11px;background:var(--ac-soft);color:var(--ac);">{{ k }}</span></sc-for>
+              </div>
+            </div>
+            </sc-if>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px;">
+                <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;margin-bottom:12px;color:var(--ac2);">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"></path></svg>已匹配（来自简历）
+                </div>
+                <div style="display:flex;flex-direction:column;gap:9px;">
+                  <sc-for list="{{ matchedPoints }}" as="e" hint-placeholder-count="0">
+                    <div style="font-size:12.5px;color:#3a485f;line-height:1.6;padding-left:14px;position:relative;"><span style="position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:var(--ac2);"></span>{{ e }}</div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ matchedEmpty }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:#a6b0c2;">—</div></sc-if>
+              </div>
+              <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px;">
+                <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;margin-bottom:12px;color:#c2710c;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>缺失（来自 JD 要求）
+                </div>
+                <div style="display:flex;flex-direction:column;gap:9px;">
+                  <sc-for list="{{ missingPoints }}" as="e" hint-placeholder-count="0">
+                    <div style="font-size:12.5px;color:#3a485f;line-height:1.6;padding-left:14px;position:relative;"><span style="position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:#e6a23c;"></span>{{ e }}</div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ missingEmpty }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:#a6b0c2;">—</div></sc-if>
+              </div>
+            </div>
+
+            <sc-if value="{{ hasWeak }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px;">
+              <div style="font-size:13.5px;font-weight:700;margin-bottom:12px;color:#9a6411;">表达偏弱、可加强</div>
+              <div style="display:flex;flex-direction:column;gap:9px;">
+                <sc-for list="{{ weakExpressions }}" as="e" hint-placeholder-count="0"><div style="font-size:12.5px;color:#3a485f;line-height:1.6;padding-left:14px;position:relative;"><span style="position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:#d8a72b;"></span>{{ e }}</div></sc-for>
+              </div>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ hasFocus }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--ac-soft);border:1px solid #d6e3ff;border-radius:14px;padding:20px;">
+              <div style="font-size:13.5px;font-weight:700;margin-bottom:12px;color:var(--ac);">针对该岗位建议突出的方向</div>
+              <div style="display:flex;flex-direction:column;gap:9px;">
+                <sc-for list="{{ suggestedFocus }}" as="e" hint-placeholder-count="0"><div style="font-size:12.5px;color:#2a4a86;line-height:1.6;padding-left:14px;position:relative;"><span style="position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:var(--ac);"></span>{{ e }}</div></sc-for>
+              </div>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ hasRisks }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fdf6f6;border:1px solid #f0d9d9;border-radius:14px;padding:20px;">
+              <div style="font-size:13.5px;font-weight:700;margin-bottom:12px;color:#c0392b;">风险提示</div>
+              <div style="display:flex;flex-direction:column;gap:9px;">
+                <sc-for list="{{ riskWarnings }}" as="e" hint-placeholder-count="0"><div style="font-size:12.5px;color:#8a4a47;line-height:1.6;padding-left:14px;position:relative;"><span style="position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:#c0392b;"></span>{{ e }}</div></sc-for>
+              </div>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ hasQuestions }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:14px;padding:20px;">
+              <div style="font-size:13.5px;font-weight:700;margin-bottom:6px;color:#9a6411;">需要你补充的信息</div>
+              <div style="font-size:12px;color:#9a6411;margin-bottom:12px;line-height:1.6;">以下内容简历里没有，AI 不会替你编造，请据实补充后再生成修改建议。</div>
+              <div style="display:flex;flex-direction:column;gap:9px;">
+                <sc-for list="{{ questionsForUser }}" as="e" hint-placeholder-count="0"><div style="font-size:12.5px;color:#7a5410;line-height:1.6;padding-left:14px;position:relative;"><span style="position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:#d8a72b;"></span>{{ e }}</div></sc-for>
+              </div>
+            </div>
+            </sc-if>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ hasRewrite }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-bottom:16px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div style="font-size:14px;font-weight:700;">简历修改建议<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">逐条「原文 / 改后 / 理由」，可编辑，确认属实后保存为版本</span></div>
+                <span style="font-size:12.5px;color:var(--ac2);font-weight:600;">已采纳 {{ sugAcceptedCount }} / {{ sugTotal }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:13px;">
+                <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="0">
+                  <div style="{{ s.cardStyle }}">
+                    <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;">
+                      <span style="font-size:13px;font-weight:700;">{{ s.section }}</span>
+                      <sc-if value="{{ s.needConfirm }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#c2710c;background:#fff3e6;border-radius:6px;padding:2px 8px;">需你核实真实性</span></sc-if>
+                      <button onClick="{{ s.toggle }}" style="{{ s.btnStyle }}">{{ s.btnLabel }}</button>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;">
+                      <div style="border:1px solid #f0d9d9;background:#fdf6f6;border-radius:10px;padding:11px 13px;">
+                        <div style="font-size:10.5px;font-weight:600;color:#b85c58;margin-bottom:6px;">原文</div>
+                        <div style="font-size:12.5px;color:#8a6a6a;line-height:1.7;">{{ s.before }}</div>
+                      </div>
+                      <div style="border:1px solid #cfe9da;background:#f3fbf6;border-radius:10px;padding:11px 13px;">
+                        <div style="font-size:10.5px;font-weight:600;color:var(--ac2);margin-bottom:6px;">建议改为（可编辑）</div>
+                        <textarea value="{{ s.after }}" onInput="{{ s.editAfter }}" style="width:100%;height:72px;border:1px solid #cfe9da;border-radius:7px;padding:7px 9px;font-size:12.5px;line-height:1.7;color:#1f6b4a;outline:none;background:#fff;"></textarea>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;gap:7px;font-size:12px;color:#6b7a96;margin-top:11px;background:#f7f9fc;border-radius:8px;padding:9px 11px;line-height:1.6;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93a0b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 16v-4M12 8h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"></path></svg>
+                      {{ s.reason }}
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              <sc-if value="{{ hasRewriteQuestions }}" hint-placeholder-val="{{ false }}">
+                <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:12px;padding:14px 16px;margin-top:13px;">
+                  <div style="font-size:12.5px;font-weight:700;color:#9a6411;margin-bottom:8px;">需要你补充确认</div>
+                  <div style="display:flex;flex-direction:column;gap:7px;">
+                    <sc-for list="{{ rewriteQuestions }}" as="e" hint-placeholder-count="0"><div style="font-size:12px;color:#7a5410;line-height:1.6;">· {{ e }}</div></sc-for>
+                  </div>
+                </div>
+              </sc-if>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;flex-wrap:wrap;">
+                <div style="font-size:12.5px;color:#6b7a96;">仅「已采纳且经你确认属实」的建议会替换简历对应文字，生成新版本（原文件不动）。</div>
+                <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存为简历版本</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ hasNote }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px 22px;margin-bottom:16px;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:14px;">投递材料草稿<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">仅供参考，请核对属实后再用</span></div>
+              <sc-if value="{{ noteSummary }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:#3a485f;line-height:1.7;margin-bottom:13px;"><b style="color:#6b7a96;font-weight:500;">投递定位：</b>{{ noteSummary }}</div></sc-if>
+              <div style="margin-bottom:12px;">
+                <div style="font-size:12px;color:#6b7a96;margin-bottom:6px;">邮件标题</div>
+                <input value="{{ noteSubject }}" onInput="{{ setNoteSubject }}" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px 12px;font-size:13px;outline:none;">
+              </div>
+              <div style="margin-bottom:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:12px;color:#6b7a96;">邮件正文（可编辑）</span><button onClick="{{ copyNoteEmail }}" style="background:none;border:none;color:var(--ac);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">复制邮件</button></div>
+                <textarea value="{{ noteBody }}" onInput="{{ setNoteBody }}" style="width:100%;height:170px;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;outline:none;"></textarea>
+              </div>
+              <sc-if value="{{ hasPrep }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:12px;color:#6b7a96;margin-bottom:6px;">面试准备要点</div>
+                <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:13px;">
+                  <sc-for list="{{ interviewPrep }}" as="e" hint-placeholder-count="0"><div style="font-size:12.5px;color:#3a485f;line-height:1.6;padding-left:14px;position:relative;"><span style="position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:var(--ac);"></span>{{ e }}</div></sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ hasFollowUp }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:12px;color:#6b7a96;">跟进待办</span><button onClick="{{ addNoteTodos }}" style="background:none;border:none;color:var(--ac2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">加入我的待办</button></div>
+                <div style="display:flex;flex-direction:column;gap:7px;">
+                  <sc-for list="{{ followUpTodo }}" as="e" hint-placeholder-count="0"><div style="font-size:12.5px;color:#3a485f;line-height:1.6;padding-left:14px;position:relative;"><span style="position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:var(--ac2);"></span>{{ e }}</div></sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ noAnalysisYet }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#fff;border:1px dashed #d6deea;border-radius:14px;padding:44px;text-align:center;color:#93a0b8;font-size:13.5px;line-height:1.7;">
+              选择岗位与简历后，点击上方按钮。<br>所有结果都来自 DeepSeek 对你真实 JD 与简历的分析，不会编造任何经历。
+            </div>
+          </sc-if>
+        </sc-if>
+      </section>
+      </sc-if>
+
+      <!-- ============ 投递记录 ============ -->
+      <sc-if value="{{ isApps }}" hint-placeholder-val="{{ false }}">
+      <section data-screen-label="投递记录">
+        <sc-if value="{{ appsEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#fff;border:1px solid #ebeef4;border-radius:16px;padding:54px 28px;text-align:center;">
+            <div style="width:56px;height:56px;border-radius:15px;background:var(--ac-soft);color:var(--ac);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+              <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v15H4z M8 3v4M16 3v4M4 10h16"></path></svg>
+            </div>
+            <div style="font-size:16px;font-weight:700;">还没有投递记录</div>
+            <div style="font-size:13px;color:#6b7a96;margin-top:7px;line-height:1.7;max-width:420px;margin:7px auto 0;">每投一个岗位就新增一条，跟踪公司、渠道、状态和下一步。这里不会自动生成任何记录。</div>
+            <button onClick="{{ openAppModal }}" style="margin-top:22px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">新建第一条投递记录</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ appsHas }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:16px;">
+            <sc-for list="{{ appSummary }}" as="b" hint-placeholder-count="4">
+              <div style="background:#fff;border:1px solid #ebeef4;border-radius:13px;padding:14px 17px;">
+                <div style="font-size:12px;color:#6b7a96;margin-bottom:6px;">{{ b.label }}</div>
+                <div style="font-size:23px;font-weight:800;color:{{ b.color }};">{{ b.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;overflow:hidden;">
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #eef1f6;flex-wrap:wrap;">
+              <input value="{{ appSearch }}" onInput="{{ setAppSearch }}" placeholder="搜索公司 / 岗位" style="flex:1;min-width:160px;border:1px solid #e2e8f0;border-radius:9px;padding:8px 12px;font-size:13px;outline:none;">
+              <select value="{{ appStatus }}" onChange="{{ setAppStatus }}" style="border:1px solid #e2e8f0;border-radius:9px;padding:8px 11px;font-size:13px;background:#fff;cursor:pointer;">
+                <sc-for list="{{ appStatusOptions }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for>
+              </select>
+              <button onClick="{{ exportCsv }}" style="display:flex;align-items:center;gap:6px;background:#fff;color:#3a485f;border:1px solid #e2e8f0;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>导出 CSV
+              </button>
+              <button onClick="{{ openAppModal }}" style="display:flex;align-items:center;gap:6px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>新增
+              </button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:920px;">
+                <thead>
+                  <tr style="background:#f9fafc;color:#6b7a96;font-size:12px;text-align:left;">
+                    <th style="padding:11px 16px;font-weight:600;">公司 / 岗位</th>
+                    <th style="padding:11px 12px;font-weight:600;">城市</th>
+                    <th style="padding:11px 12px;font-weight:600;">渠道</th>
+                    <th style="padding:11px 12px;font-weight:600;">投递日期</th>
+                    <th style="padding:11px 12px;font-weight:600;">简历版本</th>
+                    <th style="padding:11px 12px;font-weight:600;">状态</th>
+                    <th style="padding:11px 12px;font-weight:600;">下一步</th>
+                    <th style="padding:11px 16px;font-weight:600;text-align:right;">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{ appRows }}" as="r" hint-placeholder-count="0">
+                    <tr style="border-top:1px solid #f1f4f8;">
+                      <td style="padding:12px 16px;"><div style="font-weight:600;">{{ r.role }}</div><div style="font-size:11.5px;color:#93a0b8;margin-top:1px;">{{ r.company }}</div></td>
+                      <td style="padding:12px 12px;color:#5b6b85;">{{ r.city }}</td>
+                      <td style="padding:12px 12px;color:#5b6b85;">{{ r.channel }}</td>
+                      <td style="padding:12px 12px;color:#5b6b85;">{{ r.date }}</td>
+                      <td style="padding:12px 12px;color:#5b6b85;">{{ r.versionName }}</td>
+                      <td style="padding:12px 12px;"><span style="{{ r.statusStyle }}">{{ r.status }}</span></td>
+                      <td style="padding:12px 12px;color:#6b7a96;font-size:12px;max-width:180px;">{{ r.nextStep }}</td>
+                      <td style="padding:12px 16px;text-align:right;white-space:nowrap;">
+                        <button onClick="{{ r.edit }}" style="background:none;border:none;color:var(--ac);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;padding:0 4px;">编辑</button>
+                        <button onClick="{{ r.del }}" style="background:none;border:none;color:#c0392b;font-size:12.5px;font-family:inherit;cursor:pointer;padding:0 4px;">删除</button>
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+            <sc-if value="{{ appRowsEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:30px;text-align:center;color:#a6b0c2;font-size:13px;">没有符合筛选条件的记录</div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </section>
+      </sc-if>
+
+      <!-- ============ 反馈记录 ============ -->
+      <sc-if value="{{ isFeedback }}" hint-placeholder-val="{{ false }}">
+      <section data-screen-label="反馈记录">
+        <div style="display:flex;gap:11px;background:#eef4ff;border:1px solid #dbe7ff;border-radius:12px;padding:13px 16px;margin-bottom:18px;align-items:flex-start;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 16v-4M12 8h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"></path></svg>
+          <div style="font-size:12.5px;color:#3a5a9a;line-height:1.7;">反馈都由你手动记录。把收到的邮件 / 短信、笔面通知如实填进来即可；系统不会自动获取或生成任何反馈。</div>
+        </div>
+
+        <sc-if value="{{ feedbackEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#fff;border:1px solid #ebeef4;border-radius:16px;padding:48px 28px;text-align:center;">
+            <div style="font-size:16px;font-weight:700;">还没有反馈记录</div>
+            <div style="font-size:13px;color:#6b7a96;margin-top:7px;">收到笔试、面试、拒信或需补材料时，在这里记一笔。</div>
+            <button onClick="{{ openFeedbackModal }}" style="margin-top:20px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">记录反馈</button>
+          </div>
+        </sc-if>
+
+        <div style="display:flex;flex-direction:column;gap:13px;">
+          <sc-for list="{{ feedbackCards }}" as="f" hint-placeholder-count="0">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:18px 20px;">
+              <div style="display:flex;align-items:center;gap:11px;margin-bottom:12px;">
+                <div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:600;">{{ f.title }}</div><div style="font-size:11.5px;color:#93a0b8;margin-top:1px;">{{ f.time }}</div></div>
+                <span style="{{ f.typeStyle }}">{{ f.type }}</span>
+                <button onClick="{{ f.edit }}" style="background:none;border:none;color:var(--ac);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">编辑</button>
+                <button onClick="{{ f.del }}" style="background:none;border:none;color:#c0392b;font-size:12.5px;font-family:inherit;cursor:pointer;">删除</button>
+              </div>
+              <sc-if value="{{ f.summary }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:12.5px;color:#3a485f;line-height:1.7;margin-bottom:8px;"><b style="color:#6b7a96;font-weight:500;">要点：</b>{{ f.summary }}</div>
+              </sc-if>
+              <sc-if value="{{ f.nextStep }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:12.5px;color:#3a485f;line-height:1.7;margin-bottom:8px;"><b style="color:#6b7a96;font-weight:500;">下一步：</b>{{ f.nextStep }}</div>
+              </sc-if>
+              <sc-if value="{{ f.content }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:12px;color:#8694ab;line-height:1.7;white-space:pre-line;background:#f9fafc;border-radius:9px;padding:11px 13px;margin-top:4px;">{{ f.content }}</div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+      </sc-if>
+
+      <!-- ============ 求职待办 ============ -->
+      <sc-if value="{{ isTodos }}" hint-placeholder-val="{{ false }}">
+      <section data-screen-label="求职待办">
+        <sc-if value="{{ allTodosEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#fff;border:1px solid #ebeef4;border-radius:16px;padding:50px 28px;text-align:center;">
+            <div style="font-size:16px;font-weight:700;">暂无待办</div>
+            <div style="font-size:13px;color:#6b7a96;margin-top:7px;line-height:1.7;max-width:420px;margin:7px auto 0;">待办会从你的投递记录「下一步」自动汇总，你也可以手动添加一条提醒。</div>
+            <button onClick="{{ openTodoModal }}" style="margin-top:20px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">添加待办</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ todosHas }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ hasManualTodos }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;font-weight:700;color:#6b7a96;margin-bottom:10px;">我的待办</div>
+            <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:22px;">
+              <sc-for list="{{ manualTodos }}" as="t" hint-placeholder-count="0">
+                <div style="display:flex;align-items:center;gap:13px;background:#fff;border:1px solid #ebeef4;border-radius:12px;padding:13px 16px;{{ t.doneStyle }}">
+                  <button onClick="{{ t.toggle }}" style="{{ t.checkStyle }}"><sc-if value="{{ t.done }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"></path></svg></sc-if></button>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:13.5px;font-weight:500;{{ t.textStyle }}">{{ t.text }}</div>
+                    <sc-if value="{{ t.due }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#93a0b8;margin-top:2px;">截止 {{ t.due }}</div></sc-if>
+                  </div>
+                  <button onClick="{{ t.edit }}" style="background:none;border:none;color:var(--ac);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">编辑</button>
+                  <button onClick="{{ t.del }}" style="background:none;border:none;color:#c0392b;font-size:12.5px;font-family:inherit;cursor:pointer;">删除</button>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ hasAutoTodos }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;font-weight:700;color:#6b7a96;margin-bottom:10px;">来自投递记录的下一步</div>
+            <div style="display:flex;flex-direction:column;gap:9px;">
+              <sc-for list="{{ autoTodos }}" as="t" hint-placeholder-count="0">
+                <div style="display:flex;align-items:center;gap:13px;background:#fff;border:1px solid #ebeef4;border-radius:12px;padding:13px 16px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:var(--ac);flex-shrink:0;"></span>
+                  <div style="flex:1;min-width:0;"><div style="font-size:13.5px;font-weight:500;">{{ t.text }}</div><div style="font-size:11.5px;color:#93a0b8;margin-top:2px;">{{ t.sub }}</div></div>
+                  <button onClick="{{ goApps }}" style="background:none;border:none;color:var(--ac);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">查看</button>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </sc-if>
+      </section>
+      </sc-if>
+
+      <!-- ============ 个人信息 ============ -->
+      <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+      <section data-screen-label="个人信息">
+        <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:22px;margin-bottom:16px;max-width:680px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div style="font-size:15px;font-weight:700;">基本信息</div>
+            <button onClick="{{ openProfileModal }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;">编辑</button>
+          </div>
+          <div style="font-size:12.5px;color:#93a0b8;margin-bottom:14px;line-height:1.7;">这些信息只用于自动填充投递材料里的称呼，存在你本机，不会上传。</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 24px;">
+            <sc-for list="{{ profileFields }}" as="p" hint-placeholder-count="6">
+              <div><div style="font-size:11.5px;color:#93a0b8;margin-bottom:4px;">{{ p.label }}</div><div style="font-size:13.5px;color:#3a485f;">{{ p.value }}</div></div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:22px;max-width:680px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">数据管理</div>
+          <div style="font-size:12.5px;color:#93a0b8;margin-bottom:16px;line-height:1.7;">所有数据保存在本机浏览器（localStorage + IndexedDB），刷新不会丢失。建议定期导出备份。</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button onClick="{{ exportAll }}" style="background:var(--ac-soft);color:var(--ac);border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">导出全部数据（JSON 备份）</button>
+            <button onClick="{{ exportCsv }}" style="background:#fff;color:#3a485f;border:1px solid #e2e8f0;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;">导出投递记录 CSV</button>
+            <button onClick="{{ clearAll }}" style="margin-left:auto;background:#fff;color:#c0392b;border:1px solid #f0d0cc;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;">清空全部数据</button>
+          </div>
+        </div>
+      </section>
+      </sc-if>
+
+    </div>
+  </main>
+
+  <!-- ============ 通用弹窗 ============ -->
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:fixed;inset:0;background:rgba(24,34,58,.4);backdrop-filter:blur(2px);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:48px 20px;overflow-y:auto;">
+      <div onClick="{{ stop }}" style="width:100%;max-width:560px;background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(16,24,40,.24);overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #eef1f6;">
+          <div style="font-size:15.5px;font-weight:700;">{{ modalTitle }}</div>
+          <button onClick="{{ closeModal }}" style="background:none;border:none;cursor:pointer;color:#93a0b8;padding:4px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+        </div>
+        <div style="padding:20px 22px;max-height:62vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px;">
+          <sc-for list="{{ modalFields }}" as="fld" hint-placeholder-count="3">
+            <div>
+              <label style="font-size:12.5px;color:#6b7a96;display:block;margin-bottom:6px;font-weight:500;">{{ fld.label }}</label>
+              <sc-if value="{{ fld.isInput }}" hint-placeholder-val="{{ false }}">
+                <input type="{{ fld.inputType }}" value="{{ fld.value }}" onInput="{{ fld.handler }}" placeholder="{{ fld.placeholder }}" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;">
+              </sc-if>
+              <sc-if value="{{ fld.isArea }}" hint-placeholder-val="{{ false }}">
+                <textarea value="{{ fld.value }}" onInput="{{ fld.handler }}" placeholder="{{ fld.placeholder }}" style="{{ fld.areaStyle }}"></textarea>
+              </sc-if>
+              <sc-if value="{{ fld.isSelect }}" hint-placeholder-val="{{ false }}">
+                <select value="{{ fld.value }}" onChange="{{ fld.handler }}" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;background:#fff;cursor:pointer;">
+                  <sc-for list="{{ fld.options }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for>
+                </select>
+              </sc-if>
+            </div>
+          </sc-for>
+          <sc-if value="{{ modalAction.show }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ modalAction.onClick }}" style="align-self:flex-start;display:flex;align-items:center;gap:7px;background:var(--ac2-soft);color:var(--ac2);border:none;border-radius:9px;padding:9px 15px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.4 2.3 7.2-6.3-4.6L5.7 21l2.3-7.2-6-4.4h7.6z"></path></svg>
+              {{ modalAction.label }}
+            </button>
+          </sc-if>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid #eef1f6;background:#fbfcfe;">
+          <button onClick="{{ closeModal }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:500;font-family:inherit;cursor:pointer;">取消</button>
+          <button onClick="{{ saveModal }}" style="background:var(--ac);color:#fff;border:none;border-radius:9px;padding:10px 22px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ 提示 ============ -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:60;background:#18223a;color:#fff;font-size:13px;font-weight:500;padding:11px 20px;border-radius:11px;box-shadow:0 10px 30px rgba(16,24,40,.28);">{{ toast }}</div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:860},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#2f6fed&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;apiBase&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    db: (() => { try { return JSON.parse(localStorage.getItem('jm_data_v1')) || null; } catch (e) { return null; } })()
+      || { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [] },
+    page: 'dashboard', modalType: null, form: {}, editId: null,
+    toast: null, aiLoading: false, aiError: null,
+    matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '',
+    jobSearch: '', appSearch: '', appStatus: '全部'
+  };
+
+  ACTIVE = ['待投递', '已投递', '笔试', '面试'];
+  STATUSES = ['待投递', '已投递', '笔试', '面试', '已拒', '已offer', '暂停'];
+  FBTYPES = ['收到笔试', '收到面试', '被拒', '无反馈', '需要补材料'];
+
+  componentDidMount() {
+    this.applyAccent();
+    if (window.pdfjsLib) { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } catch (e) {} }
+  }
+  componentDidUpdate(prev) { if (prev.accentColor !== this.props.accentColor) this.applyAccent(); }
+  applyAccent() { const a = this.props.accentColor; if (a) document.documentElement.style.setProperty('--ac', a); }
+
+  persist(db) { try { localStorage.setItem('jm_data_v1', JSON.stringify(db)); } catch (e) {} }
+  setDb(mut) { this.setState(s => { const db = JSON.parse(JSON.stringify(s.db)); mut(db); this.persist(db); return { db }; }); }
+  uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  showToast(t) { this.setState({ toast: t }); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: null }), 1900); }
+  go(p) { this.setState({ page: p }); const m = document.getElementById('jm-main'); if (m) m.scrollTop = 0; }
+  fmt(ts) { if (!ts) return ''; const d = new Date(ts); return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  openIdb() { if (this._idb) return this._idb; this._idb = new Promise((res, rej) => { const r = indexedDB.open('jm_files', 1); r.onupgradeneeded = () => r.result.createObjectStore('files'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); return this._idb; }
+  async idbPut(id, blob) { const db = await this.openIdb(); return new Promise((res, rej) => { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').put(blob, id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
+  async idbGet(id) { const db = await this.openIdb(); return new Promise((res, rej) => { const tx = db.transaction('files', 'readonly'); const rq = tx.objectStore('files').get(id); rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); }); }
+  async idbDel(id) { const db = await this.openIdb(); return new Promise((res) => { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').delete(id); tx.oncomplete = () => res(); }); }
+
+  triggerUpload() { const el = document.getElementById('jm-file'); if (el) el.click(); }
+  async onFile(e) { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) await this.ingest(file); }
+  onDragOver(e) { e.preventDefault(); }
+  async onDrop(e) { e.preventDefault(); const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (file) await this.ingest(file); }
+  async ingest(file) {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    this.showToast('正在解析「' + file.name + '」…');
+    let text = '';
+    try {
+      if (ext === 'docx' && window.mammoth) { const ab = await file.arrayBuffer(); const r = await window.mammoth.extractRawText({ arrayBuffer: ab }); text = (r.value || '').trim(); }
+      else if (ext === 'pdf' && window.pdfjsLib) { text = await this.extractPdf(file); }
+      else if (ext === 'txt') { text = (await file.text()).trim(); }
+    } catch (err) { text = ''; }
+    const id = this.uid();
+    try { await this.idbPut(id, file); } catch (e) {}
+    this.setDb(db => db.resumes.unshift({ id, fileName: file.name, fileType: ext, size: file.size, uploadedAt: Date.now(), text }));
+    this.showToast(text ? '已上传并解析简历文字' : '已上传，但未能自动提取文字，分析时可手动粘贴');
+  }
+  async extractPdf(file) { const ab = await file.arrayBuffer(); const pdf = await window.pdfjsLib.getDocument({ data: ab }).promise; let out = ''; for (let i = 1; i <= pdf.numPages; i++) { const pg = await pdf.getPage(i); const tc = await pg.getTextContent(); out += tc.items.map(it => it.str).join(' ') + '\n'; } return out.trim(); }
+  async downloadResume(r) { try { const blob = await this.idbGet(r.id); if (!blob) { this.showToast('源文件已不在本机'); return; } const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = r.fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); } catch (e) { this.showToast('下载失败'); } }
+  delResume(r) { if (!confirm('删除简历文件「' + r.fileName + '」？')) return; this.idbDel(r.id); this.setDb(db => { db.resumes = db.resumes.filter(x => x.id !== r.id); }); this.showToast('已删除'); }
+
+  openModal(type, data) { this.setState({ modalType: type, form: Object.assign({}, data || {}), editId: (data && data.id) || null, aiError: null }); }
+  closeModal() { this.setState({ modalType: null, form: {}, editId: null }); }
+  stop(e) { e.stopPropagation(); }
+  setForm(k, v) { this.setState(s => ({ form: Object.assign({}, s.form, { [k]: v }) })); }
+  saveModal() {
+    const t = this.state.modalType, f = this.state.form, id = this.state.editId;
+    if (t === 'job') { if (!(f.company && f.role)) return this.showToast('请填写公司和岗位名称'); this.setDb(db => { if (id) Object.assign(db.jobs.find(x => x.id === id), f); else db.jobs.unshift(Object.assign({ id: this.uid(), createdAt: Date.now() }, f)); }); }
+    else if (t === 'application') { if (!(f.company && f.role)) return this.showToast('请填写公司和岗位名称'); this.setDb(db => { if (id) Object.assign(db.applications.find(x => x.id === id), f); else db.applications.unshift(Object.assign({ id: this.uid(), createdAt: Date.now(), status: f.status || '待投递', date: f.date || this.today() }, f)); }); }
+    else if (t === 'feedback') { if (!f.company) return this.showToast('请填写公司'); this.setDb(db => { if (id) Object.assign(db.feedback.find(x => x.id === id), f); else db.feedback.unshift(Object.assign({ id: this.uid(), createdAt: Date.now(), type: f.type || '无反馈' }, f)); }); }
+    else if (t === 'todo') { if (!f.text) return this.showToast('请填写待办内容'); this.setDb(db => { if (id) Object.assign(db.todos.find(x => x.id === id), f); else db.todos.unshift(Object.assign({ id: this.uid(), done: false, source: 'manual' }, f)); }); }
+    else if (t === 'version') { if (!f.name) return this.showToast('请填写版本名称'); this.setDb(db => { if (id) Object.assign(db.versions.find(x => x.id === id), f, { updatedAt: Date.now() }); else db.versions.unshift(Object.assign({ id: this.uid(), updatedAt: Date.now() }, f)); }); }
+    else if (t === 'profile') { this.setDb(db => { db.profile = Object.assign({}, f); }); }
+    this.showToast('已保存'); this.closeModal();
+  }
+
+  delJob(j) { if (!confirm('删除岗位「' + j.role + '」？')) return; this.setDb(db => { db.jobs = db.jobs.filter(x => x.id !== j.id); delete db.analyses[j.id]; }); }
+  delApp(a) { if (!confirm('删除这条投递记录？')) return; this.setDb(db => { db.applications = db.applications.filter(x => x.id !== a.id); }); }
+  delFeedback(f) { if (!confirm('删除这条反馈？')) return; this.setDb(db => { db.feedback = db.feedback.filter(x => x.id !== f.id); }); }
+  delTodo(t) { this.setDb(db => { db.todos = db.todos.filter(x => x.id !== t.id); }); }
+  delVersion(v) { if (!confirm('删除简历版本「' + v.name + '」？')) return; this.setDb(db => { db.versions = db.versions.filter(x => x.id !== v.id); }); }
+  toggleTodo(t) { this.setDb(db => { const x = db.todos.find(y => y.id === t.id); if (x) x.done = !x.done; }); }
+
+  curJobId() { const jobs = this.state.db.jobs; return this.state.matchJobId || (jobs[0] && jobs[0].id) || null; }
+  curResumeId() { const rs = this.state.db.resumes; return this.state.matchResumeId || (rs[0] && rs[0].id) || null; }
+  setMatchJob(e) { this.setState({ matchJobId: e.target.value, aiError: null }); }
+  setMatchResume(e) { this.setState({ matchResumeId: e.target.value }); }
+  setManualResume(e) { this.setForm('manualResume', e.target.value); }
+  getResumeText() { const r = this.state.db.resumes.find(x => x.id === this.curResumeId()); return (r && r.text) || this.state.form.manualResume || ''; }
+
+  // 调用后端 DeepSeek 代理（前端永远看不到 API Key）
+  async aiCall(path, body) {
+    const base = (this.props.apiBase || '').replace(/\/+$/, '');
+    let res;
+    try { res = await fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+    catch (e) { throw new Error('无法连接后端服务，请先按 server/README.md 启动 Node 服务并配置 DEEPSEEK_API_KEY。'); }
+    let data = null;
+    try { data = await res.json(); } catch (e) { throw new Error('后端返回了非 JSON 内容（HTTP ' + res.status + '），请检查服务日志。'); }
+    if (!res.ok || (data && data.error)) throw new Error((data && data.error) || ('请求失败（HTTP ' + res.status + '）'));
+    return data;
+  }
+  ensureAnalysis(db, jobId) { if (!db.analyses[jobId]) db.analyses[jobId] = {}; return db.analyses[jobId]; }
+
+  // 岗位弹窗：解析 JD 自动填表（POST /api/ai/analyze-jd）
+  async analyzeJd() {
+    const jd = (this.state.form.jd || '').trim();
+    if (!jd) return this.showToast('请先在下方粘贴岗位 JD');
+    this.setState({ aiLoading: true });
+    try {
+      const d = await this.aiCall('/api/ai/analyze-jd', { jdText: jd });
+      this.setState(s => ({ aiLoading: false, form: Object.assign({}, s.form, {
+        company: s.form.company || d.company || '',
+        role: s.form.role || d.position || '',
+        city: s.form.city || d.city || '',
+        direction: s.form.direction || d.jobType || '',
+        link: s.form.link || d.applicationLink || '',
+        parsed: d
+      }) }));
+      this.showToast('已解析并填入可编辑字段，请核对');
+    } catch (e) { this.setState({ aiLoading: false }); this.showToast(e.message); }
+  }
+
+  // 匹配分析（POST /api/ai/match-resume）
+  async matchResume() {
+    const jobId = this.curJobId();
+    const job = this.state.db.jobs.find(j => j.id === jobId);
+    if (!job) return this.showToast('请先选择岗位');
+    if (!job.jd || !job.jd.trim()) return this.setState({ aiError: '该岗位还没有 JD，请到「岗位」补充或用 AI 解析后再分析。' });
+    const resumeText = this.getResumeText();
+    if (!resumeText.trim()) return this.setState({ aiError: '没有可分析的简历文字，请上传可解析的简历或在上方粘贴简历内容。' });
+    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在分析匹配度…' });
+    try {
+      const d = await this.aiCall('/api/ai/match-resume', { resumeText, jdText: job.jd });
+      this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.match = d; a.matchedAt = Date.now(); });
+      this.setState({ aiLoading: false }); this.showToast('匹配分析完成');
+    } catch (e) { this.setState({ aiLoading: false, aiError: e.message }); }
+  }
+
+  // 修改建议（POST /api/ai/rewrite-resume）
+  async rewriteResume() {
+    const jobId = this.curJobId();
+    const job = this.state.db.jobs.find(j => j.id === jobId);
+    if (!job) return this.showToast('请先选择岗位');
+    if (!job.jd || !job.jd.trim()) return this.setState({ aiError: '该岗位还没有 JD。' });
+    const resumeText = this.getResumeText();
+    if (!resumeText.trim()) return this.setState({ aiError: '没有可分析的简历文字。' });
+    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在生成修改建议…' });
+    try {
+      const d = await this.aiCall('/api/ai/rewrite-resume', { resumeText, jdText: job.jd, targetSection: this.state.targetSection || '全部' });
+      (d.rewriteSuggestions || []).forEach(s => { s.confirmed = false; });
+      this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.rewrite = d; a.rewroteAt = Date.now(); });
+      this.setState({ aiLoading: false }); this.showToast('已生成修改建议');
+    } catch (e) { this.setState({ aiLoading: false, aiError: e.message }); }
+  }
+
+  // 投递材料（POST /api/ai/generate-application-note）
+  async generateNote() {
+    const jobId = this.curJobId();
+    const job = this.state.db.jobs.find(j => j.id === jobId);
+    if (!job) return this.showToast('请先选择岗位');
+    if (!job.jd || !job.jd.trim()) return this.setState({ aiError: '该岗位还没有 JD。' });
+    const resumeText = this.getResumeText();
+    if (!resumeText.trim()) return this.setState({ aiError: '没有可用的简历文字。' });
+    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在生成投递材料…' });
+    try {
+      const d = await this.aiCall('/api/ai/generate-application-note', { company: job.company || '', position: job.role || '', jdText: job.jd, resumeText });
+      this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.note = d; a.notedAt = Date.now(); });
+      this.setState({ aiLoading: false }); this.showToast('已生成投递材料草稿');
+    } catch (e) { this.setState({ aiLoading: false, aiError: e.message }); }
+  }
+
+  toggleSug(jobId, i) { this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].confirmed = !a.rewrite.rewriteSuggestions[i].confirmed; }); }
+  editSug(jobId, i, v) { this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].rewrittenText = v; }); }
+  setNoteField(field, v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.note) a.note[field] = v; }); }
+  copyNoteEmail() { const a = this.state.db.analyses[this.curJobId()]; const n = (a && a.note) || {}; this.copyText(((n.emailSubject || '') + '\n\n' + (n.emailBody || '')).trim()); }
+  addNoteTodos() {
+    const jobId = this.curJobId(); const a = this.state.db.analyses[jobId]; const job = this.state.db.jobs.find(j => j.id === jobId);
+    const items = (a && a.note && Array.isArray(a.note.followUpTodo)) ? a.note.followUpTodo : [];
+    if (!items.length) return this.showToast('没有可加入的待办');
+    this.setDb(db => { items.forEach(t => db.todos.unshift({ id: this.uid(), done: false, source: 'manual', text: t + (job ? '（' + (job.company || '') + '）' : ''), due: '' })); });
+    this.showToast('已加入 ' + items.length + ' 条待办');
+  }
+  copyText(t) { try { navigator.clipboard.writeText(t); this.showToast('已复制'); } catch (e) { this.showToast('复制失败，请手动选择'); } }
+
+  saveVersionFromRewrite() {
+    const jobId = this.curJobId();
+    const job = this.state.db.jobs.find(j => j.id === jobId);
+    const a = this.state.db.analyses[jobId];
+    if (!a || !a.rewrite) return;
+    const confirmed = (a.rewrite.rewriteSuggestions || []).filter(s => s.confirmed);
+    if (!confirmed.length) return this.showToast('请先勾选「采纳」且确认属实的建议');
+    const focus = confirmed.map(s => s.section).join('；');
+    let content = this.getResumeText();
+    confirmed.forEach(s => { if (s.originalText && content.indexOf(s.originalText) >= 0) content = content.split(s.originalText).join(s.rewrittenText || s.originalText); });
+    this.openModal('version', { name: ((job && (job.direction || job.role)) || '定制') + '版', targetJob: (job ? job.company + ' · ' + job.role : ''), focus, content });
+  }
+
+  exportVersion(v) { const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body><pre style="font-family:\u5b8b\u4f53,serif;font-size:11pt;line-height:1.6;white-space:pre-wrap;">' + this.esc(v.content || '') + '</pre></body></html>'; const blob = new Blob(['\ufeff', html], { type: 'application/msword' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = v.name + '.doc'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出 ' + v.name + '.doc'); }
+  exportCsv() { const rows = this.state.db.applications; if (!rows.length) return this.showToast('暂无投递记录'); const head = ['公司', '岗位', '城市', '投递渠道', '投递日期', '简历版本', '状态', '下一步', '备注']; const keys = ['company', 'role', 'city', 'channel', 'date', 'versionName', 'status', 'nextStep', 'note']; const csv = [head.join(',')].concat(rows.map(r => keys.map(k => '"' + String(r[k] == null ? '' : r[k]).replace(/"/g, '""') + '"').join(','))).join('\r\n'); const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = '\u6295\u9012\u8bb0\u5f55.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出 CSV'); }
+  exportAll() { const blob = new Blob([JSON.stringify(this.state.db, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = '\u6c42\u804c\u6570\u636e\u5907\u4efd.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出备份'); }
+  clearAll() { if (!confirm('确定清空全部数据？此操作不可恢复（建议先导出备份）。')) return; const empty = { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [] }; this.persist(empty); this.setState({ db: empty }); this.showToast('已清空'); }
+
+  buildFields() {
+    const t = this.state.modalType, f = this.state.form;
+    const inp = (key, label, ph, type) => ({ isInput: true, inputType: type || 'text', label, placeholder: ph || '', value: f[key] == null ? '' : f[key], handler: e => this.setForm(key, e.target.value) });
+    const area = (key, label, ph, tall) => ({ isArea: true, label, placeholder: ph || '', value: f[key] == null ? '' : f[key], handler: e => this.setForm(key, e.target.value), areaStyle: 'width:100%;height:' + (tall ? '160px' : '88px') + ';border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.7;outline:none;' });
+    const sel = (key, label, opts) => ({ isSelect: true, label, options: opts, value: f[key] == null ? opts[0] : f[key], handler: e => this.setForm(key, e.target.value) });
+    if (t === 'job') return [inp('company', '公司名称', '如：腾讯音乐'), inp('role', '岗位名称', '如：资金管理实习生'), inp('city', '城市', '如：深圳'), inp('direction', '岗位方向（用于命名简历版本）', '如：资金管理 / 财务BP'), inp('link', '投递链接', 'https://…'), area('jd', '岗位 JD（粘贴招聘信息）', '把岗位职责与任职要求粘贴到这里…', true), inp('source', '来源备注', '如：BOSS直聘 / 内推 / 学长转发')];
+    if (t === 'application') return [inp('company', '公司名称', ''), inp('role', '岗位名称', ''), inp('city', '城市', ''), inp('channel', '投递渠道', '如：官网 / BOSS / 内推 / 邮件'), inp('date', '投递日期', '', 'date'), inp('versionName', '使用的简历版本', '如：资金管理版'), sel('status', '当前状态', this.STATUSES), inp('nextStep', '下一步事项', '如：3 天后跟进 HR'), area('note', '备注', '')];
+    if (t === 'feedback') return [inp('company', '公司名称', ''), inp('role', '岗位名称', ''), sel('type', '反馈类型', this.FBTYPES), area('content', '反馈原文（可粘贴邮件 / 短信）', '把企业的回复原文如实粘贴到这里…', true), area('summary', '要点小结（手填）', ''), inp('nextStep', '我的下一步', '')];
+    if (t === 'todo') return [inp('text', '待办内容', '如：周五前完成某岗位网申'), inp('due', '截止日期', '', 'date')];
+    if (t === 'version') return [inp('name', '版本名称', '如：资金管理版'), inp('targetJob', '对应岗位', '如：腾讯音乐 · 资金管理实习生'), inp('focus', '修改重点', '如：突出资金账户、台账、对账经历'), area('content', '简历内容', '该版本的简历文字…', true)];
+    if (t === 'profile') return [inp('name', '姓名', ''), inp('school', '学校', ''), inp('major', '专业', ''), inp('phone', '电话', ''), inp('email', '邮箱', ''), inp('city', '期望城市', '')];
+    return [];
+  }
+
+  matchColor(n) { return n >= 85 ? 'var(--ac2)' : n >= 70 ? 'var(--ac)' : '#c2710c'; }
+  statusStyle(st) {
+    const map = { '待投递': ['#fff3e6', '#c2710c'], '已投递': ['#eef0ff', '#5a5ad8'], '笔试': ['#f1ecff', '#7a4fd0'], '面试': ['var(--ac2-soft)', 'var(--ac2)'], '已拒': ['#fdecec', '#d4544f'], '已offer': ['#e3f5ea', '#138a5a'], '暂停': ['#eef1f6', '#5b6b85'] };
+    const c = map[st] || ['#eef1f6', '#5b6b85'];
+    return 'font-size:11.5px;font-weight:600;border-radius:7px;padding:3px 9px;white-space:nowrap;background:' + c[0] + ';color:' + c[1] + ';';
+  }
+  fbTypeStyle(t) {
+    const map = { '收到笔试': ['#f1ecff', '#7a4fd0'], '收到面试': ['var(--ac2-soft)', 'var(--ac2)'], '被拒': ['#fdecec', '#d4544f'], '需要补材料': ['#fff3e6', '#c2710c'], '无反馈': ['#eef1f6', '#5b6b85'] };
+    const c = map[t] || ['#eef1f6', '#5b6b85'];
+    return 'font-size:11.5px;font-weight:600;border-radius:7px;padding:3px 9px;white-space:nowrap;background:' + c[0] + ';color:' + c[1] + ';';
+  }
+
+  renderVals() {
+    const S = this.state, db = S.db, page = S.page;
+
+    const navDefs = [
+      ['dashboard', '工作台', 'M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z', 0],
+      ['resume', '简历', 'M6 2h9l4 4v16H6z M15 2v5h5', db.versions.length],
+      ['jobs', '岗位', 'M3 7h18v13H3z M8 7V4h8v3', db.jobs.length],
+      ['match', '匹配分析', 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-4-4', 0],
+      ['apps', '投递记录', 'M4 5h16v15H4z M8 3v4M16 3v4M4 10h16', db.applications.length],
+      ['feedback', '反馈记录', 'M4 5h16v11H9l-4 4z', db.feedback.length],
+      ['todos', '求职待办', 'M9 11l3 3 8-8 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11', 0]
+    ];
+    const nav = navDefs.map(([key, label, iconPath, badge]) => {
+      const active = page === key;
+      return {
+        key, label, iconPath, badge, hasBadge: badge > 0,
+        go: () => this.go(key),
+        style: 'display:flex;align-items:center;gap:11px;width:100%;padding:10px 12px;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-family:inherit;text-align:left;margin-bottom:2px;'
+          + 'font-weight:' + (active ? '600' : '500') + ';background:' + (active ? 'var(--ac-soft)' : 'transparent') + ';color:' + (active ? 'var(--ac)' : '#5b6b85') + ';'
+      };
+    });
+
+    const titles = {
+      dashboard: ['工作台', '你的求职进度一览'],
+      resume: ['简历', '上传真实简历，管理不同岗位版本'],
+      jobs: ['岗位', '自己添加想投的岗位与 JD'],
+      match: ['匹配分析', '基于真实 JD 和简历，给出可确认的修改建议'],
+      apps: ['投递记录', '跟踪每一次真实投递的进度'],
+      feedback: ['反馈记录', '手动记录企业反馈与后续动作'],
+      todos: ['求职待办', '由你的投递记录自动汇总'],
+      settings: ['个人信息', '基本信息与数据管理']
+    };
+    const tt = titles[page] || ['', ''];
+
+    const prof = db.profile || {};
+    const profileName = prof.name || '未填写姓名';
+    const profileInitial = (prof.name && prof.name.trim()) ? prof.name.trim().charAt(0) : '+';
+    const profileSub = [prof.school, prof.major].filter(Boolean).join(' · ') || '点击完善信息';
+    const profileFields = [
+      { label: '姓名', value: prof.name || '—' }, { label: '学校', value: prof.school || '—' },
+      { label: '专业', value: prof.major || '—' }, { label: '电话', value: prof.phone || '—' },
+      { label: '邮箱', value: prof.email || '—' }, { label: '期望城市', value: prof.city || '—' }
+    ];
+
+    const headerActions = {
+      resume: { show: true, label: '上传简历', onClick: () => this.triggerUpload() },
+      jobs: { show: db.jobs.length > 0, label: '添加岗位', onClick: () => this.openModal('job') },
+      apps: { show: db.applications.length > 0, label: '新增记录', onClick: () => this.openModal('application') },
+      feedback: { show: true, label: '记录反馈', onClick: () => this.openModal('feedback') },
+      todos: { show: true, label: '添加待办', onClick: () => this.openModal('todo') }
+    };
+    const headerAction = headerActions[page] || { show: false };
+
+    // dashboard
+    const activeAppsAll = db.applications.filter(a => this.ACTIVE.includes(a.status));
+    const pendingTodos = db.todos.filter(t => !t.done);
+    const todoItems = [];
+    pendingTodos.forEach(t => todoItems.push({ text: t.text, sub: t.due ? '截止 ' + t.due : '我的待办', dot: 'var(--ac)' }));
+    activeAppsAll.filter(a => a.nextStep).forEach(a => todoItems.push({ text: a.nextStep, sub: a.company + ' · ' + a.role, dot: 'var(--ac2)' }));
+    const stats = [
+      { label: '简历版本', value: db.versions.length, unit: '个', go: () => this.go('resume') },
+      { label: '岗位', value: db.jobs.length, unit: '个', go: () => this.go('jobs') },
+      { label: '投递进行中', value: activeAppsAll.length, unit: '个', go: () => this.go('apps') },
+      { label: '待办', value: pendingTodos.length, unit: '条', go: () => this.go('todos') }
+    ];
+    const activeApps = activeAppsAll.slice(0, 6).map(a => ({ role: a.role, company: a.company, status: a.status, statusStyle: this.statusStyle(a.status) }));
+    const dashHasData = db.resumes.length || db.versions.length || db.jobs.length || db.applications.length || db.todos.length || db.feedback.length;
+
+    // resume
+    const resumeFiles = db.resumes.map(r => ({
+      fileName: r.fileName,
+      meta: (r.fileType || '').toUpperCase() + ' · ' + (r.size ? Math.max(1, Math.round(r.size / 1024)) + ' KB' : '') + ' · ' + this.fmt(r.uploadedAt),
+      parseLabel: r.text ? '已解析' : '未解析文字',
+      parseStyle: 'font-size:11.5px;font-weight:600;border-radius:7px;padding:4px 9px;white-space:nowrap;' + (r.text ? 'color:var(--ac2);background:var(--ac2-soft);' : 'color:#c2710c;background:#fff3e6;'),
+      download: () => this.downloadResume(r), del: () => this.delResume(r)
+    }));
+    const versionCards = db.versions.map(v => ({
+      name: v.name, updated: this.fmt(v.updatedAt), targetJob: v.targetJob || '—', focus: v.focus || '—',
+      export: () => this.exportVersion(v), edit: () => this.openModal('version', v), del: () => this.delVersion(v)
+    }));
+
+    // jobs
+    const jq = S.jobSearch.trim().toLowerCase();
+    const jobsFiltered = db.jobs.filter(j => !jq || ((j.company || '') + (j.role || '') + (j.city || '')).toLowerCase().indexOf(jq) >= 0);
+    const jobCards = jobsFiltered.map(j => {
+      const an = db.analyses[j.id];
+      const jm = an && an.match;
+      return {
+        role: j.role, company: j.company, cityText: j.city ? ' · ' + j.city : '', dir: j.direction || '',
+        analyzed: !!jm, notAnalyzed: !jm, score: jm ? (typeof jm.matchScore === 'number' ? jm.matchScore : (parseInt(jm.matchScore, 10) || 0)) : '',
+        hasLink: !!(j.link && j.link.trim()), link: j.link,
+        jdPreview: (j.jd || '（未填写 JD）').slice(0, 80),
+        analyze: () => this.setState({ matchJobId: j.id, page: 'match', aiError: null }),
+        edit: () => this.openModal('job', j), del: () => this.delJob(j)
+      };
+    });
+
+    // match
+    const jobs = db.jobs, resumes = db.resumes;
+    const curJobId = this.curJobId(), curResumeId = this.curResumeId();
+    const matchJobOptions = jobs.map(j => ({ id: j.id, label: (j.company || '') + ' · ' + (j.role || '') }));
+    const matchResumeOptions = resumes.map(r => ({ id: r.id, label: r.fileName + (r.text ? '' : '（未解析）') }));
+    const curJob = jobs.find(j => j.id === curJobId);
+    const curResume = resumes.find(r => r.id === curResumeId);
+    const matchNoResume = !((curResume && curResume.text) || (S.form.manualResume || '').trim());
+    const an = curJobId ? (db.analyses[curJobId] || null) : null;
+    const mat = an && an.match, rew = an && an.rewrite, note = an && an.note;
+    const hasMatch = !!mat, hasRewrite = !!(rew && rew.rewriteSuggestions), hasNote = !!note;
+    const aiBusy = S.aiLoading;
+    const arr = v => Array.isArray(v) ? v : [];
+    const circ = 2 * Math.PI * 46;
+    const matchScore = mat ? (typeof mat.matchScore === 'number' ? mat.matchScore : (parseInt(mat.matchScore, 10) || 0)) : 0;
+    const ringDash = (circ * matchScore / 100).toFixed(1) + ' ' + circ.toFixed(1);
+    const jdKeywords = (curJob && curJob.parsed && Array.isArray(curJob.parsed.keywords)) ? curJob.parsed.keywords : [];
+    let suggestions = [], sugAcceptedCount = 0, sugTotal = 0;
+    if (hasRewrite) {
+      const sugs = rew.rewriteSuggestions || [];
+      sugTotal = sugs.length;
+      suggestions = sugs.map((s, i) => {
+        const on = !!s.confirmed; if (on) sugAcceptedCount++;
+        return {
+          section: s.section || '简历', before: s.originalText || '', after: s.rewrittenText || '', reason: s.reason || '', needConfirm: !!s.truthCheckRequired,
+          cardStyle: 'background:#fff;border:1px solid ' + (on ? 'var(--ac2)' : '#ebeef4') + ';border-radius:14px;padding:17px 19px;',
+          btnLabel: on ? '✓ 已采纳' : '采纳',
+          btnStyle: 'margin-left:auto;border:none;border-radius:8px;padding:6px 15px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;' + (on ? 'background:var(--ac2);color:#fff;' : 'background:var(--ac2-soft);color:var(--ac2);'),
+          toggle: () => this.toggleSug(curJobId, i),
+          editAfter: e => this.editSug(curJobId, i, e.target.value)
+        };
+      });
+    }
+    const matchedPoints = mat ? arr(mat.matchedPoints) : [];
+    const missingPoints = mat ? arr(mat.missingPoints) : [];
+    const weakExpressions = mat ? arr(mat.weakExpressions) : [];
+    const suggestedFocus = mat ? arr(mat.suggestedResumeFocus) : [];
+    const riskWarnings = mat ? arr(mat.riskWarnings) : [];
+    const questionsForUser = mat ? arr(mat.questionsForUser) : [];
+    const rewriteQuestions = rew ? arr(rew.questionsForUser) : [];
+    const noteObj = note || {};
+    const interviewPrep = arr(noteObj.interviewPrep);
+    const followUpTodo = arr(noteObj.followUpTodo);
+    const noAnalysisYet = !hasMatch && !hasRewrite && !hasNote && !aiBusy && !S.aiError;
+
+    // apps
+    const aq = S.appSearch.trim().toLowerCase();
+    let appsFiltered = db.applications.filter(a => !aq || ((a.company || '') + (a.role || '')).toLowerCase().indexOf(aq) >= 0);
+    if (S.appStatus !== '全部') appsFiltered = appsFiltered.filter(a => a.status === S.appStatus);
+    const appRows = appsFiltered.map(a => ({
+      role: a.role, company: a.company, city: a.city || '—', channel: a.channel || '—', date: a.date || '—',
+      versionName: a.versionName || '—', status: a.status || '待投递', statusStyle: this.statusStyle(a.status || '待投递'),
+      nextStep: a.nextStep || '—', edit: () => this.openModal('application', a), del: () => this.delApp(a)
+    }));
+    const appSummary = [
+      { label: '总投递', value: db.applications.length, color: '#18223a' },
+      { label: '进行中', value: activeAppsAll.length, color: 'var(--ac)' },
+      { label: '面试中', value: db.applications.filter(a => a.status === '面试').length, color: 'var(--ac2)' },
+      { label: 'Offer', value: db.applications.filter(a => a.status === '已offer').length, color: '#138a5a' }
+    ];
+
+    // feedback
+    const feedbackCards = db.feedback.map(f => ({
+      title: (f.role ? f.role + ' · ' : '') + (f.company || ''), time: this.fmt(f.createdAt),
+      type: f.type || '无反馈', typeStyle: this.fbTypeStyle(f.type || '无反馈'),
+      summary: f.summary || '', nextStep: f.nextStep || '', content: f.content || '',
+      edit: () => this.openModal('feedback', f), del: () => this.delFeedback(f)
+    }));
+
+    // todos
+    const manualTodos = db.todos.map(t => ({
+      text: t.text, due: t.due || '', done: !!t.done,
+      doneStyle: t.done ? 'opacity:.55;' : '',
+      textStyle: t.done ? 'text-decoration:line-through;color:#93a0b8;' : '',
+      checkStyle: 'width:22px;height:22px;border-radius:7px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;border:1.5px solid ' + (t.done ? 'var(--ac2)' : '#cbd5e6') + ';background:' + (t.done ? 'var(--ac2)' : '#fff') + ';',
+      toggle: () => this.toggleTodo(t), edit: () => this.openModal('todo', t), del: () => this.delTodo(t)
+    }));
+    const autoTodos = activeAppsAll.filter(a => a.nextStep).map(a => ({ text: a.nextStep, sub: a.company + ' · ' + a.role + ' · ' + (a.status || '') }));
+
+    // modal
+    const modalFields = this.buildFields();
+    const modalTitleMap = { job: S.editId ? '编辑岗位' : '添加岗位', application: S.editId ? '编辑投递记录' : '新增投递记录', feedback: S.editId ? '编辑反馈' : '记录反馈', todo: S.editId ? '编辑待办' : '添加待办', version: S.editId ? '编辑简历版本' : '新建简历版本', profile: '编辑个人信息' };
+
+    return {
+      nav, pageTitle: tt[0], pageSubtitle: tt[1], headerAction,
+      profileName, profileInitial, profileSub, profileFields,
+      goSettings: () => this.go('settings'), goTodos: () => this.go('todos'), goApps: () => this.go('apps'),
+      triggerUpload: () => this.triggerUpload(), onFile: e => this.onFile(e), onDragOver: e => this.onDragOver(e), onDrop: e => this.onDrop(e),
+      openJobModal: () => this.openModal('job'), openAppModal: () => this.openModal('application'),
+      openFeedbackModal: () => this.openModal('feedback'), openTodoModal: () => this.openModal('todo'),
+      openVersionModal: () => this.openModal('version'), openProfileModal: () => this.openModal('profile', db.profile),
+
+      isDashboard: page === 'dashboard', isResume: page === 'resume', isJobs: page === 'jobs', isMatch: page === 'match',
+      isApps: page === 'apps', isFeedback: page === 'feedback', isTodos: page === 'todos', isSettings: page === 'settings',
+
+      dashEmpty: !dashHasData, dashHasData: !!dashHasData,
+      stats, todoItems, todoEmpty: todoItems.length === 0, activeApps, activeAppEmpty: activeApps.length === 0,
+
+      resumeFiles, resumesEmpty: db.resumes.length === 0, versionCards, versionsEmpty: db.versions.length === 0,
+
+      jobsEmpty: db.jobs.length === 0, jobsHas: db.jobs.length > 0, jobCards, jobCount: jobsFiltered.length,
+      jobSearch: S.jobSearch, setJobSearch: e => this.setState({ jobSearch: e.target.value }),
+
+      matchNoJobs: jobs.length === 0, matchReady: jobs.length > 0,
+      matchJobId: curJobId, matchResumeId: curResumeId, matchJobOptions, matchResumeOptions,
+      setMatchJob: e => this.setMatchJob(e), setMatchResume: e => this.setMatchResume(e),
+      matchNoResume, form: S.form, setManualResume: e => this.setManualResume(e),
+      targetSection: S.targetSection, setTargetSection: e => this.setState({ targetSection: e.target.value }), targetSectionOptions: ['全部', '个人总结', '实习经历', '项目经历', '技能'],
+      matchResume: () => this.matchResume(), rewriteResume: () => this.rewriteResume(), generateNote: () => this.generateNote(),
+      matchBtnLabel: aiBusy ? '分析中…' : (hasMatch ? '重新分析匹配度' : '分析匹配度'),
+      rewriteBtnLabel: aiBusy ? '生成中…' : (hasRewrite ? '重新生成修改建议' : '生成修改建议'),
+      noteBtnLabel: aiBusy ? '生成中…' : (hasNote ? '重新生成投递邮件' : '生成投递邮件'),
+      aiLoading: S.aiLoading, aiError: S.aiError,
+      hasMatch: hasMatch && !aiBusy, hasRewrite: hasRewrite && !aiBusy, hasNote: hasNote && !aiBusy, noAnalysisYet,
+      matchScore, matchTime: mat ? this.fmt(an.matchedAt) : '', ringDash,
+      hasJdKeywords: jdKeywords.length > 0, jdKeywords,
+      matchedPoints, matchedEmpty: hasMatch && matchedPoints.length === 0,
+      missingPoints, missingEmpty: hasMatch && missingPoints.length === 0,
+      hasWeak: weakExpressions.length > 0, weakExpressions,
+      hasFocus: suggestedFocus.length > 0, suggestedFocus,
+      hasRisks: riskWarnings.length > 0, riskWarnings,
+      hasQuestions: questionsForUser.length > 0, questionsForUser,
+      suggestions, sugAcceptedCount, sugTotal,
+      hasRewriteQuestions: rewriteQuestions.length > 0, rewriteQuestions,
+      saveVersionFromRewrite: () => this.saveVersionFromRewrite(),
+      noteSummary: noteObj.applicationSummary || '', noteSubject: noteObj.emailSubject || '', noteBody: noteObj.emailBody || '',
+      setNoteSubject: e => this.setNoteField('emailSubject', e.target.value), setNoteBody: e => this.setNoteField('emailBody', e.target.value),
+      copyNoteEmail: () => this.copyNoteEmail(), addNoteTodos: () => this.addNoteTodos(),
+      hasPrep: interviewPrep.length > 0, interviewPrep, hasFollowUp: followUpTodo.length > 0, followUpTodo,
+
+      appsEmpty: db.applications.length === 0, appsHas: db.applications.length > 0,
+      appRows, appRowsEmpty: appRows.length === 0 && db.applications.length > 0, appSummary,
+      appSearch: S.appSearch, setAppSearch: e => this.setState({ appSearch: e.target.value }),
+      appStatus: S.appStatus, setAppStatus: e => this.setState({ appStatus: e.target.value }), appStatusOptions: ['全部'].concat(this.STATUSES),
+      exportCsv: () => this.exportCsv(),
+
+      feedbackEmpty: db.feedback.length === 0, feedbackCards,
+
+      allTodosEmpty: manualTodos.length === 0 && autoTodos.length === 0, todosHas: manualTodos.length > 0 || autoTodos.length > 0,
+      manualTodos, autoTodos, hasManualTodos: manualTodos.length > 0, hasAutoTodos: autoTodos.length > 0,
+
+      exportAll: () => this.exportAll(), clearAll: () => this.clearAll(),
+
+      modalOpen: !!S.modalType, modalType: S.modalType, modalTitle: modalTitleMap[S.modalType] || '',
+      modalFields, modalAction: S.modalType === 'job' ? { show: true, label: S.aiLoading ? '解析中…' : '用 AI 解析 JD 自动填表', onClick: () => this.analyzeJd() } : { show: false },
+      closeModal: () => this.closeModal(), saveModal: () => this.saveModal(), stop: e => this.stop(e),
+
+      toast: S.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

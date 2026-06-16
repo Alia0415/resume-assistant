@@ -1,0 +1,8 @@
+# 防止把真实密钥提交到仓库
+.env
+.env.local
+node_modules/
+dist/
+build/
+npm-debug.log
+.DS_Store
