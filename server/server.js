@@ -57,6 +57,10 @@ function requireBasicAuth(req, res, next) {
 
 app.use(requireBasicAuth);
 
+app.get('/', (req, res) => {
+  res.redirect(302, encodeURI('/求职管家.dc.html'));
+});
+
 // 托管前端：项目根目录（server 的上一级），包含 求职管家.dc.html 与 support.js
 app.use(express.static(path.join(__dirname, '..')));
 
