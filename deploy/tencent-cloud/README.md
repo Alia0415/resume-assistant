@@ -12,6 +12,17 @@
    - `443`：HTTPS
 4. 不建议公网开放 `3000`。应用监听本机 `127.0.0.1:3000`，由 Nginx 转发。
 
+如果使用腾讯云控制台的“源码构建 / 容器镜像构建”方式，仓库根目录已提供 `Dockerfile`。构建配置选择：
+
+- Dockerfile 路径：`Dockerfile`
+- 构建上下文：`.`
+- 服务端口：`3000`
+- 启动命令：留空，使用 Dockerfile 默认 `CMD`
+
+容器部署时不要设置 `HOST=127.0.0.1`，否则容器外部无法访问服务。只在 CVM + Nginx 手动部署时使用 `HOST=127.0.0.1`。
+
+容器方式需要在腾讯云环境变量里填写 `DEEPSEEK_API_KEY`、`APP_USERNAME`、`APP_PASSWORD`；不要填写真实 `.env` 文件，也不要把 API Key 写进 Dockerfile。
+
 ## 二、服务器安装基础环境
 
 ```bash
