@@ -915,7 +915,6 @@ class Component extends DCLogic {
   setRewriteUserNotes(v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) a.rewrite.userNotes = v; }); }
   async polishRewriteUserNotes() {
     const jobId = this.curJobId();
-    const job = this.state.db.jobs.find(j => j.id === jobId);
     const a = this.state.db.analyses[jobId];
     const rew = a && a.rewrite;
     const userNotes = ((rew && rew.userNotes) || '').trim();
@@ -925,9 +924,7 @@ class Component extends DCLogic {
     try {
       const data = await this.aiCall('/api/ai/polish-confirmation-notes', {
         userNotes,
-        questions: Array.isArray(rew.questionsForUser) ? rew.questionsForUser : [],
-        resumeText: this.getResumeText(),
-        jdText: (job && job.jd) || ''
+        questions: Array.isArray(rew.questionsForUser) ? rew.questionsForUser : []
       });
       const polished = (data && data.polishedText) || userNotes;
       this.setDb(db => {

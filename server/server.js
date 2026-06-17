@@ -235,7 +235,7 @@ app.post('/api/ai/rewrite-resume', async (req, res) => {
 // ============================================================
 app.post('/api/ai/polish-confirmation-notes', async (req, res) => {
   try {
-    const { userNotes, questions, resumeText, jdText } = req.body || {};
+    const { userNotes, questions } = req.body || {};
     if (!requireText(userNotes, '补充说明（userNotes）', res)) return;
 
     const questionText = Array.isArray(questions) ? questions.join('\n') : '';
@@ -244,19 +244,17 @@ app.post('/api/ai/polish-confirmation-notes', async (req, res) => {
         role: 'system',
         content:
           '你是严谨的求职材料润色助手。' + ANTI_FABRICATION +
-          '你的任务只是润色用户已经写出的补充说明，让表达更清晰、专业、适合后续写进简历或投递材料。' +
-          '禁止新增用户未提供的经历、技能、证书、公司、数据、结果或时间。' +
+          '你的任务只是润色用户写出的这段补充说明本身，让它表达更清晰、专业、通顺，适合后续写进简历或投递材料。' +
+          '只能调整措辞、语序、标点和分点排版，必须完整保留用户提供的每一条事实信息，不得增加、删除或改写任何经历、技能、证书、公司、数据、结果或时间，也不得引入用户这段文字之外的任何内容。' +
           '如果用户补充说明里信息不足或需要核实，请保留谨慎表达，必要时用 [请补充/核实...] 占位。只输出一个 JSON 对象。',
       },
       {
         role: 'user',
         content:
-          '请润色下面【用户补充说明】，并以 JSON 输出，字段固定为：' +
+          '请只润色下面这段【用户补充说明】的文字表达，并以 JSON 输出，字段固定为：' +
           '{ "polishedText": "", "truthCheckWarnings": [], "questionsForUser": [] }。' +
-          '\npolishedText 要保留用户原意和真实性，可以分点；truthCheckWarnings 写需要用户核实的风险；questionsForUser 写还需要补充的问题。' +
-          '\n\n【AI 提出的问题】\n' + (questionText || '（无）') +
-          '\n\n【岗位 JD】\n' + (jdText || '（未提供）') +
-          '\n\n【简历文本】\n' + (resumeText || '（未提供）') +
+          '\npolishedText 是润色后的补充说明，必须与原文表达同样的事实、不增不减，可以分点；truthCheckWarnings 写这段说明里需要用户核实的风险；questionsForUser 写还需要用户补充的问题。' +
+          '\n\n【AI 提出的问题（仅供理解上下文，不要写进 polishedText）】\n' + (questionText || '（无）') +
           '\n\n【用户补充说明】\n' + userNotes,
       },
     ];
