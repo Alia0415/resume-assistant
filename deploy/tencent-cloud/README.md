@@ -140,6 +140,25 @@ sudo systemctl reload nginx
 - 腾讯云安全组/防火墙只开放 `22`、`80`、`443`。
 - API Key 只放在服务器 `/opt/resume-assistant/server/.env` 或腾讯云环境变量中。
 
+## 十、常见报错
+
+### `401 Authentication Fails, Your api key ... is invalid`
+
+这表示请求已经到达 DeepSeek，但 `DEEPSEEK_API_KEY` 无效。请在腾讯云环境变量里重新填写：
+
+```text
+DEEPSEEK_API_KEY=你的真实 DeepSeek API Key
+```
+
+注意：
+
+- 不要填变量名本身，例如不要把 value 写成 `DEEPSEEK_API_KEY`。
+- 不要填示例、占位符或被星号隐藏后的 key。
+- 不要加引号。
+- 不要开启腾讯云页面里的“API key 设置”开关；那里是腾讯云自己的 Key，不是 DeepSeek Key。
+- 如果不确定原来的 Key 是否可用，去 DeepSeek 控制台新建一个 API Key，再复制完整值到腾讯云环境变量。
+- 改完环境变量后必须重新部署或重启服务。
+
 ## 参考文档
 
 - 腾讯云 CVM：手动搭建 Node.js 环境

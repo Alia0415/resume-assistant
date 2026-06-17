@@ -78,6 +78,16 @@ function handleError(res, err) {
       error: 'AI 返回的内容无法解析为结构化数据，请重试。',
     });
   }
+  if (err && err.status === 401) {
+    return res.status(401).json({
+      error: 'AI 鉴权失败：DeepSeek API Key 无效。请在部署环境变量中重新填写 DEEPSEEK_API_KEY。',
+    });
+  }
+  if (err && err.status === 402) {
+    return res.status(402).json({
+      error: 'AI 调用失败：DeepSeek 账户余额不足，请检查 DeepSeek 控制台余额。',
+    });
+  }
   // DeepSeek SDK / 网络 / 鉴权等错误
   const status = (err && err.status) || 500;
   const msg = (err && err.message) || '服务器内部错误';
