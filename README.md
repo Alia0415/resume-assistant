@@ -51,3 +51,9 @@ Render 环境变量至少需要配置：
 - Build Command: `npm ci`
 - Start Command: `npm start`
 - Node Version: `20`
+
+腾讯云轻量应用服务器 / CVM 部署请看：
+
+```text
+deploy/tencent-cloud/README.md
+```

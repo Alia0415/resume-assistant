@@ -19,6 +19,7 @@ const { callDeepSeekJSON } = require('./lib/deepseek');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST;
 const PRO_MODEL = process.env.DEEPSEEK_MODEL_PRO; // 可选：深度改写用的更强模型
 
 app.use(cors());
@@ -256,8 +257,9 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, hasKey: !!(process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.trim()) });
 });
 
-app.listen(PORT, () => {
-  console.log('求职管家后端已启动: http://localhost:' + PORT);
+const listenArgs = HOST ? [PORT, HOST] : [PORT];
+app.listen(...listenArgs, () => {
+  console.log('求职管家后端已启动: http://' + (HOST || 'localhost') + ':' + PORT);
   if (!process.env.DEEPSEEK_API_KEY) {
     console.warn('⚠ 未检测到 DEEPSEEK_API_KEY，AI 接口会返回未配置错误。请在 server/.env 中填写。');
   }
