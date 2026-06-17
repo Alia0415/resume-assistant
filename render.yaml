@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: resume-assistant
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: deepseek-v4-flash
+      - key: DEEPSEEK_MODEL_PRO
+        value: deepseek-v4-pro
+      - key: APP_USERNAME
+        sync: false
+      - key: APP_PASSWORD
+        sync: false

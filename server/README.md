@@ -29,6 +29,8 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 | `DEEPSEEK_MODEL` | 默认模型 | `deepseek-v4-flash` |
 | `DEEPSEEK_MODEL_PRO` | 深度改写（rewrite-resume）优先使用的模型 | `deepseek-v4-pro` |
 | `PORT` | 服务端口 | `3000` |
+| `APP_USERNAME` | 公网部署访问保护用户名（建议生产环境填写） | 无 |
+| `APP_PASSWORD` | 公网部署访问保护密码（建议生产环境填写） | 无 |
 
 > `.env` 已被 `.gitignore` 忽略，不会提交，也不会暴露给前端。
 
@@ -94,6 +96,7 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 
 1. 上传整个项目（含 `server/` 与根目录的前端文件）。
 2. 在平台的环境变量里配置 `DEEPSEEK_API_KEY`（不要写进代码或提交 `.env`）。
-3. 启动命令 `node server/server.js`，确保前端文件在 `server/` 的上一级。
+3. 建议同时配置 `APP_USERNAME` 与 `APP_PASSWORD`，避免公网 URL 被别人直接使用并消耗你的 API 额度。
+4. 启动命令 `node server/server.js`，确保前端文件在 `server/` 的上一级。
 
 > 若前端与后端分开部署（不同域名），前端的「后端地址」可在工具的 Tweaks/属性里设置 `apiBase`，已默认开启 CORS。

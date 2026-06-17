@@ -32,3 +32,22 @@ http://localhost:3000/求职管家.dc.html
 - 不要把真实 DeepSeek API Key 写入前端 HTML、JS、README 或服务端代码。
 - 不要提交 `server/.env`、`.env`、`.env.local` 或 `server/.env.local`。
 - 不要提交 `node_modules/`、`dist/`、`build/` 或运行时上传文件。
+
+## 部署到公网
+
+推荐部署为一个 Node Web Service，让 Express 同时提供前端页面和 `/api/ai/*` 后端接口。本仓库已包含 `render.yaml`，可用于 Render Blueprint。
+
+Render 环境变量至少需要配置：
+
+- `DEEPSEEK_API_KEY`：你的真实 DeepSeek API Key
+- `APP_USERNAME`：公网访问用户名
+- `APP_PASSWORD`：公网访问密码
+
+不要把以上值写进代码或提交到 GitHub。设置 `APP_USERNAME` 和 `APP_PASSWORD` 后，公网访问页面和 API 都会要求浏览器登录，避免别人消耗你的 DeepSeek 额度。
+
+如果手动创建 Web Service：
+
+- Root Directory: `server`
+- Build Command: `npm ci`
+- Start Command: `npm start`
+- Node Version: `20`

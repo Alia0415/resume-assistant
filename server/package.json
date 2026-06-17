@@ -5,6 +5,9 @@
   "description": "简历投递工具后端：安全代理 DeepSeek API（API Key 仅保存在后端环境变量）",
   "type": "commonjs",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"

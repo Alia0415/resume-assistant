@@ -12,6 +12,7 @@
 require('dotenv').config();
 
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const { callDeepSeekJSON } = require('./lib/deepseek');
@@ -22,6 +23,38 @@ const PRO_MODEL = process.env.DEEPSEEK_MODEL_PRO; // 可选：深度改写用的
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+
+// Optional public-deploy protection. Set APP_USERNAME and APP_PASSWORD in the
+// hosting platform to require browser Basic Auth for all pages and APIs.
+function constantTimeEqual(a, b) {
+  const left = Buffer.from(String(a || ''));
+  const right = Buffer.from(String(b || ''));
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function requireBasicAuth(req, res, next) {
+  const expectedUser = process.env.APP_USERNAME;
+  const expectedPass = process.env.APP_PASSWORD;
+  if (!expectedUser || !expectedPass) return next();
+
+  const header = req.headers.authorization || '';
+  const match = header.match(/^Basic\s+(.+)$/i);
+  if (match) {
+    const decoded = Buffer.from(match[1], 'base64').toString('utf8');
+    const sep = decoded.indexOf(':');
+    const user = sep >= 0 ? decoded.slice(0, sep) : '';
+    const pass = sep >= 0 ? decoded.slice(sep + 1) : '';
+    if (constantTimeEqual(user, expectedUser) && constantTimeEqual(pass, expectedPass)) {
+      return next();
+    }
+  }
+
+  res.set('WWW-Authenticate', 'Basic realm="Resume Assistant"');
+  return res.status(401).send('Authentication required');
+}
+
+app.use(requireBasicAuth);
 
 // 托管前端：项目根目录（server 的上一级），包含 求职管家.dc.html 与 support.js
 app.use(express.static(path.join(__dirname, '..')));
@@ -227,5 +260,8 @@ app.listen(PORT, () => {
   console.log('求职管家后端已启动: http://localhost:' + PORT);
   if (!process.env.DEEPSEEK_API_KEY) {
     console.warn('⚠ 未检测到 DEEPSEEK_API_KEY，AI 接口会返回未配置错误。请在 server/.env 中填写。');
+  }
+  if (!process.env.APP_USERNAME || !process.env.APP_PASSWORD) {
+    console.warn('未配置 APP_USERNAME/APP_PASSWORD，公网部署时建议开启访问保护。');
   }
 });
