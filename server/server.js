@@ -230,7 +230,45 @@ app.post('/api/ai/rewrite-resume', async (req, res) => {
 });
 
 // ============================================================
-// 四、生成投递材料（投递摘要 + 邮件 + 面试准备 + 跟进待办）
+// 四、润色用户补充说明（只整理表达，不新增事实）
+// POST /api/ai/polish-confirmation-notes  { userNotes, questions, resumeText, jdText }
+// ============================================================
+app.post('/api/ai/polish-confirmation-notes', async (req, res) => {
+  try {
+    const { userNotes, questions, resumeText, jdText } = req.body || {};
+    if (!requireText(userNotes, '补充说明（userNotes）', res)) return;
+
+    const questionText = Array.isArray(questions) ? questions.join('\n') : '';
+    const messages = [
+      {
+        role: 'system',
+        content:
+          '你是严谨的求职材料润色助手。' + ANTI_FABRICATION +
+          '你的任务只是润色用户已经写出的补充说明，让表达更清晰、专业、适合后续写进简历或投递材料。' +
+          '禁止新增用户未提供的经历、技能、证书、公司、数据、结果或时间。' +
+          '如果用户补充说明里信息不足或需要核实，请保留谨慎表达，必要时用 [请补充/核实...] 占位。只输出一个 JSON 对象。',
+      },
+      {
+        role: 'user',
+        content:
+          '请润色下面【用户补充说明】，并以 JSON 输出，字段固定为：' +
+          '{ "polishedText": "", "truthCheckWarnings": [], "questionsForUser": [] }。' +
+          '\npolishedText 要保留用户原意和真实性，可以分点；truthCheckWarnings 写需要用户核实的风险；questionsForUser 写还需要补充的问题。' +
+          '\n\n【AI 提出的问题】\n' + (questionText || '（无）') +
+          '\n\n【岗位 JD】\n' + (jdText || '（未提供）') +
+          '\n\n【简历文本】\n' + (resumeText || '（未提供）') +
+          '\n\n【用户补充说明】\n' + userNotes,
+      },
+    ];
+    const data = await callDeepSeekJSON(messages, { temperature: 0.25, maxTokens: 1400 });
+    res.json(data);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+// ============================================================
+// 五、生成投递材料（投递摘要 + 邮件 + 面试准备 + 跟进待办）
 // POST /api/ai/generate-application-note  { company, position, jdText, resumeText }
 // ============================================================
 app.post('/api/ai/generate-application-note', async (req, res) => {

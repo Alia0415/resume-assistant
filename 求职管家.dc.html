@@ -452,6 +452,10 @@
                     <sc-for list="{{ rewriteQuestions }}" as="e" hint-placeholder-count="0"><div style="font-size:12px;color:#7a5410;line-height:1.6;">· {{ e }}</div></sc-for>
                   </div>
                   <textarea value="{{ rewriteUserNotes }}" onInput="{{ setRewriteUserNotes }}" placeholder="把你的真实补充写在这里，例如相关项目、课程作业、学习经历、可核实的数据等…" style="width:100%;height:104px;margin-top:12px;border:1px solid #e6d3a8;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;color:#5f420c;outline:none;background:#fff;"></textarea>
+                  <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
+                    <button onClick="{{ polishRewriteUserNotes }}" style="background:#fff;color:#9a6411;border:1px solid #e6d3a8;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ polishNotesBtnLabel }}</button>
+                    <span style="font-size:11.5px;color:#9a6411;">只润色你填写的真实内容，不新增经历。</span>
+                  </div>
                 </div>
               </sc-if>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;flex-wrap:wrap;">
@@ -909,6 +913,37 @@ class Component extends DCLogic {
   toggleSug(jobId, i) { this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].confirmed = !a.rewrite.rewriteSuggestions[i].confirmed; }); }
   editSug(jobId, i, v) { this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].rewrittenText = v; }); }
   setRewriteUserNotes(v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) a.rewrite.userNotes = v; }); }
+  async polishRewriteUserNotes() {
+    const jobId = this.curJobId();
+    const job = this.state.db.jobs.find(j => j.id === jobId);
+    const a = this.state.db.analyses[jobId];
+    const rew = a && a.rewrite;
+    const userNotes = ((rew && rew.userNotes) || '').trim();
+    if (!rew) return this.showToast('请先生成修改建议');
+    if (!userNotes) return this.showToast('请先填写补充说明');
+    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在润色补充说明…' });
+    try {
+      const data = await this.aiCall('/api/ai/polish-confirmation-notes', {
+        userNotes,
+        questions: Array.isArray(rew.questionsForUser) ? rew.questionsForUser : [],
+        resumeText: this.getResumeText(),
+        jdText: (job && job.jd) || ''
+      });
+      const polished = (data && data.polishedText) || userNotes;
+      this.setDb(db => {
+        const x = db.analyses[jobId];
+        if (x && x.rewrite) {
+          x.rewrite.userNotes = polished;
+          x.rewrite.userNoteWarnings = (data && data.truthCheckWarnings) || [];
+          x.rewrite.userNoteQuestions = (data && data.questionsForUser) || [];
+        }
+      });
+      this.setState({ aiLoading: false });
+      this.showToast('已润色补充说明');
+    } catch (e) {
+      this.setState({ aiLoading: false, aiError: e.message });
+    }
+  }
   setNoteField(field, v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.note) a.note[field] = v; }); }
   copyNoteEmail() { const a = this.state.db.analyses[this.curJobId()]; const n = (a && a.note) || {}; this.copyText(((n.emailSubject || '') + '\n\n' + (n.emailBody || '')).trim()); }
   addNoteTodos() {
@@ -1186,6 +1221,7 @@ class Component extends DCLogic {
       hasQuestions: questionsForUser.length > 0, questionsForUser,
       suggestions, sugAcceptedCount, sugTotal,
       hasRewriteQuestions: rewriteQuestions.length > 0, rewriteQuestions, rewriteUserNotes, setRewriteUserNotes: e => this.setRewriteUserNotes(e.target.value),
+      polishRewriteUserNotes: () => this.polishRewriteUserNotes(), polishNotesBtnLabel: aiBusy ? '润色中…' : 'AI 自动润色',
       saveVersionFromRewrite: () => this.saveVersionFromRewrite(),
       noteSummary: noteObj.applicationSummary || '', noteSubject: noteObj.emailSubject || '', noteBody: noteObj.emailBody || '',
       setNoteSubject: e => this.setNoteField('emailSubject', e.target.value), setNoteBody: e => this.setNoteField('emailBody', e.target.value),
