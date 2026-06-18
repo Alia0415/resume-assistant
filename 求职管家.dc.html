@@ -985,12 +985,16 @@ class Component extends DCLogic {
     }
     this.showToast('源文件不在本机，且未在云端找到');
   }
-  delResume(r) {
+  async delResume(r) {
     if (!confirm('删除简历文件「' + r.fileName + '」？')) return;
     this.idbDel(r.id); // 删本机缓存
-    if (r.fileId) { fetch('/api/files/' + encodeURIComponent(r.fileId), { method: 'DELETE', credentials: 'same-origin' }).catch(() => {}); } // 同步删云端原文件
+    let cloudOk = true;
+    if (r.fileId) {
+      try { const res = await fetch('/api/files/' + encodeURIComponent(r.fileId), { method: 'DELETE', credentials: 'same-origin' }); cloudOk = res.ok; }
+      catch (e) { cloudOk = false; }
+    }
     this.setDb(db => { db.resumes = db.resumes.filter(x => x.id !== r.id); });
-    this.showToast('已删除');
+    this.showToast(cloudOk ? '已删除' : '已从列表移除，但云端原文件删除失败（已记录，可稍后重试）');
   }
 
   openModal(type, data) { this.setState({ modalType: type, form: Object.assign({}, data || {}), editId: (data && data.id) || null, aiError: null }); }

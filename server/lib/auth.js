@@ -148,29 +148,59 @@ async function getUserData(uid) {
   const map = loadUserDataMap();
   return map[id] || null;
 }
-// baseRevision = 前端读取时的 revision；与云端当前 revision 不一致则抛 REVISION_CONFLICT，禁止覆盖。
+function tcbUpdatedCount(r) {
+  if (!r) return 0;
+  if (typeof r.updated === 'number') return r.updated;
+  if (r.stats && typeof r.stats.updated === 'number') return r.stats.updated;
+  return 0;
+}
+function revisionConflict(current) {
+  const err = new Error('数据已在别处更新，请刷新后再保存');
+  err.code = 'REVISION_CONFLICT';
+  err.current = current;
+  return err;
+}
+// 原子的 Compare-and-Set：只有云端 revision 仍等于 baseRevision 时才更新；revision 自增与数据写入
+// 在数据库内同一原子操作完成。并发的相同 base 请求只有一个成功，另一个抛 REVISION_CONFLICT（409）。
 async function setUserData(uid, data, baseRevision, updatedAt) {
   if (!uid) throw new Error('缺少用户标识');
   const id = String(uid);
   const at = Number(updatedAt) || Date.now();
   const clean = sanitizeUserData(data);
-  const current = await getUserData(id);
-  const currentRev = (current && current.revision) || 0;
-  if (baseRevision != null && Number(baseRevision) !== currentRev) {
-    const err = new Error('数据已在别处更新，请刷新后再保存');
-    err.code = 'REVISION_CONFLICT';
-    err.current = current;
-    throw err;
-  }
-  const nextRev = currentRev + 1;
-  const record = { uid: id, data: clean, updatedAt: at, revision: nextRev };
+  const base = baseRevision == null ? null : Number(baseRevision);
+
   if (USE_TCB) {
-    await tcbDb().collection(TCB_DATA_COLLECTION).doc(id).set(record);
-  } else {
-    const map = loadUserDataMap();
-    map[id] = record;
-    saveUserDataMap(map);
+    const coll = tcbDb().collection(TCB_DATA_COLLECTION);
+    if (base != null) {
+      // 条件原子更新：仅当该 _id 文档当前 revision === base 时命中并自增（MongoDB 单文档原子）。
+      const r = await coll.where({ _id: id, revision: base }).update({ data: clean, updatedAt: at, revision: base + 1 });
+      if (tcbUpdatedCount(r) >= 1) return { updatedAt: at, revision: base + 1 };
+      // 未命中：文档不存在（仅 base===0 合法新建）或 revision 已变。
+      if (base === 0) {
+        try {
+          await coll.add({ _id: id, uid: id, data: clean, updatedAt: at, revision: 1 }); // _id 唯一约束 → 原子防并发重复创建
+          return { updatedAt: at, revision: 1 };
+        } catch (e) {
+          throw revisionConflict(await getUserData(id)); // 并发已创建 / 已存在 → 冲突
+        }
+      }
+      throw revisionConflict(await getUserData(id));
+    }
+    // 无 baseRevision（少见，仅兜底）：读当前后写入。
+    const cur0 = await getUserData(id);
+    const rev0 = ((cur0 && cur0.revision) || 0) + 1;
+    await coll.doc(id).set({ uid: id, data: clean, updatedAt: at, revision: rev0 });
+    return { updatedAt: at, revision: rev0 };
   }
+
+  // 本地文件后端：同步「读-校验-写」（中间无 await）→ 单进程内原子，并发同 base 仅一个成功。
+  const map = loadUserDataMap();
+  const cur = map[id];
+  const currentRev = (cur && cur.revision) || 0;
+  if (base != null && base !== currentRev) throw revisionConflict(cur || null);
+  const nextRev = currentRev + 1;
+  map[id] = { uid: id, data: clean, updatedAt: at, revision: nextRev };
+  saveUserDataMap(map);
   return { updatedAt: at, revision: nextRev };
 }
 
@@ -201,13 +231,24 @@ async function saveResumeFile(uid, fileName, buffer) {
   if (USE_TCB) {
     const r = await tcbApp().uploadFile({ cloudPath: 'resumes/' + idSafe(uid) + '/' + fileId + '.' + ext, fileContent: buffer });
     meta.cloudFileID = (r && r.fileID) || '';
-    await tcbDb().collection(TCB_FILES_COLLECTION).doc(fileId).set(meta);
+    try {
+      await tcbDb().collection(TCB_FILES_COLLECTION).doc(fileId).set(meta);
+    } catch (e) {
+      // 元数据写入失败 → 回滚已上传的云文件，避免留下没有元数据的孤儿文件。
+      if (meta.cloudFileID) { try { await tcbApp().deleteFile({ fileList: [meta.cloudFileID] }); } catch (_) {} }
+      throw e;
+    }
   } else {
     const dir = path.join(FILES_DIR, idSafe(uid));
     fs.mkdirSync(dir, { recursive: true });
     meta.localPath = path.join(dir, fileId + '.' + ext);
     fs.writeFileSync(meta.localPath, buffer);
-    const map = loadFilesMeta(); map[fileId] = meta; saveFilesMeta(map);
+    try {
+      const map = loadFilesMeta(); map[fileId] = meta; saveFilesMeta(map);
+    } catch (e) {
+      try { fs.unlinkSync(meta.localPath); } catch (_) {} // 回滚已写入的本地文件
+      throw e;
+    }
   }
   return { fileId: meta.fileId, fileName: meta.fileName, mime: meta.mime, size: meta.size, uploadedAt: meta.uploadedAt };
 }
@@ -230,12 +271,43 @@ async function getResumeFileDownload(meta) {
   }
   return { buffer: fs.readFileSync(meta.localPath), mime: meta.mime, fileName: meta.fileName };
 }
+function isNotFoundError(e) {
+  const s = ((e && (e.code || e.message)) || '').toString().toLowerCase();
+  return (s.includes('not') && s.includes('exist')) || s.includes('nonexist') || s.includes('notfound') || s.includes('404');
+}
+// 先删文件、再删元数据：文件不存在视为已删除；文件删除真失败则保留元数据并抛错（可重试，不静默忽略）。
 async function deleteResumeFile(meta) {
+  if (!meta) return; // 重复删除 / 已不存在 → 安全返回
   if (USE_TCB) {
-    if (meta.cloudFileID) { try { await tcbApp().deleteFile({ fileList: [meta.cloudFileID] }); } catch (e) {} }
+    if (meta.cloudFileID) {
+      let fileErr = null;
+      try {
+        const r = await tcbApp().deleteFile({ fileList: [meta.cloudFileID] });
+        const item = r && r.fileList && r.fileList[0];
+        const code = item && item.code;
+        if (code && String(code).toUpperCase() !== 'SUCCESS' && !isNotFoundError({ code: code })) {
+          fileErr = new Error('云存储删除失败：' + code);
+        }
+      } catch (e) {
+        if (!isNotFoundError(e)) fileErr = e; // 文件本就不存在 → 视为已删除
+      }
+      if (fileErr) {
+        console.error('[FILE delete] 云文件删除失败，已保留元数据待重试 fileId=' + meta.fileId + '：' + fileErr.message);
+        throw fileErr; // 不静默忽略；元数据保留，调用方可重试
+      }
+    }
     try { await tcbDb().collection(TCB_FILES_COLLECTION).doc(meta.fileId).remove(); } catch (e) {}
   } else {
-    try { if (meta.localPath) fs.unlinkSync(meta.localPath); } catch (e) {}
+    if (meta.localPath) {
+      try {
+        fs.unlinkSync(meta.localPath);
+      } catch (e) {
+        if (e.code !== 'ENOENT') { // ENOENT = 文件已不存在，继续清元数据；其它错误则保留元数据待重试
+          console.error('[FILE delete] 本地文件删除失败，已保留元数据待重试 fileId=' + meta.fileId + '：' + e.message);
+          throw e;
+        }
+      }
+    }
     const map = loadFilesMeta(); delete map[meta.fileId]; saveFilesMeta(map);
   }
 }
