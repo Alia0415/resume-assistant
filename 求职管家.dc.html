@@ -479,18 +479,17 @@
               <sc-if value="{{ hasRewriteQuestions }}" hint-placeholder-val="{{ false }}">
                 <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:12px;padding:14px 16px;margin-top:13px;">
                   <div style="font-size:12.5px;font-weight:700;color:#9a6411;margin-bottom:6px;">需要你补充确认</div>
-                  <div style="font-size:11.5px;color:#9a6411;margin-bottom:11px;line-height:1.6;">选「是 / 否」即可，需要时再补充链接或一句话；点下方按钮即可据此生成补充说明。</div>
+                  <div style="font-size:11.5px;color:#9a6411;margin-bottom:11px;line-height:1.6;">每题选「是 / 否」，或选「其他」自己补充说明；点下方按钮即可据此生成补充说明。</div>
                   <div style="display:flex;flex-direction:column;gap:10px;">
                     <sc-for list="{{ rewriteQuestionItems }}" as="q" hint-placeholder-count="0">
                       <div style="background:#fff;border:1px solid #f0e2c2;border-radius:10px;padding:11px 13px;">
                         <div style="font-size:12.5px;color:#5f420c;line-height:1.6;margin-bottom:9px;">{{ q.text }}</div>
-                        <sc-if value="{{ q.isYesno }}" hint-placeholder-val="{{ false }}">
-                          <div style="display:flex;gap:8px;">
-                            <button onClick="{{ q.pickYes }}" style="{{ q.yesStyle }}">是</button>
-                            <button onClick="{{ q.pickNo }}" style="{{ q.noStyle }}">否</button>
-                          </div>
-                        </sc-if>
-                        <sc-if value="{{ q.showDetail }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                          <button onClick="{{ q.pickYes }}" style="{{ q.yesStyle }}">是</button>
+                          <button onClick="{{ q.pickNo }}" style="{{ q.noStyle }}">否</button>
+                          <button onClick="{{ q.pickOther }}" style="{{ q.otherStyle }}">其他</button>
+                        </div>
+                        <sc-if value="{{ q.showOther }}" hint-placeholder-val="{{ false }}">
                           <input value="{{ q.detail }}" onInput="{{ q.setDetail }}" placeholder="{{ q.detailHint }}" style="width:100%;margin-top:9px;border:1px solid #e6d3a8;border-radius:8px;padding:8px 11px;font-size:12.5px;color:#5f420c;outline:none;background:#fff;">
                         </sc-if>
                       </div>
@@ -1119,18 +1118,14 @@ class Component extends DCLogic {
     const ans = rew.qAnswers || {};
     const lines = [];
     qs.forEach((raw, i) => {
-      const q = (typeof raw === 'string') ? { question: raw, type: 'text' } : (raw || {});
+      const q = (typeof raw === 'string') ? { question: raw } : (raw || {});
       const an = ans[i] || {};
       const detail = (an.detail || '').trim();
-      if (q.type === 'yesno') {
-        if (an.choice) {
-          let line = '· ' + (q.question || '') + ' —— ' + an.choice;
-          // 仅当选「是」且该问题需要补充细节时，才附上 detail，避免改选「否」后残留旧链接
-          if (an.choice === '是' && q.detailOnYes && detail) line += '：' + detail;
-          lines.push(line);
-        }
-      } else if (detail) {
-        lines.push('· ' + (q.question || '') + '：' + detail);
+      // 三选项：是 / 否 / 其他。仅「其他」会带上自定义补充文字。
+      if (an.choice === '其他') {
+        lines.push('· ' + (q.question || '') + ' —— ' + (detail || '其他'));
+      } else if (an.choice === '是' || an.choice === '否') {
+        lines.push('· ' + (q.question || '') + ' —— ' + an.choice);
       }
     });
     if (!lines.length) return this.showToast('请先在上方选择或填写');
@@ -1391,20 +1386,21 @@ class Component extends DCLogic {
     const qAns = (rew && rew.qAnswers) || {};
     const chipBase = 'border:none;border-radius:7px;padding:6px 18px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;';
     const rewriteQuestionItems = (rew ? arr(rew.questionsForUser) : []).map((raw, i) => {
-      const q = (typeof raw === 'string') ? { question: raw, type: 'text' } : (raw || {});
-      const isYesno = q.type === 'yesno';
+      const q = (typeof raw === 'string') ? { question: raw } : (raw || {});
       const ans = qAns[i] || {};
       const choice = ans.choice || '';
+      const off = 'background:#f0e9d8;color:#8a6a2a;';
       return {
         text: q.question || '',
-        isYesno: isYesno,
-        showDetail: isYesno ? (!!q.detailOnYes && choice === '是') : true,
+        showOther: choice === '其他', // 选「其他」才展开补充输入框
         detail: ans.detail == null ? '' : ans.detail,
-        detailHint: q.detailHint || (isYesno ? '可补充链接或简要说明…' : '在这里填写…'),
-        yesStyle: chipBase + (choice === '是' ? 'background:var(--ac2);color:#fff;' : 'background:#f0e9d8;color:#8a6a2a;'),
-        noStyle: chipBase + (choice === '否' ? 'background:#d9694e;color:#fff;' : 'background:#f0e9d8;color:#8a6a2a;'),
+        detailHint: q.detailHint || '补充说明，例如相关链接、一句话经历…',
+        yesStyle: chipBase + (choice === '是' ? 'background:var(--ac2);color:#fff;' : off),
+        noStyle: chipBase + (choice === '否' ? 'background:#d9694e;color:#fff;' : off),
+        otherStyle: chipBase + (choice === '其他' ? 'background:var(--ac);color:#fff;' : off),
         pickYes: () => this.setQAnswerChoice(i, '是'),
         pickNo: () => this.setQAnswerChoice(i, '否'),
+        pickOther: () => this.setQAnswerChoice(i, '其他'),
         setDetail: e => this.setQAnswerDetail(i, e.target.value)
       };
     });
