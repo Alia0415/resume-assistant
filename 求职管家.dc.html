@@ -13,6 +13,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&amp;display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+  window.JM_USER = (function () { try { var m = document.cookie.match(/(?:^|; )jm_user=([^;]*)/); return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } })();
+  window.JM_STORE_KEY = function () { return window.JM_USER ? ('jm_data_v1::' + window.JM_USER) : 'jm_data_v1'; };
+  window.jmLogout = function () { fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).then(function () { location.href = '/login.html'; }).catch(function () { location.href = '/login.html'; }); };
+</script>
 <style>
   html,body{height:100%;margin:0;}
   *{box-sizing:border-box;}
@@ -56,6 +61,12 @@
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ profileName }}</div>
         <div style="font-size:11px;color:#93a0b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ profileSub }}</div>
       </div>
+    </button>
+
+    <button onClick="{{ logout }}" style="margin:0 11px 14px;display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:11px;background:#fff;border:1px solid #eef1f6;cursor:pointer;text-align:left;font-family:inherit;color:#7e8aa3;font-size:12.5px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
+      <span style="flex:1;">退出登录</span>
+      <span style="color:#aab4c8;max-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ loginName }}</span>
     </button>
   </aside>
 
@@ -296,12 +307,12 @@
                 </select>
               </div>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;">
-              <button onClick="{{ matchResume }}" style="background:var(--ac);color:#fff;border:none;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ matchBtnLabel }}</button>
-              <button onClick="{{ rewriteResume }}" style="background:var(--ac2-soft);color:var(--ac2);border:none;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ rewriteBtnLabel }}</button>
-              <button onClick="{{ generateNote }}" style="background:#fff;color:#3a485f;border:1px solid #e2e8f0;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ noteBtnLabel }}</button>
+            <div style="display:flex;gap:6px;margin-top:14px;background:#f1f4f9;border-radius:11px;padding:4px;">
+              <button onClick="{{ selectMatchTab }}" style="{{ matchTabStyle }}">匹配度分析</button>
+              <button onClick="{{ selectRewriteTab }}" style="{{ rewriteTabStyle }}">简历修改建议</button>
+              <button onClick="{{ selectNoteTab }}" style="{{ noteTabStyle }}">投递邮件</button>
             </div>
-            <div style="font-size:11.5px;color:#a6b0c2;margin-top:10px;line-height:1.6;">全部基于真实数据由 DeepSeek 分析：匹配度与修改建议都来自你的 JD 与简历；投递邮件仅供参考，请核对属实后再用。</div>
+            <div style="font-size:11.5px;color:#a6b0c2;margin-top:10px;line-height:1.6;">一次只显示一个任务的结果；切换标签不会重新生成。全部基于真实数据由 DeepSeek 分析，投递邮件仅供参考，请核对属实后再用。</div>
           </div>
 
           <sc-if value="{{ matchNoResume }}" hint-placeholder-val="{{ false }}">
@@ -322,8 +333,18 @@
             </div>
           </sc-if>
 
-          <sc-if value="{{ hasMatch }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ showMatch }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              <div style="font-size:14px;font-weight:700;">匹配度分析</div>
+              <button onClick="{{ matchResume }}" style="background:var(--ac-soft);color:var(--ac);border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">重新分析匹配度</button>
+            </div>
+            <sc-if value="{{ matchStale }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:10px;padding:10px 13px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <span style="font-size:12px;color:#9a6411;line-height:1.6;">你已采纳修改建议，简历内容已变化，建议重新分析匹配度。</span>
+                <button onClick="{{ matchResume }}" style="background:#fff;color:#9a6411;border:1px solid #e6d3a8;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">重新分析</button>
+              </div>
+            </sc-if>
             <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:22px;display:flex;gap:24px;align-items:center;">
               <div style="position:relative;width:112px;height:112px;flex-shrink:0;">
                 <svg width="112" height="112" viewBox="0 0 112 112">
@@ -414,11 +435,14 @@
           </div>
           </sc-if>
 
-          <sc-if value="{{ hasRewrite }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ showRewrite }}" hint-placeholder-val="{{ false }}">
             <div style="margin-bottom:16px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
                 <div style="font-size:14px;font-weight:700;">简历修改建议<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">逐条「原文 / 改后 / 理由」，可编辑，确认属实后保存为版本</span></div>
-                <span style="font-size:12.5px;color:var(--ac2);font-weight:600;">已采纳 {{ sugAcceptedCount }} / {{ sugTotal }}</span>
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <span style="font-size:12.5px;color:var(--ac2);font-weight:600;">已采纳 {{ sugAcceptedCount }} / {{ sugTotal }}</span>
+                  <button onClick="{{ rewriteResume }}" style="background:var(--ac2-soft);color:var(--ac2);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">重新生成</button>
+                </div>
               </div>
               <div style="display:flex;flex-direction:column;gap:13px;">
                 <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="0">
@@ -447,10 +471,25 @@
               </div>
               <sc-if value="{{ hasRewriteQuestions }}" hint-placeholder-val="{{ false }}">
                 <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:12px;padding:14px 16px;margin-top:13px;">
-                  <div style="font-size:12.5px;font-weight:700;color:#9a6411;margin-bottom:8px;">需要你补充确认</div>
-                  <div style="display:flex;flex-direction:column;gap:7px;">
-                    <sc-for list="{{ rewriteQuestions }}" as="e" hint-placeholder-count="0"><div style="font-size:12px;color:#7a5410;line-height:1.6;">· {{ e }}</div></sc-for>
+                  <div style="font-size:12.5px;font-weight:700;color:#9a6411;margin-bottom:6px;">需要你补充确认</div>
+                  <div style="font-size:11.5px;color:#9a6411;margin-bottom:11px;line-height:1.6;">选「是 / 否」即可，需要时再补充链接或一句话；点下方按钮即可据此生成补充说明。</div>
+                  <div style="display:flex;flex-direction:column;gap:10px;">
+                    <sc-for list="{{ rewriteQuestionItems }}" as="q" hint-placeholder-count="0">
+                      <div style="background:#fff;border:1px solid #f0e2c2;border-radius:10px;padding:11px 13px;">
+                        <div style="font-size:12.5px;color:#5f420c;line-height:1.6;margin-bottom:9px;">{{ q.text }}</div>
+                        <sc-if value="{{ q.isYesno }}" hint-placeholder-val="{{ false }}">
+                          <div style="display:flex;gap:8px;">
+                            <button onClick="{{ q.pickYes }}" style="{{ q.yesStyle }}">是</button>
+                            <button onClick="{{ q.pickNo }}" style="{{ q.noStyle }}">否</button>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ q.showDetail }}" hint-placeholder-val="{{ false }}">
+                          <input value="{{ q.detail }}" onInput="{{ q.setDetail }}" placeholder="{{ q.detailHint }}" style="width:100%;margin-top:9px;border:1px solid #e6d3a8;border-radius:8px;padding:8px 11px;font-size:12.5px;color:#5f420c;outline:none;background:#fff;">
+                        </sc-if>
+                      </div>
+                    </sc-for>
                   </div>
+                  <button onClick="{{ applyAnswersToNotes }}" style="margin-top:11px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">用我的选择填写补充说明 ↓</button>
                   <textarea value="{{ rewriteUserNotes }}" onInput="{{ setRewriteUserNotes }}" placeholder="把你的真实补充写在这里，例如相关项目、课程作业、学习经历、可核实的数据等…" style="width:100%;height:104px;margin-top:12px;border:1px solid #e6d3a8;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;color:#5f420c;outline:none;background:#fff;"></textarea>
                   <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
                     <button onClick="{{ polishRewriteUserNotes }}" style="background:#fff;color:#9a6411;border:1px solid #e6d3a8;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ polishNotesBtnLabel }}</button>
@@ -465,9 +504,15 @@
             </div>
           </sc-if>
 
-          <sc-if value="{{ hasNote }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ showNote }}" hint-placeholder-val="{{ false }}">
             <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px 22px;margin-bottom:16px;">
-              <div style="font-size:14px;font-weight:700;margin-bottom:14px;">投递材料草稿<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">仅供参考，请核对属实后再用</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+                <div style="font-size:14px;font-weight:700;">投递材料草稿<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">可直接编辑，确认后导出 Word</span></div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <button onClick="{{ exportNote }}" style="display:flex;align-items:center;gap:6px;background:var(--ac);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>导出 Word</button>
+                  <button onClick="{{ generateNote }}" style="background:#fff;color:#3a485f;border:1px solid #e2e8f0;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">重新生成</button>
+                </div>
+              </div>
               <sc-if value="{{ noteSummary }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:#3a485f;line-height:1.7;margin-bottom:13px;"><b style="color:#6b7a96;font-weight:500;">投递定位：</b>{{ noteSummary }}</div></sc-if>
               <div style="margin-bottom:12px;">
                 <div style="font-size:12px;color:#6b7a96;margin-bottom:6px;">邮件标题</div>
@@ -492,9 +537,22 @@
             </div>
           </sc-if>
 
-          <sc-if value="{{ noAnalysisYet }}" hint-placeholder-val="{{ true }}">
-            <div style="background:#fff;border:1px dashed #d6deea;border-radius:14px;padding:44px;text-align:center;color:#93a0b8;font-size:13.5px;line-height:1.7;">
-              选择岗位与简历后，点击上方按钮。<br>所有结果都来自 DeepSeek 对你真实 JD 与简历的分析，不会编造任何经历。
+          <sc-if value="{{ emptyMatch }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#fff;border:1px dashed #d6deea;border-radius:14px;padding:40px;text-align:center;color:#93a0b8;font-size:13.5px;line-height:1.8;">
+              还没有匹配度分析。结果来自 DeepSeek 对你真实 JD 与简历的分析，不会编造经历。<br>
+              <button onClick="{{ matchResume }}" style="margin-top:14px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:10px 20px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">分析匹配度</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ emptyRewrite }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px dashed #d6deea;border-radius:14px;padding:40px;text-align:center;color:#93a0b8;font-size:13.5px;line-height:1.8;">
+              还没有简历修改建议。AI 只在你真实简历的基础上优化表达，不新增经历。<br>
+              <button onClick="{{ rewriteResume }}" style="margin-top:14px;background:var(--ac2);color:#fff;border:none;border-radius:9px;padding:10px 20px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">生成修改建议</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ emptyNote }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px dashed #d6deea;border-radius:14px;padding:40px;text-align:center;color:#93a0b8;font-size:13.5px;line-height:1.8;">
+              还没有投递材料。生成后可直接编辑并导出 Word。<br>
+              <button onClick="{{ generateNote }}" style="margin-top:14px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:10px 20px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">生成投递邮件</button>
             </div>
           </sc-if>
         </sc-if>
@@ -745,11 +803,19 @@
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:860},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#2f6fed&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;apiBase&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
 class Component extends DCLogic {
   state = {
-    db: (() => { try { return JSON.parse(localStorage.getItem('jm_data_v1')) || null; } catch (e) { return null; } })()
+    db: (() => {
+      try {
+        const key = window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1';
+        let raw = localStorage.getItem(key);
+        // 首次登录该账号时，沿用旧版未分账号的本地数据，避免丢失。
+        if (raw == null && key !== 'jm_data_v1') raw = localStorage.getItem('jm_data_v1');
+        return JSON.parse(raw) || null;
+      } catch (e) { return null; }
+    })()
       || { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [] },
     page: 'dashboard', modalType: null, form: {}, editId: null,
     toast: null, aiLoading: false, aiError: null,
-    matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '',
+    matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
     jobSearch: '', appSearch: '', appStatus: '全部'
   };
 
@@ -764,7 +830,7 @@ class Component extends DCLogic {
   componentDidUpdate(prev) { if (prev.accentColor !== this.props.accentColor) this.applyAccent(); }
   applyAccent() { const a = this.props.accentColor; if (a) document.documentElement.style.setProperty('--ac', a); }
 
-  persist(db) { try { localStorage.setItem('jm_data_v1', JSON.stringify(db)); } catch (e) {} }
+  persist(db) { try { localStorage.setItem(window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1', JSON.stringify(db)); } catch (e) {} }
   setDb(mut) { this.setState(s => { const db = JSON.parse(JSON.stringify(s.db)); mut(db); this.persist(db); return { db }; }); }
   uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -869,10 +935,10 @@ class Component extends DCLogic {
     if (!job.jd || !job.jd.trim()) return this.setState({ aiError: '该岗位还没有 JD，请到「岗位」补充或用 AI 解析后再分析。' });
     const resumeText = this.getResumeText();
     if (!resumeText.trim()) return this.setState({ aiError: '没有可分析的简历文字，请上传可解析的简历或在上方粘贴简历内容。' });
-    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在分析匹配度…' });
+    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在分析匹配度…', matchTab: 'match' });
     try {
       const d = await this.aiCall('/api/ai/match-resume', { resumeText, jdText: job.jd });
-      this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.match = d; a.matchedAt = Date.now(); });
+      this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.match = d; a.matchedAt = Date.now(); a.matchAdoptCount = (a.rewrite && Array.isArray(a.rewrite.rewriteSuggestions)) ? a.rewrite.rewriteSuggestions.filter(s => s.confirmed).length : 0; });
       this.setState({ aiLoading: false }); this.showToast('匹配分析完成');
     } catch (e) { this.setState({ aiLoading: false, aiError: e.message }); }
   }
@@ -885,7 +951,7 @@ class Component extends DCLogic {
     if (!job.jd || !job.jd.trim()) return this.setState({ aiError: '该岗位还没有 JD。' });
     const resumeText = this.getResumeText();
     if (!resumeText.trim()) return this.setState({ aiError: '没有可分析的简历文字。' });
-    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在生成修改建议…' });
+    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在生成修改建议…', matchTab: 'rewrite' });
     try {
       const d = await this.aiCall('/api/ai/rewrite-resume', { resumeText, jdText: job.jd, targetSection: this.state.targetSection || '全部' });
       (d.rewriteSuggestions || []).forEach(s => { s.confirmed = false; });
@@ -902,7 +968,7 @@ class Component extends DCLogic {
     if (!job.jd || !job.jd.trim()) return this.setState({ aiError: '该岗位还没有 JD。' });
     const resumeText = this.getResumeText();
     if (!resumeText.trim()) return this.setState({ aiError: '没有可用的简历文字。' });
-    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在生成投递材料…' });
+    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在生成投递材料…', matchTab: 'note' });
     try {
       const d = await this.aiCall('/api/ai/generate-application-note', { company: job.company || '', position: job.role || '', jdText: job.jd, resumeText });
       this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.note = d; a.notedAt = Date.now(); });
@@ -913,6 +979,44 @@ class Component extends DCLogic {
   toggleSug(jobId, i) { this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].confirmed = !a.rewrite.rewriteSuggestions[i].confirmed; }); }
   editSug(jobId, i, v) { this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].rewrittenText = v; }); }
   setRewriteUserNotes(v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) a.rewrite.userNotes = v; }); }
+  setQAnswerChoice(i, val) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) { if (!a.rewrite.qAnswers) a.rewrite.qAnswers = {}; const cur = a.rewrite.qAnswers[i] || {}; cur.choice = (cur.choice === val ? '' : val); a.rewrite.qAnswers[i] = cur; } }); }
+  setQAnswerDetail(i, val) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) { if (!a.rewrite.qAnswers) a.rewrite.qAnswers = {}; const cur = a.rewrite.qAnswers[i] || {}; cur.detail = val; a.rewrite.qAnswers[i] = cur; } }); }
+  applyAnswersToNotes() {
+    const jobId = this.curJobId(); const a = this.state.db.analyses[jobId]; const rew = a && a.rewrite;
+    if (!rew) return this.showToast('请先生成修改建议');
+    const qs = Array.isArray(rew.questionsForUser) ? rew.questionsForUser : [];
+    const ans = rew.qAnswers || {};
+    const lines = [];
+    qs.forEach((raw, i) => {
+      const q = (typeof raw === 'string') ? { question: raw, type: 'text' } : (raw || {});
+      const an = ans[i] || {};
+      const detail = (an.detail || '').trim();
+      if (q.type === 'yesno') {
+        if (an.choice) {
+          let line = '· ' + (q.question || '') + ' —— ' + an.choice;
+          // 仅当选「是」且该问题需要补充细节时，才附上 detail，避免改选「否」后残留旧链接
+          if (an.choice === '是' && q.detailOnYes && detail) line += '：' + detail;
+          lines.push(line);
+        }
+      } else if (detail) {
+        lines.push('· ' + (q.question || '') + '：' + detail);
+      }
+    });
+    if (!lines.length) return this.showToast('请先在上方选择或填写');
+    // 不覆盖用户手写/润色过的内容：保留 MARK 之前的自由文本，只替换由选择整理出的托管段落（可重复点击且幂等）
+    const MARK = '【根据选择整理】';
+    const composed = MARK + '\n' + lines.join('\n');
+    this.setDb(db => {
+      const x = db.analyses[jobId];
+      if (x && x.rewrite) {
+        const prev = x.rewrite.userNotes || '';
+        const idx = prev.indexOf(MARK);
+        const manual = (idx >= 0 ? prev.slice(0, idx) : prev).replace(/\s+$/, '');
+        x.rewrite.userNotes = manual ? (manual + '\n\n' + composed) : composed;
+      }
+    });
+    this.showToast('已把你的选择整理进补充说明（不会覆盖你手写的内容）');
+  }
   async polishRewriteUserNotes() {
     const jobId = this.curJobId();
     const a = this.state.db.analyses[jobId];
@@ -966,6 +1070,26 @@ class Component extends DCLogic {
   }
 
   exportVersion(v) { const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body><pre style="font-family:\u5b8b\u4f53,serif;font-size:11pt;line-height:1.6;white-space:pre-wrap;">' + this.esc(v.content || '') + '</pre></body></html>'; const blob = new Blob(['\ufeff', html], { type: 'application/msword' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = v.name + '.doc'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出 ' + v.name + '.doc'); }
+  exportNote() {
+    const jobId = this.curJobId(); const a = this.state.db.analyses[jobId]; const n = (a && a.note) || null;
+    const job = this.state.db.jobs.find(j => j.id === jobId);
+    if (!n) return this.showToast('请先生成投递材料');
+    const esc = s => this.esc(s == null ? '' : s);
+    const arr = v => Array.isArray(v) ? v : [];
+    const liList = items => arr(items).map(x => '<li style="margin-bottom:4px;">' + esc(x) + '</li>').join('');
+    const title = (((job && job.company) || '') + ((job && job.role) ? ' ' + job.role : '')).trim() || '投递材料';
+    const blocks = [];
+    if (n.applicationSummary) blocks.push('<p><b>投递定位：</b>' + esc(n.applicationSummary) + '</p>');
+    blocks.push('<h3>投递邮件</h3>');
+    blocks.push('<p><b>标题：</b>' + esc(n.emailSubject || '') + '</p>');
+    blocks.push('<pre style="font-family:宋体,serif;font-size:11pt;line-height:1.7;white-space:pre-wrap;">' + esc(n.emailBody || '') + '</pre>');
+    if (arr(n.interviewPrep).length) blocks.push('<h3>面试准备要点</h3><ul>' + liList(n.interviewPrep) + '</ul>');
+    if (arr(n.followUpTodo).length) blocks.push('<h3>跟进待办</h3><ul>' + liList(n.followUpTodo) + '</ul>');
+    const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body style="font-family:宋体,serif;font-size:11pt;line-height:1.7;"><h2>' + esc(title) + ' · 投递材料</h2>' + blocks.join('') + '</body></html>';
+    const blob = new Blob(['﻿', html], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob); const el = document.createElement('a'); el.href = url; el.download = title + '-投递材料.doc'; el.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+    this.showToast('已导出投递材料.doc');
+  }
   exportCsv() { const rows = this.state.db.applications; if (!rows.length) return this.showToast('暂无投递记录'); const head = ['公司', '岗位', '城市', '投递渠道', '投递日期', '简历版本', '状态', '下一步', '备注']; const keys = ['company', 'role', 'city', 'channel', 'date', 'versionName', 'status', 'nextStep', 'note']; const csv = [head.join(',')].concat(rows.map(r => keys.map(k => '"' + String(r[k] == null ? '' : r[k]).replace(/"/g, '""') + '"').join(','))).join('\r\n'); const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = '\u6295\u9012\u8bb0\u5f55.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出 CSV'); }
   exportAll() { const blob = new Blob([JSON.stringify(this.state.db, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = '\u6c42\u804c\u6570\u636e\u5907\u4efd.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出备份'); }
   clearAll() { if (!confirm('确定清空全部数据？此操作不可恢复（建议先导出备份）。')) return; const empty = { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [] }; this.persist(empty); this.setState({ db: empty }); this.showToast('已清空'); }
@@ -1132,12 +1256,40 @@ class Component extends DCLogic {
     const suggestedFocus = mat ? arr(mat.suggestedResumeFocus) : [];
     const riskWarnings = mat ? arr(mat.riskWarnings) : [];
     const questionsForUser = mat ? arr(mat.questionsForUser) : [];
-    const rewriteQuestions = rew ? arr(rew.questionsForUser) : [];
+    // 补充确认问题：结构化成可点选的控件（兼容旧的纯字符串）
+    const qAns = (rew && rew.qAnswers) || {};
+    const chipBase = 'border:none;border-radius:7px;padding:6px 18px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;';
+    const rewriteQuestionItems = (rew ? arr(rew.questionsForUser) : []).map((raw, i) => {
+      const q = (typeof raw === 'string') ? { question: raw, type: 'text' } : (raw || {});
+      const isYesno = q.type === 'yesno';
+      const ans = qAns[i] || {};
+      const choice = ans.choice || '';
+      return {
+        text: q.question || '',
+        isYesno: isYesno,
+        showDetail: isYesno ? (!!q.detailOnYes && choice === '是') : true,
+        detail: ans.detail == null ? '' : ans.detail,
+        detailHint: q.detailHint || (isYesno ? '可补充链接或简要说明…' : '在这里填写…'),
+        yesStyle: chipBase + (choice === '是' ? 'background:var(--ac2);color:#fff;' : 'background:#f0e9d8;color:#8a6a2a;'),
+        noStyle: chipBase + (choice === '否' ? 'background:#d9694e;color:#fff;' : 'background:#f0e9d8;color:#8a6a2a;'),
+        pickYes: () => this.setQAnswerChoice(i, '是'),
+        pickNo: () => this.setQAnswerChoice(i, '否'),
+        setDetail: e => this.setQAnswerDetail(i, e.target.value)
+      };
+    });
+    const hasRewriteQuestions = rewriteQuestionItems.length > 0;
     const rewriteUserNotes = (rew && rew.userNotes) || '';
     const noteObj = note || {};
     const interviewPrep = arr(noteObj.interviewPrep);
     const followUpTodo = arr(noteObj.followUpTodo);
-    const noAnalysisYet = !hasMatch && !hasRewrite && !hasNote && !aiBusy && !S.aiError;
+
+    // 匹配分析的三个任务改成「标签页」：一次只显示一个任务；切换标签不会触发重新生成。
+    const activeTab = S.matchTab || (hasMatch ? 'match' : (hasRewrite ? 'rewrite' : (hasNote ? 'note' : 'match')));
+    const tabMatch = activeTab === 'match', tabRewrite = activeTab === 'rewrite', tabNote = activeTab === 'note';
+    const matchStale = hasMatch && hasRewrite && sugAcceptedCount > ((an && an.matchAdoptCount) || 0);
+    const tabBase = 'flex:1;border:none;border-radius:8px;padding:9px 0;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s;';
+    const tabOn = tabBase + 'background:#fff;color:var(--ac);box-shadow:0 1px 3px rgba(31,53,90,.10);';
+    const tabOff = tabBase + 'background:transparent;color:#7e8aa3;';
 
     // apps
     const aq = S.appSearch.trim().toLowerCase();
@@ -1180,6 +1332,7 @@ class Component extends DCLogic {
     return {
       nav, pageTitle: tt[0], pageSubtitle: tt[1], headerAction,
       profileName, profileInitial, profileSub, profileFields,
+      loginName: (typeof window !== 'undefined' && window.JM_USER) || '', logout: () => { if (window.jmLogout) window.jmLogout(); },
       goSettings: () => this.go('settings'), goTodos: () => this.go('todos'), goApps: () => this.go('apps'),
       triggerUpload: () => this.triggerUpload(), onFile: e => this.onFile(e), onDragOver: e => this.onDragOver(e), onDrop: e => this.onDrop(e),
       openJobModal: () => this.openModal('job'), openAppModal: () => this.openModal('application'),
@@ -1207,7 +1360,13 @@ class Component extends DCLogic {
       rewriteBtnLabel: aiBusy ? '生成中…' : (hasRewrite ? '重新生成修改建议' : '生成修改建议'),
       noteBtnLabel: aiBusy ? '生成中…' : (hasNote ? '重新生成投递邮件' : '生成投递邮件'),
       aiLoading: S.aiLoading, aiError: S.aiError,
-      hasMatch: hasMatch && !aiBusy, hasRewrite: hasRewrite && !aiBusy, hasNote: hasNote && !aiBusy, noAnalysisYet,
+      hasMatch: hasMatch && !aiBusy, hasRewrite: hasRewrite && !aiBusy, hasNote: hasNote && !aiBusy,
+      showMatch: tabMatch && hasMatch && !aiBusy, showRewrite: tabRewrite && hasRewrite && !aiBusy, showNote: tabNote && hasNote && !aiBusy,
+      emptyMatch: tabMatch && !hasMatch && !aiBusy, emptyRewrite: tabRewrite && !hasRewrite && !aiBusy, emptyNote: tabNote && !hasNote && !aiBusy,
+      tabMatch, tabRewrite, tabNote, matchStale,
+      matchTabStyle: tabMatch ? tabOn : tabOff, rewriteTabStyle: tabRewrite ? tabOn : tabOff, noteTabStyle: tabNote ? tabOn : tabOff,
+      selectMatchTab: () => this.setState({ matchTab: 'match' }), selectRewriteTab: () => this.setState({ matchTab: 'rewrite' }), selectNoteTab: () => this.setState({ matchTab: 'note' }),
+      exportNote: () => this.exportNote(),
       matchScore, matchTime: mat ? this.fmt(an.matchedAt) : '', ringDash,
       hasJdKeywords: jdKeywords.length > 0, jdKeywords,
       matchedPoints, matchedEmpty: hasMatch && matchedPoints.length === 0,
@@ -1217,7 +1376,7 @@ class Component extends DCLogic {
       hasRisks: riskWarnings.length > 0, riskWarnings,
       hasQuestions: questionsForUser.length > 0, questionsForUser,
       suggestions, sugAcceptedCount, sugTotal,
-      hasRewriteQuestions: rewriteQuestions.length > 0, rewriteQuestions, rewriteUserNotes, setRewriteUserNotes: e => this.setRewriteUserNotes(e.target.value),
+      hasRewriteQuestions, rewriteQuestionItems, applyAnswersToNotes: () => this.applyAnswersToNotes(), rewriteUserNotes, setRewriteUserNotes: e => this.setRewriteUserNotes(e.target.value),
       polishRewriteUserNotes: () => this.polishRewriteUserNotes(), polishNotesBtnLabel: aiBusy ? '润色中…' : 'AI 自动润色',
       saveVersionFromRewrite: () => this.saveVersionFromRewrite(),
       noteSummary: noteObj.applicationSummary || '', noteSubject: noteObj.emailSubject || '', noteBody: noteObj.emailBody || '',

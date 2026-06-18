@@ -12,50 +12,82 @@
 require('dotenv').config();
 
 const path = require('path');
-const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const { callDeepSeekJSON } = require('./lib/deepseek');
+const auth = require('./lib/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST;
 const PRO_MODEL = process.env.DEEPSEEK_MODEL_PRO; // 可选：深度改写用的更强模型
+const ALLOW_REGISTRATION = String(process.env.ALLOW_REGISTRATION || 'true').toLowerCase() !== 'false';
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-// Optional public-deploy protection. Set APP_USERNAME and APP_PASSWORD in the
-// hosting platform to require browser Basic Auth for all pages and APIs.
-function constantTimeEqual(a, b) {
-  const left = Buffer.from(String(a || ''));
-  const right = Buffer.from(String(b || ''));
-  if (left.length !== right.length) return false;
-  return crypto.timingSafeEqual(left, right);
-}
+// ============================================================
+// 账号认证（多用户：注册 / 登录 / 退出）
+// 登录态用 HttpOnly 签名 Cookie 保持；密码用 scrypt 加盐哈希存储。
+// 以下 /api/auth/* 与 /api/health 公开，放在登录门禁之前。
+// ============================================================
+const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,32}$/;
 
-function requireBasicAuth(req, res, next) {
-  const expectedUser = process.env.APP_USERNAME;
-  const expectedPass = process.env.APP_PASSWORD;
-  if (!expectedUser || !expectedPass) return next();
-
-  const header = req.headers.authorization || '';
-  const match = header.match(/^Basic\s+(.+)$/i);
-  if (match) {
-    const decoded = Buffer.from(match[1], 'base64').toString('utf8');
-    const sep = decoded.indexOf(':');
-    const user = sep >= 0 ? decoded.slice(0, sep) : '';
-    const pass = sep >= 0 ? decoded.slice(sep + 1) : '';
-    if (constantTimeEqual(user, expectedUser) && constantTimeEqual(pass, expectedPass)) {
-      return next();
-    }
+app.post('/api/auth/register', (req, res) => {
+  if (!ALLOW_REGISTRATION) return res.status(403).json({ error: '当前未开放注册，请联系管理员。' });
+  const { username, password, displayName } = req.body || {};
+  const name = String(username || '').trim();
+  if (!USERNAME_RE.test(name)) return res.status(400).json({ error: '用户名需为 2–32 位字母、数字或 _ . - 组合。' });
+  if (typeof password !== 'string' || password.length < 6) return res.status(400).json({ error: '密码至少 6 位。' });
+  try {
+    const user = auth.createUser(name, password, displayName);
+    auth.setAuthCookies(req, res, user);
+    return res.json({ ok: true, user: { username: user.username, displayName: user.displayName } });
+  } catch (err) {
+    if (err && err.code === 'DUP_USER') return res.status(409).json({ error: '该用户名已被注册。' });
+    console.error('[AUTH register]', err && err.message);
+    return res.status(500).json({ error: '注册失败：' + ((err && err.message) || '服务器内部错误') });
   }
+});
 
-  res.set('WWW-Authenticate', 'Basic realm="Resume Assistant"');
-  return res.status(401).send('Authentication required');
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body || {};
+  const user = auth.findUser(username);
+  if (!user || !auth.verifyPassword(password || '', user.passHash)) {
+    return res.status(401).json({ error: '用户名或密码错误。' });
+  }
+  auth.setAuthCookies(req, res, user);
+  return res.json({ ok: true, user: { username: user.username, displayName: user.displayName } });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  auth.clearAuthCookies(res);
+  return res.json({ ok: true });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const session = auth.getSession(req);
+  if (!session) return res.json({ authenticated: false });
+  return res.json({ authenticated: true, username: session.u });
+});
+
+// 健康检查：前端可用它判断后端与 Key 是否就绪
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, hasKey: !!(process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.trim()) });
+});
+
+// ---------- 登录门禁：保护前端页面与所有 AI 接口 ----------
+const PUBLIC_PATHS = new Set(['/login.html', '/favicon.ico']);
+function requireAuth(req, res, next) {
+  let p = req.path;
+  try { p = decodeURIComponent(req.path); } catch (e) {}
+  if (PUBLIC_PATHS.has(p)) return next();
+  const session = auth.getSession(req);
+  if (session) { req.user = session; return next(); }
+  if (p.startsWith('/api/')) return res.status(401).json({ error: '未登录或登录已过期，请重新登录。', code: 'UNAUTH' });
+  return res.redirect(302, '/login.html');
 }
-
-app.use(requireBasicAuth);
+app.use(requireAuth);
 
 app.get('/', (req, res) => {
   res.redirect(302, encodeURI('/求职管家.dc.html'));
@@ -210,9 +242,13 @@ app.post('/api/ai/rewrite-resume', async (req, res) => {
         content:
           '请针对简历的「' + section + '」部分，结合岗位 JD 给出改写建议，并以 JSON 输出，字段固定为：' +
           '{ "rewriteSuggestions": [ { "section": "", "originalText": "", "rewrittenText": "", "reason": "", "truthCheckRequired": true } ], ' +
-          '"overallNotes": [], "questionsForUser": [] }。' +
+          '"overallNotes": [], "questionsForUser": [ { "question": "", "type": "yesno", "detailOnYes": false, "detailHint": "" } ] }。' +
           '\n每条建议必须给出：对应模块 section、简历中的原文 originalText（尽量摘录真实句子）、改写后 rewrittenText、修改理由 reason、是否需要核实真实性 truthCheckRequired。' +
-          '\noverallNotes 为整体注意事项；questionsForUser 为需要我补充真实信息的问题。给出 2-5 条 rewriteSuggestions。' +
+          '\noverallNotes 为整体注意事项。' +
+          '\nquestionsForUser 为需要用户补充真实信息的问题，每条是一个对象，目标是让用户用最少的输入就能回答：' +
+          'question 为问题原文；type 取 "yesno"（用户只需选「是 / 否」）或 "text"（需要用户填一句话）；' +
+          'detailOnYes 仅对 yesno 有意义——若回答「是」后还需要用户补充链接或简短说明（例如“是否发表过文章 / 做过相关项目 / 有作品可展示”），设为 true，否则 false；' +
+          'detailHint 为需要补充时输入框的示例提示（如“粘贴文章或项目链接”）。能用是/否问清楚的就用 yesno，不要滥用 text。给出 2-5 条 rewriteSuggestions。' +
           '\n\n【原简历文本】\n' + resumeText +
           '\n\n【岗位 JD】\n' + jdText,
       },
@@ -238,7 +274,9 @@ app.post('/api/ai/polish-confirmation-notes', async (req, res) => {
     const { userNotes, questions } = req.body || {};
     if (!requireText(userNotes, '补充说明（userNotes）', res)) return;
 
-    const questionText = Array.isArray(questions) ? questions.join('\n') : '';
+    const questionText = Array.isArray(questions)
+      ? questions.map((q) => (typeof q === 'string' ? q : (q && q.question) || '')).filter(Boolean).join('\n')
+      : '';
     const messages = [
       {
         role: 'system',
@@ -302,18 +340,13 @@ app.post('/api/ai/generate-application-note', async (req, res) => {
   }
 });
 
-// 健康检查：前端可用它判断后端与 Key 是否就绪
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, hasKey: !!(process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.trim()) });
-});
-
 const listenArgs = HOST ? [PORT, HOST] : [PORT];
 app.listen(...listenArgs, () => {
   console.log('求职管家后端已启动: http://' + (HOST || 'localhost') + ':' + PORT);
   if (!process.env.DEEPSEEK_API_KEY) {
     console.warn('⚠ 未检测到 DEEPSEEK_API_KEY，AI 接口会返回未配置错误。请在 server/.env 中填写。');
   }
-  if (!process.env.APP_USERNAME || !process.env.APP_PASSWORD) {
-    console.warn('未配置 APP_USERNAME/APP_PASSWORD，公网部署时建议开启访问保护。');
+  if (auth.usingEphemeralSecret()) {
+    console.warn('⚠ 未配置 SESSION_SECRET，已使用进程内临时密钥：重启后所有登录态会失效。生产环境请在 server/.env 设置 SESSION_SECRET。');
   }
 });

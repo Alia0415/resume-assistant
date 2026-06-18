@@ -3,6 +3,7 @@ node_modules/
 .env.local
 server/.env
 server/.env.local
+server/data/
 dist/
 build/
 .DS_Store
