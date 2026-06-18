@@ -826,11 +826,57 @@ class Component extends DCLogic {
   componentDidMount() {
     this.applyAccent();
     if (window.pdfjsLib) { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } catch (e) {} }
+    this.cloudLoad();
   }
   componentDidUpdate(prev) { if (prev.accentColor !== this.props.accentColor) this.applyAccent(); }
   applyAccent() { const a = this.props.accentColor; if (a) document.documentElement.style.setProperty('--ac', a); }
 
-  persist(db) { try { localStorage.setItem(window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1', JSON.stringify(db)); } catch (e) {} }
+  storeKey() { return window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1'; }
+  // 本地缓存（即时，加速首屏 / 离线可用）。localStorage 只是缓存，不再是唯一数据源。
+  cacheLocal(db) { try { localStorage.setItem(this.storeKey(), JSON.stringify(db)); } catch (e) {} }
+  // 数据有改动时：盖时间戳 → 写本地缓存 → 防抖同步到云数据库。
+  persist(db) {
+    try { db._updatedAt = Date.now(); } catch (e) {}
+    this.cacheLocal(db);
+    this.scheduleCloudSave(db);
+  }
+  scheduleCloudSave(db) {
+    clearTimeout(this._cloudSaveTimer);
+    this._cloudSaveTimer = setTimeout(() => this.cloudSave(db), 900);
+  }
+  async cloudSave(db) {
+    try {
+      const res = await fetch('/api/data', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+        body: JSON.stringify({ data: db })
+      });
+      this._cloudOk = res.ok;
+    } catch (e) { this._cloudOk = false; /* 离线则保留本地缓存，下次改动再同步 */ }
+  }
+  // 登录后从云数据库加载本账号数据；云端为权威，必要时把本地未同步的改动推上去。
+  async cloudLoad() {
+    try {
+      const res = await fetch('/api/data', { credentials: 'same-origin' });
+      if (!res.ok) return; // 未登录 / 出错 → 暂用本地缓存
+      const out = await res.json();
+      const cloud = out && out.data;
+      const cloudAt = (cloud && Number(cloud._updatedAt)) || (out && Number(out.updatedAt)) || 0;
+      const local = this.state.db || {};
+      const localAt = Number(local._updatedAt) || 0;
+      const localHasData = !!(((local.resumes || []).length) || ((local.versions || []).length) ||
+        ((local.jobs || []).length) || (Object.keys(local.analyses || {}).length) ||
+        ((local.applications || []).length) || ((local.feedback || []).length) ||
+        ((local.todos || []).length) || (local.profile && Object.keys(local.profile).length));
+      if (cloud && cloudAt >= localAt) {
+        this.setState({ db: cloud });            // 云端较新 → 以云端为准
+        this.cacheLocal(cloud);
+      } else if (!cloud && localHasData) {
+        this.cloudSave(local);                   // 云端为空但本地有数据（老用户迁移）→ 推到云端
+      } else if (cloud && localAt > cloudAt) {
+        this.cloudSave(local);                   // 本地有未同步的更新 → 推到云端
+      }
+    } catch (e) { /* 离线 → 用本地缓存 */ }
+  }
   setDb(mut) { this.setState(s => { const db = JSON.parse(JSON.stringify(s.db)); mut(db); this.persist(db); return { db }; }); }
   uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }

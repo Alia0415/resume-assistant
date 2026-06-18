@@ -36,25 +36,42 @@ function usingEphemeralSecret() {
 
 // ---------- 用户存储（可插拔） ----------
 // 线上（腾讯云 CloudBase 云托管）：设置环境变量 TCB_ENV_ID = CloudBase 环境 ID，
-//   即用「云数据库」持久化账号，容器重启 / 重新部署都不会丢。
-// 本地开发：不设置 TCB_ENV_ID 时回退到 server/data/users.json（已被 .gitignore 忽略）。
+//   账号与用户业务数据都持久化到「云数据库」，容器重启 / 重新部署 / 换设备都不会丢。
+// 本地开发：不设置 TCB_ENV_ID 时回退到 server/data/*.json（已被 .gitignore 忽略）。
+// 注意：集合不会自动创建，需先在 CloudBase 控制台手动创建并设置权限
+//       （见 deploy/tencent-cloud/cloudbase-persistence.md）。
 const TCB_ENV_ID = (process.env.TCB_ENV_ID || '').trim();
 const USE_TCB = !!TCB_ENV_ID;
-const TCB_COLLECTION = (process.env.TCB_USERS_COLLECTION || 'jm_users').trim();
+const TCB_COLLECTION = (process.env.TCB_USERS_COLLECTION || 'jm_users').trim(); // 账号
+const TCB_DATA_COLLECTION = (process.env.TCB_DATA_COLLECTION || 'jm_user_data').trim(); // 用户业务数据
+const USERDATA_FILE = path.join(DATA_DIR, 'userdata.json');
 
 function storeMode() {
-  return USE_TCB ? 'cloudbase(' + TCB_COLLECTION + ')' : 'file';
+  return USE_TCB ? 'cloudbase(' + TCB_COLLECTION + ',' + TCB_DATA_COLLECTION + ')' : 'file';
 }
 
 function normUsername(u) {
   return String(u || '').trim().toLowerCase();
 }
+function isDuplicateError(e) {
+  const s = ((e && (e.code || e.message)) || '').toString().toLowerCase();
+  return s.includes('duplicate') || s.includes('already') || s.includes('exist') || s.includes('conflict');
+}
+
+// -- CloudBase 云数据库（云托管运行时凭证由平台自动注入，无需 SecretId/Key） --
+let _tcbApp = null;
+function tcbDb() {
+  if (!_tcbApp) {
+    const tcb = require('@cloudbase/node-sdk');
+    _tcbApp = tcb.init({ env: TCB_ENV_ID });
+  }
+  return _tcbApp.database();
+}
 
 // -- 本地 JSON 文件实现 --
 function loadUsers() {
   try {
-    const raw = fs.readFileSync(USERS_FILE, 'utf8');
-    const arr = JSON.parse(raw);
+    const arr = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
     return Array.isArray(arr) ? arr : [];
   } catch (e) {
     return [];
@@ -64,47 +81,54 @@ function saveUsers(users) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
-
-// -- CloudBase 云数据库实现（在云托管运行时凭证由平台自动注入，无需 SecretId/Key） --
-let _tcbApp = null;
-let _tcbReady = null;
-function tcbDb() {
-  if (!_tcbApp) {
-    const tcb = require('@cloudbase/node-sdk');
-    _tcbApp = tcb.init({ env: TCB_ENV_ID });
+function loadUserDataMap() {
+  try {
+    const obj = JSON.parse(fs.readFileSync(USERDATA_FILE, 'utf8'));
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch (e) {
+    return {};
   }
-  return _tcbApp.database();
 }
-function ensureTcbCollection() {
-  if (_tcbReady) return _tcbReady;
-  // 首次使用时尽力创建集合；已存在则忽略错误。
-  _tcbReady = tcbDb().createCollection(TCB_COLLECTION).catch(() => {});
-  return _tcbReady;
+function saveUserDataMap(map) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(USERDATA_FILE, JSON.stringify(map, null, 2));
 }
 
-// -- 统一的异步存储接口 --
-async function storeGetUser(username) {
+// ---------- 账号查询 ----------
+async function findUser(username) {
   const key = normUsername(username);
   if (USE_TCB) {
-    await ensureTcbCollection();
     const res = await tcbDb().collection(TCB_COLLECTION).where({ username: key }).limit(1).get();
     return (res && res.data && res.data[0]) || null;
   }
   return loadUsers().find((u) => u.username === key) || null;
 }
-async function storeAddUser(user) {
-  if (USE_TCB) {
-    await ensureTcbCollection();
-    await tcbDb().collection(TCB_COLLECTION).add(user);
-    return;
-  }
-  const users = loadUsers();
-  users.push(user);
-  saveUsers(users);
-}
 
-async function findUser(username) {
-  return storeGetUser(username);
+// ---------- 用户业务数据（按不可变 uid 绑定，整份 db 存为一条文档） ----------
+async function getUserData(uid) {
+  if (!uid) return null;
+  const id = String(uid);
+  if (USE_TCB) {
+    const res = await tcbDb().collection(TCB_DATA_COLLECTION).doc(id).get();
+    const doc = res && res.data && res.data[0];
+    return doc ? { data: doc.data || null, updatedAt: doc.updatedAt || 0 } : null;
+  }
+  const map = loadUserDataMap();
+  return map[id] || null;
+}
+async function setUserData(uid, data, updatedAt) {
+  if (!uid) throw new Error('缺少用户标识');
+  const id = String(uid);
+  const at = Number(updatedAt) || Date.now();
+  if (USE_TCB) {
+    // doc(id).set 为按 _id 的 upsert：存在则整份替换，不存在则创建。
+    await tcbDb().collection(TCB_DATA_COLLECTION).doc(id).set({ uid: id, data: data, updatedAt: at });
+    return { updatedAt: at };
+  }
+  const map = loadUserDataMap();
+  map[id] = { data: data, updatedAt: at };
+  saveUserDataMap(map);
+  return { updatedAt: at };
 }
 
 // ---------- 密码哈希（scrypt + 盐，恒定时间比较） ----------
@@ -128,23 +152,40 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(known, test);
 }
 
-// ---------- 创建用户 ----------
+// ---------- 创建账号 ----------
+// 不可变用户 ID（id / uid）= 规范化用户名；CloudBase 侧用它作为文档 _id，
+// 借主键唯一约束在并发下也不会产生重复账号（确定性 ID + 原子写入）。
 async function createUser(username, password, displayName) {
   const key = normUsername(username);
-  const existing = await storeGetUser(key);
-  if (existing) {
-    const err = new Error('该用户名已被注册');
-    err.code = 'DUP_USER';
-    throw err;
-  }
   const user = {
-    id: crypto.randomBytes(8).toString('hex'),
+    id: key,
+    uid: key,
     username: key,
     displayName: String(displayName || username).trim() || key,
     passHash: hashPassword(password),
     createdAt: Date.now(),
   };
-  await storeAddUser(user);
+  if (USE_TCB) {
+    if (await findUser(key)) {
+      const err = new Error('该用户名已被注册'); err.code = 'DUP_USER'; throw err;
+    }
+    try {
+      await tcbDb().collection(TCB_COLLECTION).add({ _id: key, ...user });
+    } catch (e) {
+      // _id 主键冲突说明并发下已被别的请求抢先创建
+      if (isDuplicateError(e) || (await findUser(key))) {
+        const err = new Error('该用户名已被注册'); err.code = 'DUP_USER'; throw err;
+      }
+      throw e;
+    }
+    return user;
+  }
+  const users = loadUsers();
+  if (users.some((u) => u.username === key)) {
+    const err = new Error('该用户名已被注册'); err.code = 'DUP_USER'; throw err;
+  }
+  users.push(user);
+  saveUsers(users);
   return user;
 }
 
@@ -234,6 +275,8 @@ module.exports = {
   loadUsers,
   findUser,
   createUser,
+  getUserData,
+  setUserData,
   verifyPassword,
   createSession,
   setAuthCookies,

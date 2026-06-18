@@ -24,7 +24,7 @@ const PRO_MODEL = process.env.DEEPSEEK_MODEL_PRO; // 可选：深度改写用的
 const ALLOW_REGISTRATION = String(process.env.ALLOW_REGISTRATION || 'true').toLowerCase() !== 'false';
 
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '4mb' })); // 放宽以容纳整份用户数据（/api/data）
 
 // ============================================================
 // 账号认证（多用户：注册 / 登录 / 退出）
@@ -100,6 +100,39 @@ app.get('/', (req, res) => {
 
 // 托管前端：项目根目录（server 的上一级），包含 求职管家.dc.html 与 support.js
 app.use(express.static(path.join(__dirname, '..')));
+
+// ============================================================
+// 用户业务数据读写（简历 / 岗位 / 匹配 / 投递材料等整份 db）
+// 用户身份只取自登录会话（req.user.uid），绝不接受前端传入的用户 ID，确保严格隔离。
+// ============================================================
+app.get('/api/data', async (req, res) => {
+  const uid = req.user && req.user.uid;
+  if (!uid) return res.status(401).json({ error: '未登录或登录已过期，请重新登录。', code: 'UNAUTH' });
+  try {
+    const rec = await auth.getUserData(uid);
+    return res.json({ data: (rec && rec.data) || null, updatedAt: (rec && rec.updatedAt) || 0 });
+  } catch (err) {
+    console.error('[DATA get]', err && err.message);
+    return res.status(500).json({ error: '读取数据失败：' + ((err && err.message) || '服务器内部错误') });
+  }
+});
+
+app.put('/api/data', async (req, res) => {
+  const uid = req.user && req.user.uid;
+  if (!uid) return res.status(401).json({ error: '未登录或登录已过期，请重新登录。', code: 'UNAUTH' });
+  const data = req.body && req.body.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return res.status(400).json({ error: '数据格式不正确。' });
+  }
+  try {
+    const updatedAt = Number(data._updatedAt) || Date.now();
+    const out = await auth.setUserData(uid, data, updatedAt);
+    return res.json({ ok: true, updatedAt: out.updatedAt });
+  } catch (err) {
+    console.error('[DATA put]', err && err.message);
+    return res.status(500).json({ error: '保存数据失败：' + ((err && err.message) || '服务器内部错误') });
+  }
+});
 
 // ---------- 工具：统一错误处理 ----------
 function handleError(res, err) {
