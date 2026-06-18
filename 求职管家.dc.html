@@ -1081,12 +1081,14 @@ class Component extends DCLogic {
     if (!job.jd || !job.jd.trim()) return this.setState({ aiError: '该岗位还没有 JD。' });
     const resumeText = this.getResumeText();
     if (!resumeText.trim()) return this.setState({ aiError: '没有可分析的简历文字。' });
+    // 把「补充确认」里整理出的真实补充一起交给 AI，让改写真正用上你提供的信息。
+    const userNotes = (((this.state.db.analyses[jobId] || {}).rewrite || {}).userNotes || '').trim();
     this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在生成修改建议…', matchTab: 'rewrite' });
     try {
-      const d = await this.aiCall('/api/ai/rewrite-resume', { resumeText, jdText: job.jd, targetSection: this.state.targetSection || '全部' });
+      const d = await this.aiCall('/api/ai/rewrite-resume', { resumeText, jdText: job.jd, targetSection: this.state.targetSection || '全部', userNotes });
       (d.rewriteSuggestions || []).forEach(s => { s.confirmed = false; });
-      this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.rewrite = d; a.rewroteAt = Date.now(); });
-      this.setState({ aiLoading: false }); this.showToast('已生成修改建议');
+      this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.rewrite = d; if (userNotes) a.rewrite.userNotes = userNotes; a.rewrite.qAnswers = {}; a.rewroteAt = Date.now(); });
+      this.setState({ aiLoading: false }); this.showToast(userNotes ? '已结合你的补充重新生成修改建议' : '已生成修改建议');
     } catch (e) { this.setState({ aiLoading: false, aiError: e.message }); }
   }
 
@@ -1191,8 +1193,23 @@ class Component extends DCLogic {
     if (!confirmed.length) return this.showToast('请先勾选「采纳」且确认属实的建议');
     const focus = confirmed.map(s => s.section).join('；');
     let content = this.getResumeText();
-    confirmed.forEach(s => { if (s.originalText && content.indexOf(s.originalText) >= 0) content = content.split(s.originalText).join(s.rewrittenText || s.originalText); });
+    const notApplied = [];
+    confirmed.forEach(s => {
+      if (s.originalText && content.indexOf(s.originalText) >= 0) {
+        content = content.split(s.originalText).join(s.rewrittenText || s.originalText); // 原文精确命中 → 直接替换
+      } else {
+        notApplied.push(s); // 未能精确定位 → 不静默丢弃，附到末尾供手动整合
+      }
+    });
+    if (notApplied.length) {
+      content += '\n\n—— 以下采纳的改写未能在原文中精确定位，请手动整合到对应位置 ——\n' +
+        notApplied.map(s => '【' + (s.section || '简历') + '】' + (s.rewrittenText || '')).join('\n');
+    }
     this.openModal('version', { name: ((job && (job.direction || job.role)) || '定制') + '版', targetJob: (job ? job.company + ' · ' + job.role : ''), focus, content });
+    const applied = confirmed.length - notApplied.length;
+    this.showToast(notApplied.length
+      ? ('已生成新版本：' + applied + ' 条已自动替换，' + notApplied.length + ' 条已附在末尾待手动整合')
+      : '已按采纳的建议生成新版本，请核对后保存');
   }
 
   exportVersion(v) { const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body><pre style="font-family:\u5b8b\u4f53,serif;font-size:11pt;line-height:1.6;white-space:pre-wrap;">' + this.esc(v.content || '') + '</pre></body></html>'; const blob = new Blob(['\ufeff', html], { type: 'application/msword' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = v.name + '.doc'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出 ' + v.name + '.doc'); }

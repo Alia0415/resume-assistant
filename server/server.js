@@ -324,19 +324,21 @@ app.post('/api/ai/match-resume', async (req, res) => {
 // ============================================================
 app.post('/api/ai/rewrite-resume', async (req, res) => {
   try {
-    const { resumeText, jdText, targetSection } = req.body || {};
+    const { resumeText, jdText, targetSection, userNotes } = req.body || {};
     if (!requireText(resumeText, '简历文本（resumeText）', res)) return;
     if (!requireText(jdText, '岗位 JD（jdText）', res)) return;
     const section = (typeof targetSection === 'string' && targetSection.trim()) || '全部';
+    const supplement = (typeof userNotes === 'string' && userNotes.trim()) ? userNotes.trim() : '';
 
     const messages = [
       {
         role: 'system',
         content:
           '你是严谨的简历改写顾问。' + ANTI_FABRICATION +
-          '改写必须保留真实性：只能基于简历已有事实优化措辞、结构与针对性，绝不新增用户没有提供过的经历、技能或数字。' +
-          '若某处需要真实数据而简历未提供，请在 rewrittenText 中用 [请补充具体数据] 占位，并把 truthCheckRequired 设为 true。' +
-          '凡涉及无法从简历确认的信息，truthCheckRequired 必须为 true。',
+          '改写必须保留真实性：只能基于简历已有事实、以及用户在【补充确认】中提供的真实信息来优化措辞、结构与针对性，绝不新增这两者之外的经历、技能或数字。' +
+          '用户在【补充确认】里提供的信息视为真实，应尽量自然地融入到对应模块的改写中。' +
+          '若某处需要真实数据而简历与补充均未提供，请在 rewrittenText 中用 [请补充具体数据] 占位，并把 truthCheckRequired 设为 true。' +
+          '凡涉及无法从简历或补充确认确认的信息，truthCheckRequired 必须为 true。',
       },
       {
         role: 'user',
@@ -344,20 +346,21 @@ app.post('/api/ai/rewrite-resume', async (req, res) => {
           '请针对简历的「' + section + '」部分，结合岗位 JD 给出改写建议，并以 JSON 输出，字段固定为：' +
           '{ "rewriteSuggestions": [ { "section": "", "originalText": "", "rewrittenText": "", "reason": "", "truthCheckRequired": true } ], ' +
           '"overallNotes": [], "questionsForUser": [ { "question": "", "type": "yesno", "detailOnYes": false, "detailHint": "" } ] }。' +
-          '\n每条建议必须给出：对应模块 section、简历中的原文 originalText（尽量摘录真实句子）、改写后 rewrittenText、修改理由 reason、是否需要核实真实性 truthCheckRequired。' +
+          '\n每条建议必须给出：对应模块 section、简历中的原文 originalText（务必从【原简历文本】中逐字摘录真实句子，便于自动替换）、改写后 rewrittenText、修改理由 reason、是否需要核实真实性 truthCheckRequired。' +
           '\noverallNotes 为整体注意事项。' +
-          '\nquestionsForUser 为需要用户补充真实信息的问题，每条是一个对象，目标是让用户用最少的输入就能回答：' +
+          '\nquestionsForUser 为仍需用户补充真实信息的问题（如果用户的补充已覆盖，可减少或不再追问），每条是一个对象，目标是让用户用最少的输入就能回答：' +
           'question 为问题原文；type 取 "yesno"（用户只需选「是 / 否」）或 "text"（需要用户填一句话）；' +
           'detailOnYes 仅对 yesno 有意义——若回答「是」后还需要用户补充链接或简短说明（例如“是否发表过文章 / 做过相关项目 / 有作品可展示”），设为 true，否则 false；' +
           'detailHint 为需要补充时输入框的示例提示（如“粘贴文章或项目链接”）。能用是/否问清楚的就用 yesno，不要滥用 text。给出 2-5 条 rewriteSuggestions。' +
+          (supplement ? ('\n\n【用户补充的真实信息（来自补充确认，视为真实，请据此改写）】\n' + supplement) : '') +
           '\n\n【原简历文本】\n' + resumeText +
           '\n\n【岗位 JD】\n' + jdText,
       },
     ];
-    // 深度改写优先使用 Pro 模型（如已配置）
+    // 深度改写优先使用 Pro 模型（如已配置）。maxTokens 给足，避免结合补充信息后输出被截断导致 JSON 解析失败。
     const data = await callDeepSeekJSON(messages, {
       temperature: 0.35,
-      maxTokens: 2600,
+      maxTokens: 4096,
       model: PRO_MODEL || undefined,
     });
     res.json(data);
