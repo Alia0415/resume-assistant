@@ -34,7 +34,23 @@ function usingEphemeralSecret() {
   return !(process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim());
 }
 
-// ---------- 用户存储（JSON 文件） ----------
+// ---------- 用户存储（可插拔） ----------
+// 线上（腾讯云 CloudBase 云托管）：设置环境变量 TCB_ENV_ID = CloudBase 环境 ID，
+//   即用「云数据库」持久化账号，容器重启 / 重新部署都不会丢。
+// 本地开发：不设置 TCB_ENV_ID 时回退到 server/data/users.json（已被 .gitignore 忽略）。
+const TCB_ENV_ID = (process.env.TCB_ENV_ID || '').trim();
+const USE_TCB = !!TCB_ENV_ID;
+const TCB_COLLECTION = (process.env.TCB_USERS_COLLECTION || 'jm_users').trim();
+
+function storeMode() {
+  return USE_TCB ? 'cloudbase(' + TCB_COLLECTION + ')' : 'file';
+}
+
+function normUsername(u) {
+  return String(u || '').trim().toLowerCase();
+}
+
+// -- 本地 JSON 文件实现 --
 function loadUsers() {
   try {
     const raw = fs.readFileSync(USERS_FILE, 'utf8');
@@ -49,12 +65,46 @@ function saveUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
-function normUsername(u) {
-  return String(u || '').trim().toLowerCase();
+// -- CloudBase 云数据库实现（在云托管运行时凭证由平台自动注入，无需 SecretId/Key） --
+let _tcbApp = null;
+let _tcbReady = null;
+function tcbDb() {
+  if (!_tcbApp) {
+    const tcb = require('@cloudbase/node-sdk');
+    _tcbApp = tcb.init({ env: TCB_ENV_ID });
+  }
+  return _tcbApp.database();
 }
-function findUser(username) {
+function ensureTcbCollection() {
+  if (_tcbReady) return _tcbReady;
+  // 首次使用时尽力创建集合；已存在则忽略错误。
+  _tcbReady = tcbDb().createCollection(TCB_COLLECTION).catch(() => {});
+  return _tcbReady;
+}
+
+// -- 统一的异步存储接口 --
+async function storeGetUser(username) {
   const key = normUsername(username);
+  if (USE_TCB) {
+    await ensureTcbCollection();
+    const res = await tcbDb().collection(TCB_COLLECTION).where({ username: key }).limit(1).get();
+    return (res && res.data && res.data[0]) || null;
+  }
   return loadUsers().find((u) => u.username === key) || null;
+}
+async function storeAddUser(user) {
+  if (USE_TCB) {
+    await ensureTcbCollection();
+    await tcbDb().collection(TCB_COLLECTION).add(user);
+    return;
+  }
+  const users = loadUsers();
+  users.push(user);
+  saveUsers(users);
+}
+
+async function findUser(username) {
+  return storeGetUser(username);
 }
 
 // ---------- 密码哈希（scrypt + 盐，恒定时间比较） ----------
@@ -79,10 +129,10 @@ function verifyPassword(password, stored) {
 }
 
 // ---------- 创建用户 ----------
-function createUser(username, password, displayName) {
+async function createUser(username, password, displayName) {
   const key = normUsername(username);
-  const users = loadUsers();
-  if (users.some((u) => u.username === key)) {
+  const existing = await storeGetUser(key);
+  if (existing) {
     const err = new Error('该用户名已被注册');
     err.code = 'DUP_USER';
     throw err;
@@ -94,8 +144,7 @@ function createUser(username, password, displayName) {
     passHash: hashPassword(password),
     createdAt: Date.now(),
   };
-  users.push(user);
-  saveUsers(users);
+  await storeAddUser(user);
   return user;
 }
 
@@ -181,6 +230,7 @@ module.exports = {
   USERS_FILE,
   getSecret,
   usingEphemeralSecret,
+  storeMode,
   loadUsers,
   findUser,
   createUser,

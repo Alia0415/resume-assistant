@@ -33,14 +33,14 @@ app.use(express.json({ limit: '1mb' }));
 // ============================================================
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,32}$/;
 
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   if (!ALLOW_REGISTRATION) return res.status(403).json({ error: '当前未开放注册，请联系管理员。' });
   const { username, password, displayName } = req.body || {};
   const name = String(username || '').trim();
   if (!USERNAME_RE.test(name)) return res.status(400).json({ error: '用户名需为 2–32 位字母、数字或 _ . - 组合。' });
   if (typeof password !== 'string' || password.length < 6) return res.status(400).json({ error: '密码至少 6 位。' });
   try {
-    const user = auth.createUser(name, password, displayName);
+    const user = await auth.createUser(name, password, displayName);
     auth.setAuthCookies(req, res, user);
     return res.json({ ok: true, user: { username: user.username, displayName: user.displayName } });
   } catch (err) {
@@ -50,14 +50,19 @@ app.post('/api/auth/register', (req, res) => {
   }
 });
 
-app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body || {};
-  const user = auth.findUser(username);
-  if (!user || !auth.verifyPassword(password || '', user.passHash)) {
-    return res.status(401).json({ error: '用户名或密码错误。' });
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    const user = await auth.findUser(username);
+    if (!user || !auth.verifyPassword(password || '', user.passHash)) {
+      return res.status(401).json({ error: '用户名或密码错误。' });
+    }
+    auth.setAuthCookies(req, res, user);
+    return res.json({ ok: true, user: { username: user.username, displayName: user.displayName } });
+  } catch (err) {
+    console.error('[AUTH login]', err && err.message);
+    return res.status(500).json({ error: '登录失败：' + ((err && err.message) || '服务器内部错误') });
   }
-  auth.setAuthCookies(req, res, user);
-  return res.json({ ok: true, user: { username: user.username, displayName: user.displayName } });
 });
 
 app.post('/api/auth/logout', (req, res) => {
@@ -343,10 +348,14 @@ app.post('/api/ai/generate-application-note', async (req, res) => {
 const listenArgs = HOST ? [PORT, HOST] : [PORT];
 app.listen(...listenArgs, () => {
   console.log('求职管家后端已启动: http://' + (HOST || 'localhost') + ':' + PORT);
+  console.log('账号存储模式: ' + auth.storeMode());
+  if (auth.storeMode() === 'file') {
+    console.warn('⚠ 账号存储为本地文件 server/data/users.json：在云托管等容器环境重启 / 重新部署后会丢失。线上请设置 TCB_ENV_ID 启用 CloudBase 云数据库持久化。');
+  }
   if (!process.env.DEEPSEEK_API_KEY) {
     console.warn('⚠ 未检测到 DEEPSEEK_API_KEY，AI 接口会返回未配置错误。请在 server/.env 中填写。');
   }
   if (auth.usingEphemeralSecret()) {
-    console.warn('⚠ 未配置 SESSION_SECRET，已使用进程内临时密钥：重启后所有登录态会失效。生产环境请在 server/.env 设置 SESSION_SECRET。');
+    console.warn('⚠ 未配置 SESSION_SECRET，已使用进程内临时密钥：重启后所有登录态会失效。生产环境请在 CloudBase 环境变量设置 SESSION_SECRET。');
   }
 });
