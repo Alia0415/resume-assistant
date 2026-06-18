@@ -32,7 +32,7 @@
 </helmet>
 <div style="display:flex;height:100vh;overflow:hidden;background:#f5f7fb;font-family:'Noto Sans SC',system-ui,sans-serif;color:#18223a;">
 
-  <input id="jm-file" type="file" accept=".docx,.pdf,.txt" style="display:none;" onChange="{{ onFile }}">
+  <input id="jm-file" type="file" accept=".pdf,.doc,.docx,.txt" style="display:none;" onChange="{{ onFile }}">
 
   <aside style="width:230px;flex-shrink:0;background:#ffffff;border-right:1px solid #ebeef4;display:flex;flex-direction:column;height:100vh;">
     <div style="padding:20px 18px 14px;display:flex;align-items:center;gap:10px;">
@@ -68,6 +68,13 @@
       <span style="flex:1;">退出登录</span>
       <span style="color:#aab4c8;max-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ loginName }}</span>
     </button>
+
+    <sc-if value="{{ cloudSyncError }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ retryCloudSave }}" style="margin:0 11px 14px;display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:11px;background:#fdecec;border:1px solid #f3c9c9;cursor:pointer;text-align:left;font-family:inherit;color:#c0392b;font-size:12px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+        <span style="flex:1;">云同步失败，点击重试</span>
+      </button>
+    </sc-if>
   </aside>
 
   <main id="jm-main" style="flex:1;min-width:0;height:100vh;overflow-y:auto;">
@@ -816,7 +823,7 @@ class Component extends DCLogic {
     page: 'dashboard', modalType: null, form: {}, editId: null,
     toast: null, aiLoading: false, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
-    jobSearch: '', appSearch: '', appStatus: '全部'
+    jobSearch: '', appSearch: '', appStatus: '全部', syncErr: false
   };
 
   ACTIVE = ['待投递', '已投递', '笔试', '面试'];
@@ -826,40 +833,92 @@ class Component extends DCLogic {
   componentDidMount() {
     this.applyAccent();
     if (window.pdfjsLib) { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } catch (e) {} }
+    this.setupFlushOnHide();
     this.cloudLoad();
   }
   componentDidUpdate(prev) { if (prev.accentColor !== this.props.accentColor) this.applyAccent(); }
   applyAccent() { const a = this.props.accentColor; if (a) document.documentElement.style.setProperty('--ac', a); }
 
   storeKey() { return window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1'; }
-  // 本地缓存（即时，加速首屏 / 离线可用）。localStorage 只是缓存，不再是唯一数据源。
+  // 本地缓存（即时、加速首屏、离线可用）。localStorage 只是缓存，不再是唯一数据源。
   cacheLocal(db) { try { localStorage.setItem(this.storeKey(), JSON.stringify(db)); } catch (e) {} }
-  // 数据有改动时：盖时间戳 → 写本地缓存 → 防抖同步到云数据库。
+  // 数据改动：盖时间戳 → 写本地缓存 → 防抖触发「串行保存队列」同步到云端。
   persist(db) {
     try { db._updatedAt = Date.now(); } catch (e) {}
     this.cacheLocal(db);
-    this.scheduleCloudSave(db);
+    this._pendingDb = db;
+    this._dirty = true;
+    this.scheduleFlush();
   }
-  scheduleCloudSave(db) {
-    clearTimeout(this._cloudSaveTimer);
-    this._cloudSaveTimer = setTimeout(() => this.cloudSave(db), 900);
+  scheduleFlush() { clearTimeout(this._cloudSaveTimer); this._cloudSaveTimer = setTimeout(() => this.flushSave(), 800); }
+  flushSave() { if (this._loaded && !this._saving) this.saveLoop(); }
+  // 串行保存队列：同一时刻只发一个 PUT；保存期间的多次改动会合并为「最后一份」整库写入，避免并发乱序。
+  async saveLoop() {
+    if (this._saving) return;
+    this._saving = true;
+    try {
+      while (this._dirty) {
+        this._dirty = false;                    // 先认领当前待保存；保存期间又有改动会把 _dirty 置回 true
+        const ok = await this.cloudPut(this._pendingDb);
+        if (!ok) { this._dirty = true; break; } // 失败：保留待保存，稍后重试
+      }
+    } finally {
+      this._saving = false;
+      if (this._dirty) { clearTimeout(this._retryTimer); this._retryTimer = setTimeout(() => this.flushSave(), 5000); }
+    }
   }
-  async cloudSave(db) {
+  async cloudPut(db) {
     try {
       const res = await fetch('/api/data', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
-        body: JSON.stringify({ data: db })
+        body: JSON.stringify({ data: db, baseRevision: this._revision })
       });
-      this._cloudOk = res.ok;
-    } catch (e) { this._cloudOk = false; /* 离线则保留本地缓存，下次改动再同步 */ }
+      if (res.status === 409) {
+        // 云端已被别处更新：不直接覆盖，改为采用云端最新版本。
+        const out = await res.json();
+        if (out && out.data) { this.setState({ db: out.data }); this.cacheLocal(out.data); }
+        this._revision = (out && out.revision) || this._revision;
+        this._pendingDb = null;
+        if (this.state.syncErr) this.setState({ syncErr: false });
+        this.showToast('数据在其他地方有更新，已同步为最新版本');
+        return true;
+      }
+      if (!res.ok) { if (!this.state.syncErr) this.setState({ syncErr: true }); this.showToast('云端保存失败，已暂存本地，稍后自动重试'); return false; }
+      const out = await res.json();
+      this._revision = (out && out.revision) != null ? out.revision : ((this._revision || 0) + 1);
+      if (this.state.syncErr) this.setState({ syncErr: false });
+      return true;
+    } catch (e) {
+      if (!this.state.syncErr) this.setState({ syncErr: true });
+      this.showToast('云端保存失败（网络问题），已暂存本地');
+      return false;
+    }
   }
-  // 登录后从云数据库加载本账号数据；云端为权威，必要时把本地未同步的改动推上去。
+  // 页面隐藏 / 关闭前尽量把最后一次改动 flush 出去（keepalive 允许请求在卸载后完成）。
+  flushBeacon() {
+    if (!this._dirty || !this._pendingDb) return;
+    try {
+      fetch('/api/data', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+        keepalive: true, body: JSON.stringify({ data: this._pendingDb, baseRevision: this._revision })
+      });
+    } catch (e) {}
+  }
+  setupFlushOnHide() {
+    if (this._flushBound) return; this._flushBound = true;
+    try {
+      window.addEventListener('pagehide', () => this.flushBeacon());
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this.flushBeacon(); });
+    } catch (e) {}
+  }
+  // 登录后从云端加载本账号数据；云端为权威，必要时把本地未同步改动推上去。
   async cloudLoad() {
     try {
       const res = await fetch('/api/data', { credentials: 'same-origin' });
-      if (!res.ok) return; // 未登录 / 出错 → 暂用本地缓存
+      if (!res.ok) { this._loaded = true; return; } // 未登录 / 出错 → 暂用本地缓存
       const out = await res.json();
       const cloud = out && out.data;
+      this._revision = (out && Number(out.revision)) || 0;
       const cloudAt = (cloud && Number(cloud._updatedAt)) || (out && Number(out.updatedAt)) || 0;
       const local = this.state.db || {};
       const localAt = Number(local._updatedAt) || 0;
@@ -867,15 +926,13 @@ class Component extends DCLogic {
         ((local.jobs || []).length) || (Object.keys(local.analyses || {}).length) ||
         ((local.applications || []).length) || ((local.feedback || []).length) ||
         ((local.todos || []).length) || (local.profile && Object.keys(local.profile).length));
+      this._loaded = true;
       if (cloud && cloudAt >= localAt) {
-        this.setState({ db: cloud });            // 云端较新 → 以云端为准
-        this.cacheLocal(cloud);
-      } else if (!cloud && localHasData) {
-        this.cloudSave(local);                   // 云端为空但本地有数据（老用户迁移）→ 推到云端
-      } else if (cloud && localAt > cloudAt) {
-        this.cloudSave(local);                   // 本地有未同步的更新 → 推到云端
+        this.setState({ db: cloud }); this.cacheLocal(cloud);          // 云端较新 → 以云端为准
+      } else if ((!cloud && localHasData) || (cloud && localAt > cloudAt)) {
+        this._pendingDb = local; this._dirty = true; this.flushSave();  // 本地有未同步数据 → 推到云端
       }
-    } catch (e) { /* 离线 → 用本地缓存 */ }
+    } catch (e) { this._loaded = true; /* 离线 → 用本地缓存 */ }
   }
   setDb(mut) { this.setState(s => { const db = JSON.parse(JSON.stringify(s.db)); mut(db); this.persist(db); return { db }; }); }
   uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -896,7 +953,9 @@ class Component extends DCLogic {
   async onDrop(e) { e.preventDefault(); const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (file) await this.ingest(file); }
   async ingest(file) {
     const ext = (file.name.split('.').pop() || '').toLowerCase();
-    this.showToast('正在解析「' + file.name + '」…');
+    if (!['pdf', 'doc', 'docx', 'txt'].includes(ext)) return this.showToast('仅支持 PDF / DOC / DOCX / TXT 文件');
+    if (file.size > 10 * 1024 * 1024) return this.showToast('文件超过 10MB 限制');
+    this.showToast('正在处理「' + file.name + '」…');
     let text = '';
     try {
       if (ext === 'docx' && window.mammoth) { const ab = await file.arrayBuffer(); const r = await window.mammoth.extractRawText({ arrayBuffer: ab }); text = (r.value || '').trim(); }
@@ -904,13 +963,35 @@ class Component extends DCLogic {
       else if (ext === 'txt') { text = (await file.text()).trim(); }
     } catch (err) { text = ''; }
     const id = this.uid();
-    try { await this.idbPut(id, file); } catch (e) {}
-    this.setDb(db => db.resumes.unshift({ id, fileName: file.name, fileType: ext, size: file.size, uploadedAt: Date.now(), text }));
-    this.showToast(text ? '已上传并解析简历文字' : '已上传，但未能自动提取文字，分析时可手动粘贴');
+    try { await this.idbPut(id, file); } catch (e) {} // 本机缓存原文件
+    let fileId = null;
+    if (ext !== 'txt') { // PDF/DOC/DOCX：原文件经后端上传到云存储（后端鉴权、按 uid 隔离）
+      try {
+        const res = await fetch('/api/files', { method: 'POST', credentials: 'same-origin', headers: { 'X-Filename': encodeURIComponent(file.name) }, body: file });
+        const out = await res.json().catch(() => ({}));
+        if (res.ok && out.file) fileId = out.file.fileId;
+        else this.showToast('原文件上传云端失败：' + (out.error || '请稍后重试') + '（已暂存本地）');
+      } catch (e) { this.showToast('原文件上传云端失败（网络问题，已暂存本地）'); }
+    }
+    this.setDb(db => db.resumes.unshift({ id, fileId: fileId, fileName: file.name, fileType: ext, size: file.size, uploadedAt: Date.now(), text }));
+    if (fileId || ext === 'txt') this.showToast(text ? '已保存并解析简历文字' : '已保存，未能自动提取文字，分析时可手动粘贴');
   }
   async extractPdf(file) { const ab = await file.arrayBuffer(); const pdf = await window.pdfjsLib.getDocument({ data: ab }).promise; let out = ''; for (let i = 1; i <= pdf.numPages; i++) { const pg = await pdf.getPage(i); const tc = await pg.getTextContent(); out += tc.items.map(it => it.str).join(' ') + '\n'; } return out.trim(); }
-  async downloadResume(r) { try { const blob = await this.idbGet(r.id); if (!blob) { this.showToast('源文件已不在本机'); return; } const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = r.fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); } catch (e) { this.showToast('下载失败'); } }
-  delResume(r) { if (!confirm('删除简历文件「' + r.fileName + '」？')) return; this.idbDel(r.id); this.setDb(db => { db.resumes = db.resumes.filter(x => x.id !== r.id); }); this.showToast('已删除'); }
+  async downloadResume(r) {
+    try { const blob = await this.idbGet(r.id); if (blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = r.fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); return; } } catch (e) {}
+    if (r.fileId) { // 本机无缓存 → 从云端取（后端校验归属当前账号）
+      const a = document.createElement('a'); a.href = '/api/files/' + encodeURIComponent(r.fileId); a.download = r.fileName || 'resume'; a.click();
+      return;
+    }
+    this.showToast('源文件不在本机，且未在云端找到');
+  }
+  delResume(r) {
+    if (!confirm('删除简历文件「' + r.fileName + '」？')) return;
+    this.idbDel(r.id); // 删本机缓存
+    if (r.fileId) { fetch('/api/files/' + encodeURIComponent(r.fileId), { method: 'DELETE', credentials: 'same-origin' }).catch(() => {}); } // 同步删云端原文件
+    this.setDb(db => { db.resumes = db.resumes.filter(x => x.id !== r.id); });
+    this.showToast('已删除');
+  }
 
   openModal(type, data) { this.setState({ modalType: type, form: Object.assign({}, data || {}), editId: (data && data.id) || null, aiError: null }); }
   closeModal() { this.setState({ modalType: null, form: {}, editId: null }); }
@@ -1379,6 +1460,7 @@ class Component extends DCLogic {
       nav, pageTitle: tt[0], pageSubtitle: tt[1], headerAction,
       profileName, profileInitial, profileSub, profileFields,
       loginName: (typeof window !== 'undefined' && window.JM_USER) || '', logout: () => { if (window.jmLogout) window.jmLogout(); },
+      cloudSyncError: !!S.syncErr, retryCloudSave: () => { this.setState({ syncErr: false }); this.flushSave(); },
       goSettings: () => this.go('settings'), goTodos: () => this.go('todos'), goApps: () => this.go('apps'),
       triggerUpload: () => this.triggerUpload(), onFile: e => this.onFile(e), onDragOver: e => this.onDragOver(e), onDrop: e => this.onDrop(e),
       openJobModal: () => this.openModal('job'), openAppModal: () => this.openModal('application'),

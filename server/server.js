@@ -110,13 +110,14 @@ app.get('/api/data', async (req, res) => {
   if (!uid) return res.status(401).json({ error: '未登录或登录已过期，请重新登录。', code: 'UNAUTH' });
   try {
     const rec = await auth.getUserData(uid);
-    return res.json({ data: (rec && rec.data) || null, updatedAt: (rec && rec.updatedAt) || 0 });
+    return res.json({ data: (rec && rec.data) || null, updatedAt: (rec && rec.updatedAt) || 0, revision: (rec && rec.revision) || 0 });
   } catch (err) {
     console.error('[DATA get]', err && err.message);
     return res.status(500).json({ error: '读取数据失败：' + ((err && err.message) || '服务器内部错误') });
   }
 });
 
+// 用 baseRevision 做乐观锁：云端 revision 变了就返回 409，前端必须先同步再保存，禁止直接覆盖。
 app.put('/api/data', async (req, res) => {
   const uid = req.user && req.user.uid;
   if (!uid) return res.status(401).json({ error: '未登录或登录已过期，请重新登录。', code: 'UNAUTH' });
@@ -124,13 +125,75 @@ app.put('/api/data', async (req, res) => {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return res.status(400).json({ error: '数据格式不正确。' });
   }
+  const baseRevision = req.body && req.body.baseRevision;
   try {
     const updatedAt = Number(data._updatedAt) || Date.now();
-    const out = await auth.setUserData(uid, data, updatedAt);
-    return res.json({ ok: true, updatedAt: out.updatedAt });
+    const out = await auth.setUserData(uid, data, baseRevision, updatedAt);
+    return res.json({ ok: true, updatedAt: out.updatedAt, revision: out.revision });
   } catch (err) {
+    if (err && err.code === 'REVISION_CONFLICT') {
+      const cur = err.current || {};
+      return res.status(409).json({ error: '数据已在其他地方更新，请同步后再保存。', code: 'REVISION_CONFLICT', data: cur.data || null, updatedAt: cur.updatedAt || 0, revision: cur.revision || 0 });
+    }
     console.error('[DATA put]', err && err.message);
     return res.status(500).json({ error: '保存数据失败：' + ((err && err.message) || '服务器内部错误') });
+  }
+});
+
+// ============================================================
+// 简历原文件上传 / 下载 / 删除（CloudBase 云存储 / 本地 fallback）
+// 身份只取自会话；下载与删除都校验文件归属当前账号，按 uid 隔离。
+// ============================================================
+app.post('/api/files', express.raw({ type: () => true, limit: '12mb' }), async (req, res) => {
+  const uid = req.user && req.user.uid;
+  if (!uid) return res.status(401).json({ error: '未登录或登录已过期，请重新登录。', code: 'UNAUTH' });
+  let fileName = '';
+  try { fileName = decodeURIComponent(req.headers['x-filename'] || ''); } catch (e) { fileName = req.headers['x-filename'] || ''; }
+  if (!fileName) return res.status(400).json({ error: '缺少文件名。' });
+  const buffer = Buffer.isBuffer(req.body) ? req.body : null;
+  if (!buffer || !buffer.length) return res.status(400).json({ error: '文件内容为空。' });
+  try {
+    const meta = await auth.saveResumeFile(uid, fileName, buffer);
+    return res.json({ ok: true, file: meta });
+  } catch (err) {
+    if (err && (err.code === 'BAD_TYPE' || err.code === 'TOO_LARGE' || err.code === 'BAD_FILE')) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error('[FILE upload]', err && err.message);
+    return res.status(500).json({ error: '文件上传失败：' + ((err && err.message) || '服务器内部错误') });
+  }
+});
+
+app.get('/api/files/:fileId', async (req, res) => {
+  const uid = req.user && req.user.uid;
+  if (!uid) return res.status(401).json({ error: '未登录或登录已过期，请重新登录。', code: 'UNAUTH' });
+  try {
+    const meta = await auth.getFileMeta(req.params.fileId);
+    if (!meta) return res.status(404).json({ error: '文件不存在。' });
+    if (String(meta.uid) !== String(uid)) return res.status(403).json({ error: '无权访问该文件。' });
+    const out = await auth.getResumeFileDownload(meta);
+    if (out.url) return res.redirect(302, out.url);
+    res.setHeader('Content-Type', out.mime || 'application/octet-stream');
+    res.setHeader('Content-Disposition', 'attachment; filename*=UTF-8\'\'' + encodeURIComponent(out.fileName || 'resume'));
+    return res.send(out.buffer);
+  } catch (err) {
+    console.error('[FILE download]', err && err.message);
+    return res.status(500).json({ error: '文件下载失败：' + ((err && err.message) || '服务器内部错误') });
+  }
+});
+
+app.delete('/api/files/:fileId', async (req, res) => {
+  const uid = req.user && req.user.uid;
+  if (!uid) return res.status(401).json({ error: '未登录或登录已过期，请重新登录。', code: 'UNAUTH' });
+  try {
+    const meta = await auth.getFileMeta(req.params.fileId);
+    if (!meta) return res.json({ ok: true }); // 已不存在视为成功
+    if (String(meta.uid) !== String(uid)) return res.status(403).json({ error: '无权删除该文件。' });
+    await auth.deleteResumeFile(meta);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[FILE delete]', err && err.message);
+    return res.status(500).json({ error: '文件删除失败：' + ((err && err.message) || '服务器内部错误') });
   }
 });
 
