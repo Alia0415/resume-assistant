@@ -1026,14 +1026,21 @@ class Component extends DCLogic {
     });
     return out;
   }
+  feedbackSourceItems() {
+    const db = this.state.db || {};
+    return []
+      .concat(db.applications || [])
+      .concat(db.jobs || [])
+      .filter(x => x && (x.company || x.role));
+  }
   feedbackCompanyOptions() {
-    return this.uniqueOptions((this.state.db.applications || []).map(a => a.company));
+    return this.uniqueOptions(this.feedbackSourceItems().map(a => a.company));
   }
   feedbackRoleOptions(company) {
     const companyKey = this.normChoice(company);
     if (!companyKey) return [];
-    const apps = (this.state.db.applications || []).filter(a => !companyKey || this.normChoice(a.company) === companyKey);
-    return this.uniqueOptions(apps.map(a => a.role));
+    const items = this.feedbackSourceItems().filter(a => this.normChoice(a.company) === companyKey);
+    return this.uniqueOptions(items.map(a => a.role));
   }
   selectFeedbackCompany(value, currentRole) {
     if (value === '__manual__') {
@@ -1312,7 +1319,7 @@ class Component extends DCLogic {
     const sel = (key, label, opts) => ({ isSelect: true, label, options: opts, value: f[key] == null ? opts[0] : f[key], handler: e => this.setForm(key, e.target.value) });
     if (t === 'job') return [inp('company', '公司名称', '如：腾讯音乐'), inp('role', '岗位名称', '如：资金管理实习生'), inp('city', '城市', '如：深圳'), inp('direction', '岗位方向（用于命名简历版本）', '如：资金管理 / 财务BP'), inp('link', '投递链接', 'https://…'), area('jd', '岗位 JD（粘贴招聘信息）', '把岗位职责与任职要求粘贴到这里…', true), inp('source', '来源备注', '如：BOSS直聘 / 内推 / 学长转发')];
     if (t === 'application') return [inp('company', '公司名称', ''), inp('role', '岗位名称', ''), inp('city', '城市', ''), inp('channel', '投递渠道', '如：官网 / BOSS / 内推 / 邮件'), inp('date', '投递日期', '', 'date'), inp('versionName', '使用的简历版本', '如：资金管理版'), sel('status', '当前状态', this.STATUSES), inp('nextStep', '下一步事项', '如：3 天后跟进 HR'), area('note', '备注', '')];
-    if (t === 'feedback') return [combo('company', '公司名称', '直接输入新公司', this.feedbackCompanyOptions(), v => this.selectFeedbackCompany(v, f.role || ''), '选择已投递公司', '手动输入新公司'), combo('role', '岗位名称', '直接输入新岗位', this.feedbackRoleOptions(f.company), v => this.selectFeedbackRole(v), f.company ? '选择该公司的已投岗位' : '先选择公司', '手动输入新岗位'), sel('type', '反馈类型', this.FBTYPES), area('content', '反馈原文（可粘贴邮件 / 短信）', '把企业的回复原文如实粘贴到这里…', true), area('summary', '要点小结（手填）', ''), inp('nextStep', '我的下一步', '')];
+    if (t === 'feedback') return [combo('company', '公司名称', '直接输入新公司', this.feedbackCompanyOptions(), v => this.selectFeedbackCompany(v, f.role || ''), '选择已记录公司', '手动输入新公司'), combo('role', '岗位名称', '直接输入新岗位', this.feedbackRoleOptions(f.company), v => this.selectFeedbackRole(v), f.company ? '选择该公司的已记录岗位' : '先选择公司', '手动输入新岗位'), sel('type', '反馈类型', this.FBTYPES), area('content', '反馈原文（可粘贴邮件 / 短信）', '把企业的回复原文如实粘贴到这里…', true), area('summary', '要点小结（手填）', ''), inp('nextStep', '我的下一步', '')];
     if (t === 'todo') return [inp('text', '待办内容', '如：周五前完成某岗位网申'), inp('due', '截止日期', '', 'date')];
     if (t === 'version') return [inp('name', '版本名称', '如：资金管理版'), inp('targetJob', '对应岗位', '如：腾讯音乐 · 资金管理实习生'), inp('focus', '修改重点', '如：突出资金账户、台账、对账经历'), area('content', '简历内容', '该版本的简历文字…', true)];
     if (t === 'profile') return [inp('name', '姓名', ''), inp('school', '学校', ''), inp('major', '专业', ''), inp('phone', '电话', ''), inp('email', '邮箱', ''), inp('city', '期望城市', '')];
