@@ -14,7 +14,13 @@ services:
         value: deepseek-v4-flash
       - key: DEEPSEEK_MODEL_PRO
         value: deepseek-v4-pro
-      - key: APP_USERNAME
-        sync: false
-      - key: APP_PASSWORD
-        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ALLOW_REGISTRATION
+        value: true
+      - key: AUTH_DATA_DIR
+        value: /var/data/resume-assistant
+    disk:
+      name: resume-assistant-data
+      mountPath: /var/data/resume-assistant
+      sizeGB: 1

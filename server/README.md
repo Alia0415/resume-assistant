@@ -29,8 +29,10 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 | `DEEPSEEK_MODEL` | 默认模型 | `deepseek-v4-flash` |
 | `DEEPSEEK_MODEL_PRO` | 深度改写（rewrite-resume）优先使用的模型 | `deepseek-v4-pro` |
 | `PORT` | 服务端口 | `3000` |
-| `APP_USERNAME` | 公网部署访问保护用户名（建议生产环境填写） | 无 |
-| `APP_PASSWORD` | 公网部署访问保护密码（建议生产环境填写） | 无 |
+| `SESSION_SECRET` | 登录会话签名密钥，生产环境必须固定配置 | 进程内临时密钥 |
+| `ALLOW_REGISTRATION` | 是否开放注册；建好账号后建议设为 `false` | `true` |
+| `AUTH_DATA_DIR` | 本地文件账号/数据目录；容器平台应指向持久磁盘 | `server/data` |
+| `TCB_ENV_ID` | CloudBase 环境 ID；设置后账号与业务数据写入云数据库 | 无 |
 
 > `.env` 已被 `.gitignore` 忽略，不会提交，也不会暴露给前端。
 
@@ -95,8 +97,9 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 任意支持 Node 的平台均可（自有服务器 / Render / Railway / Fly.io 等）：
 
 1. 上传整个项目（含 `server/` 与根目录的前端文件）。
-2. 在平台的环境变量里配置 `DEEPSEEK_API_KEY`（不要写进代码或提交 `.env`）。
-3. 建议同时配置 `APP_USERNAME` 与 `APP_PASSWORD`，避免公网 URL 被别人直接使用并消耗你的 API 额度。
-4. 启动命令 `node server/server.js`，确保前端文件在 `server/` 的上一级。
+2. 在平台的环境变量里配置 `DEEPSEEK_API_KEY` 与固定的 `SESSION_SECRET`（不要写进代码或提交 `.env`）。
+3. 首次部署可保留 `ALLOW_REGISTRATION=true` 注册自己的账号；账号建好后建议改为 `false`。
+4. 确保账号数据可持久化：Render 可使用仓库里的 `render.yaml` 挂载 `AUTH_DATA_DIR=/var/data/resume-assistant`；CloudBase 云托管请配置 `TCB_ENV_ID` 并创建集合。
+5. 启动命令 `node server/server.js`，确保前端文件在 `server/` 的上一级。
 
 > 若前端与后端分开部署（不同域名），前端的「后端地址」可在工具的 Tweaks/属性里设置 `apiBase`，已默认开启 CORS。

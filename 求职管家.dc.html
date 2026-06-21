@@ -772,7 +772,12 @@
             <div>
               <label style="font-size:12.5px;color:#6b7a96;display:block;margin-bottom:6px;font-weight:500;">{{ fld.label }}</label>
               <sc-if value="{{ fld.isInput }}" hint-placeholder-val="{{ false }}">
-                <input type="{{ fld.inputType }}" value="{{ fld.value }}" onInput="{{ fld.handler }}" placeholder="{{ fld.placeholder }}" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;">
+                <input type="{{ fld.inputType }}" value="{{ fld.value }}" onInput="{{ fld.handler }}" placeholder="{{ fld.placeholder }}" list="{{ fld.listId }}" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;">
+                <sc-if value="{{ fld.hasList }}" hint-placeholder-val="{{ false }}">
+                  <datalist id="{{ fld.listId }}">
+                    <sc-for list="{{ fld.listOptions }}" as="o" hint-placeholder-count="0"><option value="{{ o.value }}">{{ o.label }}</option></sc-for>
+                  </datalist>
+                </sc-if>
               </sc-if>
               <sc-if value="{{ fld.isArea }}" hint-placeholder-val="{{ false }}">
                 <textarea value="{{ fld.value }}" onInput="{{ fld.handler }}" placeholder="{{ fld.placeholder }}" style="{{ fld.areaStyle }}"></textarea>
@@ -1000,6 +1005,28 @@ class Component extends DCLogic {
   closeModal() { this.setState({ modalType: null, form: {}, editId: null }); }
   stop(e) { e.stopPropagation(); }
   setForm(k, v) { this.setState(s => ({ form: Object.assign({}, s.form, { [k]: v }) })); }
+  normChoice(v) { return String(v || '').trim().toLowerCase(); }
+  uniqueOptions(values) {
+    const seen = {};
+    const out = [];
+    (values || []).forEach(v => {
+      const value = String(v || '').trim();
+      if (!value) return;
+      const key = this.normChoice(value);
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push({ value, label: value });
+    });
+    return out;
+  }
+  feedbackCompanyOptions() {
+    return this.uniqueOptions((this.state.db.applications || []).map(a => a.company));
+  }
+  feedbackRoleOptions(company) {
+    const companyKey = this.normChoice(company);
+    const apps = (this.state.db.applications || []).filter(a => !companyKey || this.normChoice(a.company) === companyKey);
+    return this.uniqueOptions(apps.map(a => a.role));
+  }
   saveModal() {
     const t = this.state.modalType, f = this.state.form, id = this.state.editId;
     if (t === 'job') { if (!(f.company && f.role)) return this.showToast('请填写公司和岗位名称'); this.setDb(db => { if (id) Object.assign(db.jobs.find(x => x.id === id), f); else db.jobs.unshift(Object.assign({ id: this.uid(), createdAt: Date.now() }, f)); }); }
@@ -1239,12 +1266,13 @@ class Component extends DCLogic {
 
   buildFields() {
     const t = this.state.modalType, f = this.state.form;
-    const inp = (key, label, ph, type) => ({ isInput: true, inputType: type || 'text', label, placeholder: ph || '', value: f[key] == null ? '' : f[key], handler: e => this.setForm(key, e.target.value) });
+    const inp = (key, label, ph, type) => ({ isInput: true, inputType: type || 'text', label, placeholder: ph || '', value: f[key] == null ? '' : f[key], hasList: false, listId: '', listOptions: [], handler: e => this.setForm(key, e.target.value) });
+    const inpList = (key, label, ph, listId, listOptions) => Object.assign(inp(key, label, ph), { hasList: listOptions && listOptions.length > 0, listId: listId, listOptions: listOptions || [] });
     const area = (key, label, ph, tall) => ({ isArea: true, label, placeholder: ph || '', value: f[key] == null ? '' : f[key], handler: e => this.setForm(key, e.target.value), areaStyle: 'width:100%;height:' + (tall ? '160px' : '88px') + ';border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.7;outline:none;' });
     const sel = (key, label, opts) => ({ isSelect: true, label, options: opts, value: f[key] == null ? opts[0] : f[key], handler: e => this.setForm(key, e.target.value) });
     if (t === 'job') return [inp('company', '公司名称', '如：腾讯音乐'), inp('role', '岗位名称', '如：资金管理实习生'), inp('city', '城市', '如：深圳'), inp('direction', '岗位方向（用于命名简历版本）', '如：资金管理 / 财务BP'), inp('link', '投递链接', 'https://…'), area('jd', '岗位 JD（粘贴招聘信息）', '把岗位职责与任职要求粘贴到这里…', true), inp('source', '来源备注', '如：BOSS直聘 / 内推 / 学长转发')];
     if (t === 'application') return [inp('company', '公司名称', ''), inp('role', '岗位名称', ''), inp('city', '城市', ''), inp('channel', '投递渠道', '如：官网 / BOSS / 内推 / 邮件'), inp('date', '投递日期', '', 'date'), inp('versionName', '使用的简历版本', '如：资金管理版'), sel('status', '当前状态', this.STATUSES), inp('nextStep', '下一步事项', '如：3 天后跟进 HR'), area('note', '备注', '')];
-    if (t === 'feedback') return [inp('company', '公司名称', ''), inp('role', '岗位名称', ''), sel('type', '反馈类型', this.FBTYPES), area('content', '反馈原文（可粘贴邮件 / 短信）', '把企业的回复原文如实粘贴到这里…', true), area('summary', '要点小结（手填）', ''), inp('nextStep', '我的下一步', '')];
+    if (t === 'feedback') return [inpList('company', '公司名称', '选择已投递公司，或直接输入新公司', 'jm-feedback-company-options', this.feedbackCompanyOptions()), inpList('role', '岗位名称', '选择该公司的已投岗位，或直接输入新岗位', 'jm-feedback-role-options', this.feedbackRoleOptions(f.company)), sel('type', '反馈类型', this.FBTYPES), area('content', '反馈原文（可粘贴邮件 / 短信）', '把企业的回复原文如实粘贴到这里…', true), area('summary', '要点小结（手填）', ''), inp('nextStep', '我的下一步', '')];
     if (t === 'todo') return [inp('text', '待办内容', '如：周五前完成某岗位网申'), inp('due', '截止日期', '', 'date')];
     if (t === 'version') return [inp('name', '版本名称', '如：资金管理版'), inp('targetJob', '对应岗位', '如：腾讯音乐 · 资金管理实习生'), inp('focus', '修改重点', '如：突出资金账户、台账、对账经历'), area('content', '简历内容', '该版本的简历文字…', true)];
     if (t === 'profile') return [inp('name', '姓名', ''), inp('school', '学校', ''), inp('major', '专业', ''), inp('phone', '电话', ''), inp('email', '邮箱', ''), inp('city', '期望城市', '')];

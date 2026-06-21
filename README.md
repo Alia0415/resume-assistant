@@ -40,10 +40,12 @@ http://localhost:3000/求职管家.dc.html
 Render 环境变量至少需要配置：
 
 - `DEEPSEEK_API_KEY`：你的真实 DeepSeek API Key
-- `APP_USERNAME`：公网访问用户名
-- `APP_PASSWORD`：公网访问密码
+- `SESSION_SECRET`：一段随机长字符串，用于保持登录态稳定
+- `ALLOW_REGISTRATION`：是否开放注册，建好账号后建议改为 `false`
 
-不要把以上值写进代码或提交到 GitHub。设置 `APP_USERNAME` 和 `APP_PASSWORD` 后，公网访问页面和 API 都会要求浏览器登录，避免别人消耗你的 DeepSeek 额度。
+不要把以上值写进代码或提交到 GitHub。公网部署现在使用应用内多用户注册 / 登录；创建好自己的账号后，建议把 `ALLOW_REGISTRATION=false`，避免陌生人注册并消耗你的 DeepSeek 额度。
+
+如果部署到 Render，`render.yaml` 已配置 `AUTH_DATA_DIR=/var/data/resume-assistant` 和持久磁盘，用来保存本地文件模式下的账号与业务数据。其它容器平台也需要挂载持久目录，或按 `deploy/tencent-cloud/cloudbase-persistence.md` 配置 CloudBase 云数据库。
 
 如果手动创建 Web Service：
 

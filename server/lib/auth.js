@@ -3,7 +3,7 @@
 /**
  * 多用户认证模块（零额外依赖）
  * ------------------------------------------------------------
- * - 账号存储：server/data/users.json（已被 .gitignore 忽略，不进仓库）。
+ * - 账号存储：AUTH_DATA_DIR/users.json 或 server/data/users.json（已被 .gitignore 忽略，不进仓库）。
  * - 密码哈希：Node 内置 crypto.scrypt + 随机盐，绝不明文保存。
  * - 会话：无状态 HMAC 签名 token，存放在 HttpOnly Cookie 里；
  *   签名密钥来自环境变量 SESSION_SECRET（未配置则用进程内临时密钥并告警）。
@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = path.resolve((process.env.AUTH_DATA_DIR || '').trim() || path.join(__dirname, '..', 'data'));
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 
 const SESSION_COOKIE = 'jm_session';
@@ -109,13 +109,27 @@ function saveUserDataMap(map) {
 }
 
 // ---------- 账号查询 ----------
+function normalizeUserRecord(user, fallbackUsername) {
+  if (!user || typeof user !== 'object') return null;
+  const username = normUsername(user.username || fallbackUsername || user.uid || user.id || user._id);
+  const uid = normUsername(user.uid || user.id || user._id || username);
+  const id = uid || username;
+  if (!id) return Object.assign({}, user);
+  return Object.assign({}, user, {
+    id: id,
+    uid: id,
+    username: username || id,
+    displayName: user.displayName || user.username || username || id,
+  });
+}
+
 async function findUser(username) {
   const key = normUsername(username);
   if (USE_TCB) {
     const res = await tcbDb().collection(TCB_COLLECTION).where({ username: key }).limit(1).get();
-    return (res && res.data && res.data[0]) || null;
+    return normalizeUserRecord((res && res.data && res.data[0]) || null, key);
   }
-  return loadUsers().find((u) => u.username === key) || null;
+  return normalizeUserRecord(loadUsers().find((u) => u.username === key) || null, key);
 }
 
 function idSafe(uid) {
@@ -400,7 +414,9 @@ function verifyToken(token) {
   return payload;
 }
 function createSession(user) {
-  return signToken({ uid: user.id, u: user.username, exp: Date.now() + SESSION_TTL_MS });
+  const rec = normalizeUserRecord(user);
+  if (!rec || !rec.uid) throw new Error('无法创建登录会话：缺少用户标识');
+  return signToken({ uid: rec.uid, u: rec.username, exp: Date.now() + SESSION_TTL_MS });
 }
 
 // ---------- Cookie 工具 ----------
@@ -428,14 +444,16 @@ function isSecure(req) {
   return proto === 'https';
 }
 function setAuthCookies(req, res, user) {
+  const rec = normalizeUserRecord(user);
+  if (!rec || !rec.uid) throw new Error('无法设置登录 Cookie：缺少用户标识');
   const opts = {
     path: '/',
     maxAge: SESSION_TTL_MS,
     sameSite: 'lax',
     secure: isSecure(req),
   };
-  res.cookie(SESSION_COOKIE, createSession(user), Object.assign({ httpOnly: true }, opts));
-  res.cookie(USER_COOKIE, user.displayName || user.username, Object.assign({ httpOnly: false }, opts));
+  res.cookie(SESSION_COOKIE, createSession(rec), Object.assign({ httpOnly: true }, opts));
+  res.cookie(USER_COOKIE, rec.displayName || rec.username, Object.assign({ httpOnly: false }, opts));
 }
 function clearAuthCookies(res) {
   res.clearCookie(SESSION_COOKIE, { path: '/' });
@@ -454,6 +472,7 @@ module.exports = {
   usingEphemeralSecret,
   storeMode,
   loadUsers,
+  normalizeUserRecord,
   findUser,
   createUser,
   getUserData,

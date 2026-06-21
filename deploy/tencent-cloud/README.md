@@ -21,7 +21,7 @@
 
 容器部署时不要设置 `HOST=127.0.0.1`，否则容器外部无法访问服务。只在 CVM + Nginx 手动部署时使用 `HOST=127.0.0.1`。
 
-容器方式需要在腾讯云环境变量里填写 `DEEPSEEK_API_KEY`、`APP_USERNAME`、`APP_PASSWORD`；不要填写真实 `.env` 文件，也不要把 API Key 写进 Dockerfile。
+容器方式需要在腾讯云环境变量里填写 `DEEPSEEK_API_KEY`、固定的 `SESSION_SECRET`，并按需要设置 `ALLOW_REGISTRATION`；不要填写真实 `.env` 文件，也不要把 API Key 写进 Dockerfile。
 
 ## 二、服务器安装基础环境
 
@@ -64,11 +64,19 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_MODEL_PRO=deepseek-v4-pro
 PORT=3000
 HOST=127.0.0.1
-APP_USERNAME=公网访问用户名
-APP_PASSWORD=公网访问密码
+SESSION_SECRET=替换为随机长字符串
+ALLOW_REGISTRATION=true
 ```
 
 `.env` 只能保存在服务器本地，不能提交到 GitHub。
+
+生成 `SESSION_SECRET`：
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+首次部署后先注册自己的账号；账号创建完成后，建议把 `ALLOW_REGISTRATION=false` 并重启服务，避免公网用户自行注册。
 
 ## 五、配置 systemd
 
@@ -136,7 +144,7 @@ sudo systemctl reload nginx
 
 - 不要开放 `3000` 到公网。
 - 不要提交 `server/.env`。
-- 公网必须配置 `APP_USERNAME` 和 `APP_PASSWORD`。
+- 公网必须配置固定的 `SESSION_SECRET`，并在创建好账号后关闭注册。
 - 腾讯云安全组/防火墙只开放 `22`、`80`、`443`。
 - API Key 只放在服务器 `/opt/resume-assistant/server/.env` 或腾讯云环境变量中。
 

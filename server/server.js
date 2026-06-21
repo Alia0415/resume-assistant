@@ -449,7 +449,7 @@ app.listen(...listenArgs, () => {
   console.log('求职管家后端已启动: http://' + (HOST || 'localhost') + ':' + PORT);
   console.log('账号存储模式: ' + auth.storeMode());
   if (auth.storeMode() === 'file') {
-    console.warn('⚠ 账号存储为本地文件 server/data/users.json：在云托管等容器环境重启 / 重新部署后会丢失。线上请设置 TCB_ENV_ID 启用 CloudBase 云数据库持久化。');
+    console.warn('⚠ 账号存储为本地文件 AUTH_DATA_DIR/users.json 或 server/data/users.json：在未挂载持久磁盘的云托管 / 容器环境重启或重新部署后会丢失。线上请配置 AUTH_DATA_DIR 指向持久磁盘，或设置 TCB_ENV_ID 启用 CloudBase 云数据库持久化。');
   }
   if (!process.env.DEEPSEEK_API_KEY) {
     console.warn('⚠ 未检测到 DEEPSEEK_API_KEY，AI 接口会返回未配置错误。请在 server/.env 中填写。');
