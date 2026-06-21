@@ -50,7 +50,7 @@
 </style>
 </head>
 <body>
-  <form class="card" id="form" autocomplete="on">
+  <form class="card" id="form" autocomplete="off">
     <div class="brand">
       <div class="logo">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"></path></svg>
@@ -67,19 +67,19 @@
     </div>
 
     <label for="username">用户名</label>
-    <input id="username" name="username" type="text" autocomplete="username" placeholder="字母 / 数字，2–32 位" required>
+    <input id="username" name="username" type="text" autocomplete="off" placeholder="字母 / 数字，2–32 位" required>
 
     <div id="row-display" style="display:none;">
       <label for="displayName">昵称（可选）</label>
-      <input id="displayName" name="displayName" type="text" placeholder="显示在侧边栏的名字">
+      <input id="displayName" name="displayName" type="text" autocomplete="off" placeholder="显示在侧边栏的名字">
     </div>
 
     <label for="password">密码</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" placeholder="至少 6 位" required>
+    <input id="password" name="password" type="password" autocomplete="off" placeholder="至少 6 位" required>
 
     <div id="row-confirm" style="display:none;">
       <label for="confirm">确认密码</label>
-      <input id="confirm" name="confirm" type="password" autocomplete="new-password" placeholder="再次输入密码">
+      <input id="confirm" name="confirm" type="password" autocomplete="off" placeholder="再次输入密码">
     </div>
 
     <button type="submit" class="submit" id="submit">登录</button>
@@ -99,13 +99,28 @@
     el('row-display').style.display = m === 'register' ? '' : 'none';
     el('row-confirm').style.display = m === 'register' ? '' : 'none';
     el('submit').textContent = m === 'register' ? '注册并登录' : '登录';
-    el('password').setAttribute('autocomplete', m === 'register' ? 'new-password' : 'current-password');
+    el('password').setAttribute('autocomplete', 'off');
     msg.className = 'msg';
     msg.textContent = '';
   }
   function show(kind, text) { msg.className = 'msg ' + kind; msg.textContent = text; }
+  function clearMessage() {
+    msg.className = 'msg';
+    msg.textContent = '';
+  }
+  function resetEntryState() {
+    ['username', 'password', 'displayName', 'confirm'].forEach(function (id) {
+      el(id).value = '';
+    });
+    el('submit').disabled = false;
+    setMode('login');
+    clearMessage();
+  }
   el('tab-login').onclick = function () { setMode('login'); };
   el('tab-register').onclick = function () { setMode('register'); };
+  ['username', 'password', 'displayName', 'confirm'].forEach(function (id) {
+    el(id).addEventListener('input', clearMessage);
+  });
 
   el('form').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -135,7 +150,9 @@
       .catch(function () { show('err', '网络错误，请稍后重试'); el('submit').disabled = false; });
   });
 
-  setMode('login');
+  resetEntryState();
+  window.addEventListener('pageshow', resetEntryState);
+  window.setTimeout(resetEntryState, 0);
 })();
 </script>
 </body>

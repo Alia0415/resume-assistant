@@ -54,8 +54,11 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
     const user = await auth.findUser(username);
-    if (!user || !auth.verifyPassword(password || '', user.passHash)) {
-      return res.status(401).json({ error: '用户名或密码错误。' });
+    if (!user) {
+      return res.status(404).json({ error: '该账号还没有注册，请先切换到「注册」。', code: 'NO_SUCH_USER' });
+    }
+    if (!auth.verifyPassword(password || '', user.passHash)) {
+      return res.status(401).json({ error: '密码错误，请重新输入。', code: 'BAD_PASSWORD' });
     }
     auth.setAuthCookies(req, res, user);
     return res.json({ ok: true, user: { username: user.username, displayName: user.displayName } });
