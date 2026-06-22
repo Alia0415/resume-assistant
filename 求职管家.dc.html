@@ -1058,10 +1058,62 @@ class Component extends DCLogic {
     }
     this.setState(s => ({ form: Object.assign({}, s.form, { role: value, _manualRole: false }) }));
   }
+  matchedJobItems() {
+    const db = this.state.db || {};
+    const analyses = db.analyses || {};
+    return (db.jobs || []).filter(j => j && j.id && analyses[j.id] && analyses[j.id].match && (j.company || j.role));
+  }
+  applicationCompanyOptions() {
+    return this.uniqueOptions(this.matchedJobItems().map(j => j.company));
+  }
+  applicationRoleOptions(company) {
+    const companyKey = this.normChoice(company);
+    if (!companyKey) return [];
+    const items = this.matchedJobItems().filter(j => this.normChoice(j.company) === companyKey);
+    return this.uniqueOptions(items.map(j => j.role));
+  }
+  matchedJobFor(company, role) {
+    const companyKey = this.normChoice(company);
+    const roleKey = this.normChoice(role);
+    return this.matchedJobItems().find(j => this.normChoice(j.company) === companyKey && this.normChoice(j.role) === roleKey) || null;
+  }
+  selectApplicationCompany(value, currentRole) {
+    if (value === '__manual__') {
+      this.setState(s => ({ form: Object.assign({}, s.form, { company: '', role: '', city: '', _manualAppCompany: true, _manualAppRole: false }) }));
+      return;
+    }
+    const roles = this.applicationRoleOptions(value);
+    const nextRole = roles.some(o => o.value === currentRole) ? currentRole : (roles.length === 1 ? roles[0].value : '');
+    const job = nextRole ? this.matchedJobFor(value, nextRole) : null;
+    this.setState(s => ({ form: Object.assign({}, s.form, { company: value, role: nextRole, city: (job && job.city) || '', _manualAppCompany: false, _manualAppRole: false }) }));
+  }
+  selectApplicationRole(value) {
+    if (value === '__manual__') {
+      this.setState(s => ({ form: Object.assign({}, s.form, { role: '', _manualAppRole: true }) }));
+      return;
+    }
+    this.setState(s => {
+      const job = this.matchedJobFor(s.form.company, value);
+      return { form: Object.assign({}, s.form, { role: value, city: (job && job.city) || s.form.city || '', _manualAppRole: false }) };
+    });
+  }
+  resumeVersionOptions() {
+    const db = this.state.db || {};
+    const versionNames = (db.versions || []).map(v => v.name);
+    const fileNames = (db.resumes || []).map(r => r.fileName);
+    return this.uniqueOptions([].concat(versionNames).concat(fileNames));
+  }
+  selectApplicationVersion(value) {
+    if (value === '__manual__') {
+      this.setState(s => ({ form: Object.assign({}, s.form, { versionName: '', _manualAppVersion: true }) }));
+      return;
+    }
+    this.setState(s => ({ form: Object.assign({}, s.form, { versionName: value, _manualAppVersion: false }) }));
+  }
   saveModal() {
     const t = this.state.modalType, f = this.state.form, id = this.state.editId;
     if (t === 'job') { if (!(f.company && f.role)) return this.showToast('请填写公司和岗位名称'); this.setDb(db => { if (id) Object.assign(db.jobs.find(x => x.id === id), f); else db.jobs.unshift(Object.assign({ id: this.uid(), createdAt: Date.now() }, f)); }); }
-    else if (t === 'application') { if (!(f.company && f.role)) return this.showToast('请填写公司和岗位名称'); this.setDb(db => { if (id) Object.assign(db.applications.find(x => x.id === id), f); else db.applications.unshift(Object.assign({ id: this.uid(), createdAt: Date.now(), status: f.status || '待投递', date: f.date || this.today() }, f)); }); }
+    else if (t === 'application') { if (!(f.company && f.role)) return this.showToast('请填写公司和岗位名称'); const clean = Object.assign({}, f); delete clean._manualAppCompany; delete clean._manualAppRole; delete clean._manualAppVersion; this.setDb(db => { if (id) Object.assign(db.applications.find(x => x.id === id), clean); else db.applications.unshift(Object.assign({ id: this.uid(), createdAt: Date.now(), status: clean.status || '待投递', date: clean.date || this.today() }, clean)); }); }
     else if (t === 'feedback') { if (!f.company) return this.showToast('请填写公司'); const clean = Object.assign({}, f); delete clean._manualCompany; delete clean._manualRole; this.setDb(db => { if (id) Object.assign(db.feedback.find(x => x.id === id), clean); else db.feedback.unshift(Object.assign({ id: this.uid(), createdAt: Date.now(), type: clean.type || '无反馈' }, clean)); }); }
     else if (t === 'todo') { if (!f.text) return this.showToast('请填写待办内容'); this.setDb(db => { if (id) Object.assign(db.todos.find(x => x.id === id), f); else db.todos.unshift(Object.assign({ id: this.uid(), done: false, source: 'manual' }, f)); }); }
     else if (t === 'version') { if (!f.name) return this.showToast('请填写版本名称'); this.setDb(db => { if (id) Object.assign(db.versions.find(x => x.id === id), f, { updatedAt: Date.now() }); else db.versions.unshift(Object.assign({ id: this.uid(), updatedAt: Date.now() }, f)); }); }
@@ -1328,7 +1380,7 @@ class Component extends DCLogic {
     const area = (key, label, ph, tall) => ({ isArea: true, label, placeholder: ph || '', value: f[key] == null ? '' : f[key], handler: e => this.setForm(key, e.target.value), areaStyle: 'width:100%;height:' + (tall ? '160px' : '88px') + ';border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.7;outline:none;' });
     const sel = (key, label, opts) => ({ isSelect: true, label, options: opts, value: f[key] == null ? opts[0] : f[key], handler: e => this.setForm(key, e.target.value) });
     if (t === 'job') return [inp('company', '公司名称', '如：腾讯音乐'), inp('role', '岗位名称', '如：资金管理实习生'), inp('city', '城市', '如：深圳'), inp('direction', '岗位方向（用于命名简历版本）', '如：资金管理 / 财务BP'), inp('link', '投递链接', 'https://…'), area('jd', '岗位 JD（粘贴招聘信息）', '把岗位职责与任职要求粘贴到这里…', true), inp('source', '来源备注', '如：BOSS直聘 / 内推 / 学长转发')];
-    if (t === 'application') return [inp('company', '公司名称', ''), inp('role', '岗位名称', ''), inp('city', '城市', ''), inp('channel', '投递渠道', '如：官网 / BOSS / 内推 / 邮件'), inp('date', '投递日期', '', 'date'), inp('versionName', '使用的简历版本', '如：资金管理版'), sel('status', '当前状态', this.STATUSES), inp('nextStep', '下一步事项', '如：3 天后跟进 HR'), area('note', '备注', '')];
+    if (t === 'application') return [combo('company', '公司名称', '直接输入新公司', this.applicationCompanyOptions(), v => this.selectApplicationCompany(v, f.role || ''), '选择已匹配公司', '手动输入新公司', '_manualAppCompany'), combo('role', '岗位名称', '直接输入新岗位', this.applicationRoleOptions(f.company), v => this.selectApplicationRole(v), f.company ? '选择该公司的已匹配岗位' : '先选择公司', '手动输入新岗位', '_manualAppRole'), inp('city', '城市', ''), inp('channel', '投递渠道', '如：官网 / BOSS / 内推 / 邮件'), inp('date', '投递日期', '', 'date'), combo('versionName', '使用的简历版本', '直接输入简历版本', this.resumeVersionOptions(), v => this.selectApplicationVersion(v), '选择已有简历版本', '手动输入简历版本', '_manualAppVersion'), sel('status', '当前状态', this.STATUSES), inp('nextStep', '下一步事项', '如：3 天后跟进 HR'), area('note', '备注', '')];
     if (t === 'feedback') return [combo('company', '公司名称', '直接输入新公司', this.feedbackCompanyOptions(), v => this.selectFeedbackCompany(v, f.role || ''), '选择已记录公司', '手动输入新公司', '_manualCompany'), combo('role', '岗位名称', '直接输入新岗位', this.feedbackRoleOptions(f.company), v => this.selectFeedbackRole(v), f.company ? '选择该公司的已记录岗位' : '先选择公司', '手动输入新岗位', '_manualRole'), sel('type', '反馈类型', this.FBTYPES), area('content', '反馈原文（可粘贴邮件 / 短信）', '把企业的回复原文如实粘贴到这里…', true), area('summary', '要点小结（手填）', ''), inp('nextStep', '我的下一步', '')];
     if (t === 'todo') return [inp('text', '待办内容', '如：周五前完成某岗位网申'), inp('due', '截止日期', '', 'date')];
     if (t === 'version') return [inp('name', '版本名称', '如：资金管理版'), inp('targetJob', '对应岗位', '如：腾讯音乐 · 资金管理实习生'), inp('focus', '修改重点', '如：突出资金账户、台账、对账经历'), area('content', '简历内容', '该版本的简历文字…', true)];
