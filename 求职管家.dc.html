@@ -777,7 +777,7 @@
               <sc-if value="{{ fld.isCombo }}" hint-placeholder-val="{{ false }}">
                 <sc-if value="{{ fld.showSelect }}" hint-placeholder-val="{{ false }}">
                   <select value="{{ fld.selectValue }}" onChange="{{ fld.selectHandler }}" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;background:#fff;cursor:pointer;">
-                    <option value="">{{ fld.selectPlaceholder }}</option>
+                    <option value="" disabled hidden>{{ fld.selectPlaceholder }}</option>
                     <sc-for list="{{ fld.options }}" as="o" hint-placeholder-count="0"><option value="{{ o.value }}">{{ o.label }}</option></sc-for>
                     <option value="__manual__">{{ fld.manualLabel }}</option>
                   </select>
