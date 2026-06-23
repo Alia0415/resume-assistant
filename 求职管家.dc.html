@@ -74,7 +74,7 @@
     <sc-if value="{{ cloudSyncError }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ retryCloudSave }}" style="margin:0 11px 14px;display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:11px;background:#fdecec;border:1px solid #f3c9c9;cursor:pointer;text-align:left;font-family:inherit;color:#c0392b;font-size:12px;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
-        <span style="flex:1;">云同步失败，点击重试</span>
+        <span style="flex:1;">{{ cloudSyncText }}</span>
       </button>
     </sc-if>
   </aside>
@@ -863,6 +863,22 @@ class Component extends DCLogic {
   }
   scheduleFlush() { clearTimeout(this._cloudSaveTimer); this._cloudSaveTimer = setTimeout(() => this.flushSave(), 800); }
   flushSave() { if (this._loaded && !this._saving) this.saveLoop(); }
+  clearSyncError() { if (this.state.syncErr) this.setState({ syncErr: false }); }
+  setSyncError(message) {
+    const next = message || true;
+    const changed = this.state.syncErr !== next;
+    if (changed) this.setState({ syncErr: next });
+    return changed;
+  }
+  async readCloudError(res) {
+    let out = null;
+    try { out = await res.json(); } catch (e) {}
+    const serverMessage = out && (out.error || out.message || out.code);
+    if (res.status === 401) return '登录状态已过期，已暂存本地，请重新登录后同步';
+    if (res.status === 413) return '云端保存失败：数据超过服务器限制，已暂存本地';
+    if (serverMessage) return '云端保存失败：' + serverMessage + '（已暂存本地）';
+    return '云端保存失败：HTTP ' + res.status + '（已暂存本地）';
+  }
   // 串行保存队列：同一时刻只发一个 PUT；保存期间的多次改动会合并为「最后一份」整库写入，避免并发乱序。
   async saveLoop() {
     if (this._saving) return;
@@ -890,18 +906,22 @@ class Component extends DCLogic {
         if (out && out.data) { this.setState({ db: out.data }); this.cacheLocal(out.data); }
         this._revision = (out && out.revision) || this._revision;
         this._pendingDb = null;
-        if (this.state.syncErr) this.setState({ syncErr: false });
+        this.clearSyncError();
         this.showToast('数据在其他地方有更新，已同步为最新版本');
         return true;
       }
-      if (!res.ok) { if (!this.state.syncErr) this.setState({ syncErr: true }); this.showToast('云端保存失败，已暂存本地，稍后自动重试'); return false; }
+      if (!res.ok) {
+        const message = await this.readCloudError(res);
+        if (this.setSyncError(message)) this.showToast(message);
+        return false;
+      }
       const out = await res.json();
       this._revision = (out && out.revision) != null ? out.revision : ((this._revision || 0) + 1);
-      if (this.state.syncErr) this.setState({ syncErr: false });
+      this.clearSyncError();
       return true;
     } catch (e) {
-      if (!this.state.syncErr) this.setState({ syncErr: true });
-      this.showToast('云端保存失败（网络问题），已暂存本地');
+      const message = '网络异常，云端暂未保存，已暂存本地';
+      if (this.setSyncError(message)) this.showToast(message);
       return false;
     }
   }
@@ -1614,7 +1634,8 @@ class Component extends DCLogic {
       nav, pageTitle: tt[0], pageSubtitle: tt[1], headerAction,
       profileName, profileInitial, profileSub, profileFields,
       loginName: (typeof window !== 'undefined' && window.JM_USER) || '', logout: () => { if (window.jmLogout) window.jmLogout(); },
-      cloudSyncError: !!S.syncErr, retryCloudSave: () => { this.setState({ syncErr: false }); this.flushSave(); },
+      cloudSyncError: !!S.syncErr, cloudSyncText: typeof S.syncErr === 'string' ? S.syncErr : '云同步失败，点击重试',
+      retryCloudSave: () => { this.setState({ syncErr: false }); this.flushSave(); },
       goSettings: () => this.go('settings'), goTodos: () => this.go('todos'), goApps: () => this.go('apps'),
       triggerUpload: () => this.triggerUpload(), onFile: e => this.onFile(e), onDragOver: e => this.onDragOver(e), onDrop: e => this.onDrop(e),
       openJobModal: () => this.openModal('job'), openAppModal: () => this.openModal('application'),
