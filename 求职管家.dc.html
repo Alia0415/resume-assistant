@@ -528,32 +528,26 @@
                 <div style="position:sticky;top:86px;background:#fff;border:1px solid #ebeef4;border-radius:14px;overflow:hidden;">
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
                     <div>
-                      <div style="font-size:13px;font-weight:700;">原文件与编辑稿</div>
-                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">上方是真实上传文件预览；下方是采纳建议后的可编辑稿</div>
+                      <div style="font-size:13px;font-weight:700;">原文件编辑区</div>
+                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">直接在上传的 PDF / Word 版式上修改；采纳建议会写到这里</div>
                     </div>
-                    <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存当前预览</button>
+                    <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存当前编辑</button>
                   </div>
                   <sc-if value="{{ previewHasUnlocated }}" hint-placeholder-val="{{ false }}">
-                    <div style="margin:12px 16px 0;background:#fff8ee;border:1px solid #f5e3c3;border-radius:10px;padding:9px 11px;font-size:11.8px;color:#9a6411;line-height:1.6;">有 {{ previewUnlocatedCount }} 条建议未在简历中定位，未自动写入正文。请在右侧预览中手动修改，或调整建议原文后再采纳。</div>
+                    <div style="margin:12px 16px 0;background:#fff8ee;border:1px solid #f5e3c3;border-radius:10px;padding:9px 11px;font-size:11.8px;color:#9a6411;line-height:1.6;">有 {{ previewUnlocatedCount }} 条建议未在原文件中定位，未自动写入。请直接在右侧文件编辑区手动修改，或调整建议原文后再采纳。</div>
                   </sc-if>
                   <div style="background:#f3f5f9;padding:18px;max-height:820px;overflow:auto;">
-                    <div style="width:100%;max-width:760px;margin:0 auto 16px;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 24px rgba(31,53,90,.08);">
+                    <div style="width:100%;max-width:760px;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 24px rgba(31,53,90,.08);">
                       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
-                        <span style="font-size:12.5px;font-weight:700;color:#18223a;">原文件版式</span>
+                        <span style="font-size:12.5px;font-weight:700;color:#18223a;">可直接编辑的原文件</span>
                         <span style="font-size:11.5px;color:#93a0b8;">{{ sourcePreviewLabel }}</span>
                       </div>
-                      <div id="jm-source-preview" data-source-key="{{ sourcePreviewKey }}" style="max-height:420px;overflow:auto;padding:14px;background:#eef2f7;display:flex;flex-direction:column;align-items:center;gap:14px;"></div>
-                    </div>
-                    <div style="width:100%;max-width:760px;margin:0 auto 8px;font-size:12.5px;font-weight:700;color:#18223a;">可编辑稿</div>
-                    <div id="jm-rewrite-preview-editor" contenteditable="true" spellcheck="false" style="width:100%;max-width:760px;min-height:620px;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 28px rgba(31,53,90,.10);padding:34px 42px;font-family:SimSun,'Noto Sans SC',serif;font-size:12.5px;line-height:1.65;color:#111827;outline:2px solid transparent;white-space:pre-wrap;">
-                      <sc-for list="{{ rewritePreviewLines }}" as="line" hint-placeholder-count="0">
-                        <div style="{{ line.style }}"><sc-for list="{{ line.segments }}" as="seg" hint-placeholder-count="0"><span style="{{ seg.style }}" title="{{ seg.title }}">{{ seg.text }}</span></sc-for></div>
-                      </sc-for>
+                      <div id="jm-source-preview" data-source-key="{{ sourcePreviewKey }}" style="min-height:640px;max-height:780px;overflow:auto;padding:14px;background:#eef2f7;display:flex;flex-direction:column;align-items:center;gap:14px;"></div>
                     </div>
                   </div>
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-top:1px solid #eef1f6;background:#fbfcfe;flex-wrap:wrap;">
-                    <div style="font-size:11.5px;color:#7e8aa3;">保存后会进入「简历版本」，再决定是否导出 Word。</div>
-                    <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存为简历版本</button>
+                    <div style="font-size:11.5px;color:#7e8aa3;">这里的当前内容会进入「简历版本」，再决定是否导出 Word。</div>
+                    <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存当前文件编辑</button>
                   </div>
                 </div>
               </div>
@@ -1066,36 +1060,91 @@ class Component extends DCLogic {
     if (!resume) return this.sourcePreviewMessage(box, '当前没有选择简历文件。');
     const ext = String(resume.fileType || '').toLowerCase();
     const blob = await this.resumeBlob(resume);
-    if (!blob) return this.sourcePreviewMessage(box, '找不到原文件，只能显示下方文字编辑稿。');
+    if (!blob) return this.sourcePreviewMessage(box, '找不到原文件，无法进入原文件编辑区。');
     try {
       if (ext === 'pdf') return await this.renderPdfSourcePreview(box, blob);
       if (ext === 'docx') return await this.renderDocxSourcePreview(box, blob);
-      if (ext === 'txt') return this.sourcePreviewMessage(box, 'TXT 没有原始版式，下方编辑稿就是可编辑内容。');
+      if (ext === 'txt') return this.renderTextSourcePreview(box, resume.text || '');
       return this.sourcePreviewMessage(box, '暂不支持预览 .' + (ext || 'doc') + ' 原始版式；请上传 PDF 或 DOCX。');
     } catch (e) {
       console.error('[source preview]', e);
-      this.sourcePreviewMessage(box, '原文件预览失败，但下方编辑稿仍可使用。');
+      this.sourcePreviewMessage(box, '原文件编辑区渲染失败，请刷新或重新上传文件。');
     }
+  }
+  renderTextSourcePreview(box, text) {
+    box.innerHTML = '';
+    const holder = document.createElement('div');
+    holder.setAttribute('data-jm-source-edit-root', '1');
+    holder.setAttribute('contenteditable', 'true');
+    holder.setAttribute('spellcheck', 'false');
+    holder.style.cssText = 'width:100%;max-width:680px;min-height:620px;background:#fff;border:1px solid #dfe5ee;box-shadow:0 8px 20px rgba(31,53,90,.12);padding:34px 42px;font-family:SimSun,\"Noto Sans SC\",serif;font-size:12.5px;line-height:1.65;color:#111827;outline:2px solid transparent;white-space:pre-wrap;';
+    holder.textContent = text || '';
+    box.appendChild(holder);
+    this.refreshRewritePreviewEditor();
   }
   async renderPdfSourcePreview(box, blob) {
     if (!window.pdfjsLib) return this.sourcePreviewMessage(box, 'PDF 预览组件加载失败，请刷新后重试。');
     box.innerHTML = '';
+    const holder = document.createElement('div');
+    holder.setAttribute('data-jm-source-edit-root', '1');
+    holder.setAttribute('contenteditable', 'true');
+    holder.setAttribute('spellcheck', 'false');
+    holder.style.cssText = 'display:flex;flex-direction:column;gap:14px;align-items:center;outline:2px solid transparent;';
+    box.appendChild(holder);
     const ab = await blob.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({ data: ab }).promise;
     const maxPages = Math.min(pdf.numPages || 1, 3);
     for (let i = 1; i <= maxPages; i++) {
       const pg = await pdf.getPage(i);
-      const viewport = pg.getViewport({ scale: 1.35 });
+      const viewport = pg.getViewport({ scale: 1.15 });
+      const page = document.createElement('div');
+      page.style.cssText = 'position:relative;width:' + Math.ceil(viewport.width) + 'px;height:' + Math.ceil(viewport.height) + 'px;background:#fff;border:1px solid #dfe5ee;box-shadow:0 8px 20px rgba(31,53,90,.12);overflow:hidden;';
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
-      canvas.style.width = '100%';
-      canvas.style.maxWidth = '680px';
-      canvas.style.background = '#fff';
-      canvas.style.boxShadow = '0 8px 20px rgba(31,53,90,.12)';
-      canvas.style.border = '1px solid #dfe5ee';
+      canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;background:#fff;opacity:.28;pointer-events:none;';
       await pg.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      box.appendChild(canvas);
+      page.appendChild(canvas);
+      const layer = document.createElement('div');
+      layer.style.cssText = 'position:absolute;inset:0;font-family:SimSun,\"Noto Sans SC\",serif;color:#111827;';
+      const tc = await pg.getTextContent();
+      const items = (tc.items || []).map(it => {
+        const tx = window.pdfjsLib.Util.transform(viewport.transform, it.transform);
+        const fontSize = Math.max(7, Math.hypot(tx[2], tx[3]) || Math.abs(tx[3]) || 11);
+        return {
+          text: it.str || '',
+          x: tx[4] || 0,
+          y: (tx[5] || 0) - fontSize,
+          fontSize,
+          width: Math.max(12, (it.width || 0) * viewport.scale)
+        };
+      }).filter(it => it.text.trim());
+      items.sort((a, b) => Math.abs(a.y - b.y) > 3 ? a.y - b.y : a.x - b.x);
+      const lines = [];
+      items.forEach(it => {
+        let line = lines.find(l => Math.abs(l.y - it.y) <= Math.max(3, it.fontSize * .28));
+        if (!line) { line = { y: it.y, items: [] }; lines.push(line); }
+        line.items.push(it);
+      });
+      lines.sort((a, b) => a.y - b.y);
+      lines.forEach(line => {
+        line.items.sort((a, b) => a.x - b.x);
+        let text = '', endX = null, fontSize = 11;
+        line.items.forEach(it => {
+          if (text && endX != null && it.x - endX > Math.max(3, it.fontSize * .45)) text += ' ';
+          text += it.text;
+          endX = it.x + it.width;
+          fontSize = Math.max(fontSize, it.fontSize);
+        });
+        const x = Math.max(0, Math.min.apply(null, line.items.map(it => it.x)));
+        const y = Math.max(0, line.y);
+        const div = document.createElement('div');
+        div.textContent = text;
+        div.style.cssText = 'position:absolute;left:' + x.toFixed(1) + 'px;top:' + y.toFixed(1) + 'px;max-width:' + Math.max(80, viewport.width - x - 24).toFixed(1) + 'px;min-height:' + Math.ceil(fontSize * 1.12) + 'px;font-size:' + fontSize.toFixed(1) + 'px;line-height:1.12;white-space:pre-wrap;background:rgba(255,255,255,.94);outline:1px solid transparent;padding:0 1px;';
+        layer.appendChild(div);
+      });
+      page.appendChild(layer);
+      holder.appendChild(page);
     }
     if (pdf.numPages > maxPages) {
       const note = document.createElement('div');
@@ -1103,12 +1152,16 @@ class Component extends DCLogic {
       note.textContent = '仅预览前 ' + maxPages + ' 页，共 ' + pdf.numPages + ' 页。';
       box.appendChild(note);
     }
+    this.refreshRewritePreviewEditor();
   }
   async renderDocxSourcePreview(box, blob) {
     if (!(window.docx && window.docx.renderAsync)) return this.sourcePreviewMessage(box, 'Word 预览组件加载失败，请刷新后重试。');
     box.innerHTML = '';
     const holder = document.createElement('div');
-    holder.style.cssText = 'width:100%;max-width:680px;background:#fff;box-shadow:0 8px 20px rgba(31,53,90,.12);overflow:auto;';
+    holder.setAttribute('data-jm-source-edit-root', '1');
+    holder.setAttribute('contenteditable', 'true');
+    holder.setAttribute('spellcheck', 'false');
+    holder.style.cssText = 'width:100%;max-width:680px;background:#fff;box-shadow:0 8px 20px rgba(31,53,90,.12);overflow:auto;outline:2px solid transparent;';
     box.appendChild(holder);
     const ab = await blob.arrayBuffer();
     await window.docx.renderAsync(ab, holder, null, {
@@ -1120,6 +1173,11 @@ class Component extends DCLogic {
       breakPages: true,
       useBase64URL: true
     });
+    holder.setAttribute('contenteditable', 'true');
+    holder.querySelectorAll('section,.docx-wrapper,.docx').forEach(el => {
+      el.setAttribute('contenteditable', 'true');
+    });
+    this.refreshRewritePreviewEditor();
   }
 
   triggerUpload() { const el = document.getElementById('jm-file'); if (el) el.click(); }
@@ -1623,6 +1681,82 @@ class Component extends DCLogic {
       '</div>'
     ).join('');
   }
+  sourceEditRoot() {
+    const box = document.getElementById('jm-source-preview');
+    return box ? box.querySelector('[data-jm-source-edit-root="1"]') : null;
+  }
+  sourceEditorText() {
+    try {
+      const root = this.sourceEditRoot();
+      const text = root ? (root.innerText || root.textContent || '') : '';
+      return text.replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    } catch (e) { return ''; }
+  }
+  resetSourceSuggestionMarks(root) {
+    if (!root) return;
+    Array.from(root.querySelectorAll('[data-jm-suggestion-mark="1"]')).forEach(mark => {
+      const raw = mark.getAttribute('data-jm-original');
+      mark.replaceWith(document.createTextNode(raw != null ? raw : (mark.textContent || '')));
+    });
+    root.normalize();
+  }
+  sourceDomTextMap(root) {
+    const out = { text: '', map: [] };
+    if (!root) return out;
+    const NF = window.NodeFilter || { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 };
+    const walker = document.createTreeWalker(root, NF.SHOW_TEXT, {
+      acceptNode: node => {
+        const p = node.parentElement;
+        if (!p) return NF.FILTER_REJECT;
+        if (p.closest('script,style,[data-jm-ignore-text="1"]')) return NF.FILTER_REJECT;
+        return node.nodeValue ? NF.FILTER_ACCEPT : NF.FILTER_REJECT;
+      }
+    });
+    let node = walker.nextNode();
+    while (node) {
+      String(node.nodeValue || '').split('').forEach((ch, offset) => {
+        if (/[\s\u00a0•·\-—–,，.。;；:：、"'“”‘’()[\]（）【】{}《》<>]/.test(ch)) return;
+        out.text += ch.toLowerCase();
+        out.map.push({ node, offset });
+      });
+      node = walker.nextNode();
+    }
+    return out;
+  }
+  findSourceDomMatch(root, target) {
+    const targetText = this.previewCompactText(target).text;
+    if (!targetText || targetText.length < 6) return null;
+    const mapped = this.sourceDomTextMap(root);
+    const pos = mapped.text.indexOf(targetText);
+    if (pos < 0) return null;
+    const start = mapped.map[pos];
+    const last = mapped.map[pos + targetText.length - 1];
+    if (!start || !last) return null;
+    return { start, end: { node: last.node, offset: last.offset + 1 } };
+  }
+  sourceSuggestionStyle(kind) {
+    const base = 'border-radius:4px;padding:1px 2px;white-space:pre-wrap;outline:1px solid transparent;';
+    if (kind === 'accepted') return base + 'background:#e8f8ef;color:#176b4f;font-weight:600;box-shadow:inset 0 -1px 0 #63c18d;';
+    return base + 'background:#fff3c4;box-shadow:inset 0 -1px 0 #d8a72b;';
+  }
+  replaceInSourceEditor(root, before, after, kind, index) {
+    const match = this.findSourceDomMatch(root, before);
+    if (!match) return false;
+    const range = document.createRange();
+    range.setStart(match.start.node, match.start.offset);
+    range.setEnd(match.end.node, match.end.offset);
+    const span = document.createElement('span');
+    span.setAttribute('data-jm-suggestion-mark', '1');
+    span.setAttribute('data-jm-suggestion-index', String(index));
+    span.setAttribute('data-jm-original', before || '');
+    span.setAttribute('contenteditable', 'true');
+    span.setAttribute('title', kind === 'accepted' ? '已采纳：来自修改建议' : '待确认：点击左侧采纳后替换');
+    span.style.cssText = this.sourceSuggestionStyle(kind);
+    span.textContent = after || before || '';
+    range.deleteContents();
+    range.insertNode(span);
+    return true;
+  }
   currentRewritePreview() {
     const jobId = this.curJobId();
     const a = this.state.db.analyses[jobId];
@@ -1632,16 +1766,24 @@ class Component extends DCLogic {
   refreshRewritePreviewEditor() {
     clearTimeout(this._rewritePreviewTimer);
     this._rewritePreviewTimer = setTimeout(() => {
-      const el = document.getElementById('jm-rewrite-preview-editor');
-      if (!el) return;
-      const preview = this.currentRewritePreview();
-      el.innerHTML = this.previewMarkup(preview.lines);
+      const root = this.sourceEditRoot();
+      if (!root) return;
+      this.resetSourceSuggestionMarks(root);
+      const jobId = this.curJobId();
+      const a = this.state.db.analyses[jobId];
+      const rew = a && a.rewrite;
+      const suggestions = (rew && rew.rewriteSuggestions) || [];
+      this._sourceSuggestionHits = suggestions.map((s, i) => {
+        const before = (s && s.originalText) || '';
+        if (!before) return false;
+        const after = s.confirmed ? ((s.rewrittenText || before).trim() || before) : before;
+        return this.replaceInSourceEditor(root, before, after, s.confirmed ? 'accepted' : 'pending', i);
+      });
     }, 0);
   }
   rewritePreviewEditorText() {
     try {
-      const el = document.getElementById('jm-rewrite-preview-editor');
-      const text = el ? (el.innerText || el.textContent || '') : '';
+      const text = this.sourceEditorText();
       return text.replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
     } catch (e) { return ''; }
   }
@@ -1655,12 +1797,12 @@ class Component extends DCLogic {
     const focus = confirmed.map(s => s.section).join('；');
     const allSuggestions = a.rewrite.rewriteSuggestions || [];
     const preview = this.buildRewritePreview(this.getResumeText(), allSuggestions);
-    const content = this.rewritePreviewEditorText() || preview.text || this.getResumeText();
+    const content = this.sourceEditorText() || this.rewritePreviewEditorText() || preview.text || this.getResumeText();
     const notApplied = confirmed.filter(s => !preview.hits[allSuggestions.indexOf(s)]);
     this.openModal('version', { name: ((job && (job.direction || job.role)) || '定制') + '版', targetJob: (job ? job.company + ' · ' + job.role : ''), focus, content });
     this.showToast(notApplied.length
-      ? ('已用右侧预览生成版本；' + notApplied.length + ' 条未定位建议未自动写入')
-      : '已用右侧预览生成版本，请核对后保存');
+      ? ('已用右侧文件编辑区生成版本；' + notApplied.length + ' 条未定位建议未自动写入')
+      : '已用右侧文件编辑区生成版本，请核对后保存');
   }
 
   async exportVersion(v) {
@@ -2127,7 +2269,7 @@ class Component extends DCLogic {
         return {
           section: s.section || '简历', before: s.originalText || '', after: s.rewrittenText || '', reason: s.reason || '', needConfirm: !!s.truthCheckRequired,
           cardStyle: 'background:#fff;border:1px solid ' + (on ? 'var(--ac2)' : '#ebeef4') + ';border-radius:14px;padding:17px 19px;',
-          locLabel: located ? (on ? '已替换到预览' : '已标注到预览') : '未定位',
+          locLabel: located ? (on ? '已替换到原文件' : '已标注到原文件') : '未定位',
           locStyle: 'font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;' + (located ? (on ? 'color:#176b4f;background:#e8f8ef;' : 'color:#9a6411;background:#fff3c4;') : 'color:#c0392b;background:#fdecec;'),
           btnLabel: on ? '✓ 已采纳' : '采纳',
           btnStyle: 'margin-left:auto;border:none;border-radius:8px;padding:6px 15px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;' + (on ? 'background:var(--ac2);color:#fff;' : 'background:var(--ac2-soft);color:var(--ac2);'),
