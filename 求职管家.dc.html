@@ -448,67 +448,105 @@
           <sc-if value="{{ showRewrite }}" hint-placeholder-val="{{ false }}">
             <div style="margin-bottom:16px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
-                <div style="font-size:14px;font-weight:700;">简历修改建议<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">逐条「原文 / 改后 / 理由」，可编辑，确认属实后保存为版本</span></div>
+                <div style="font-size:14px;font-weight:700;">简历修改工作台<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">左侧确认建议，右侧直接预览和编辑最终简历</span></div>
                 <div style="display:flex;align-items:center;gap:12px;">
                   <span style="font-size:12.5px;color:var(--ac2);font-weight:600;">已采纳 {{ sugAcceptedCount }} / {{ sugTotal }}</span>
                   <button onClick="{{ rewriteResume }}" style="background:var(--ac2-soft);color:var(--ac2);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">重新生成</button>
                 </div>
               </div>
-              <div style="display:flex;flex-direction:column;gap:13px;">
-                <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="0">
-                  <div style="{{ s.cardStyle }}">
-                    <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;">
-                      <span style="font-size:13px;font-weight:700;">{{ s.section }}</span>
-                      <sc-if value="{{ s.needConfirm }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#c2710c;background:#fff3e6;border-radius:6px;padding:2px 8px;">需你核实真实性</span></sc-if>
-                      <button onClick="{{ s.toggle }}" style="{{ s.btnStyle }}">{{ s.btnLabel }}</button>
-                    </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;">
-                      <div style="border:1px solid #f0d9d9;background:#fdf6f6;border-radius:10px;padding:11px 13px;">
-                        <div style="font-size:10.5px;font-weight:600;color:#b85c58;margin-bottom:6px;">原文</div>
-                        <div style="font-size:12.5px;color:#8a6a6a;line-height:1.7;">{{ s.before }}</div>
-                      </div>
-                      <div style="border:1px solid #cfe9da;background:#f3fbf6;border-radius:10px;padding:11px 13px;">
-                        <div style="font-size:10.5px;font-weight:600;color:var(--ac2);margin-bottom:6px;">建议改为（可编辑）</div>
-                        <textarea value="{{ s.after }}" onInput="{{ s.editAfter }}" style="width:100%;height:72px;border:1px solid #cfe9da;border-radius:7px;padding:7px 9px;font-size:12.5px;line-height:1.7;color:#1f6b4a;outline:none;background:#fff;"></textarea>
+
+              <div style="display:grid;grid-template-columns:minmax(330px,.85fr) minmax(460px,1.15fr);gap:16px;align-items:start;">
+                <div style="display:flex;flex-direction:column;gap:13px;">
+                  <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:14px 16px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+                      <div style="font-size:13px;font-weight:700;">修改建议</div>
+                      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+                        <span style="font-size:11.5px;color:#176b4f;background:#e8f8ef;border-radius:999px;padding:4px 8px;">已替换 {{ previewAppliedCount }}</span>
+                        <sc-if value="{{ previewUnlocatedCount }}" hint-placeholder-val="{{ false }}"><span style="font-size:11.5px;color:#9a6411;background:#fff3e6;border-radius:999px;padding:4px 8px;">未定位 {{ previewUnlocatedCount }}</span></sc-if>
                       </div>
                     </div>
-                    <div style="display:flex;align-items:flex-start;gap:7px;font-size:12px;color:#6b7a96;margin-top:11px;background:#f7f9fc;border-radius:8px;padding:9px 11px;line-height:1.6;">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93a0b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 16v-4M12 8h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"></path></svg>
-                      {{ s.reason }}
-                    </div>
+                    <div style="font-size:11.5px;color:#7e8aa3;line-height:1.6;">黄色表示右侧已定位但尚未采纳；绿色表示已采纳并替换到预览。未定位的建议不会自动写入正文。</div>
                   </div>
-                </sc-for>
-              </div>
-              <sc-if value="{{ hasRewriteQuestions }}" hint-placeholder-val="{{ false }}">
-                <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:12px;padding:14px 16px;margin-top:13px;">
-                  <div style="font-size:12.5px;font-weight:700;color:#9a6411;margin-bottom:6px;">需要你补充确认</div>
-                  <div style="font-size:11.5px;color:#9a6411;margin-bottom:11px;line-height:1.6;">每题选「是 / 否」，或选「其他」自己补充说明；点下方按钮即可据此生成补充说明。</div>
-                  <div style="display:flex;flex-direction:column;gap:10px;">
-                    <sc-for list="{{ rewriteQuestionItems }}" as="q" hint-placeholder-count="0">
-                      <div style="background:#fff;border:1px solid #f0e2c2;border-radius:10px;padding:11px 13px;">
-                        <div style="font-size:12.5px;color:#5f420c;line-height:1.6;margin-bottom:9px;">{{ q.text }}</div>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                          <button onClick="{{ q.pickYes }}" style="{{ q.yesStyle }}">是</button>
-                          <button onClick="{{ q.pickNo }}" style="{{ q.noStyle }}">否</button>
-                          <button onClick="{{ q.pickOther }}" style="{{ q.otherStyle }}">其他</button>
+
+                  <div style="display:flex;flex-direction:column;gap:13px;max-height:720px;overflow:auto;padding-right:3px;">
+                    <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="0">
+                      <div style="{{ s.cardStyle }}">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                          <span style="font-size:13px;font-weight:700;">{{ s.section }}</span>
+                          <span style="{{ s.locStyle }}">{{ s.locLabel }}</span>
+                          <sc-if value="{{ s.needConfirm }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#c2710c;background:#fff3e6;border-radius:6px;padding:2px 8px;">需你核实真实性</span></sc-if>
+                          <button onClick="{{ s.toggle }}" style="{{ s.btnStyle }}">{{ s.btnLabel }}</button>
                         </div>
-                        <sc-if value="{{ q.showOther }}" hint-placeholder-val="{{ false }}">
-                          <input value="{{ q.detail }}" onInput="{{ q.setDetail }}" placeholder="{{ q.detailHint }}" style="width:100%;margin-top:9px;border:1px solid #e6d3a8;border-radius:8px;padding:8px 11px;font-size:12.5px;color:#5f420c;outline:none;background:#fff;">
-                        </sc-if>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                          <div style="border:1px solid #f0d9d9;background:#fdf6f6;border-radius:10px;padding:10px 12px;">
+                            <div style="font-size:10.5px;font-weight:600;color:#b85c58;margin-bottom:6px;">原文</div>
+                            <div style="font-size:12.3px;color:#8a6a6a;line-height:1.65;">{{ s.before }}</div>
+                          </div>
+                          <div style="border:1px solid #cfe9da;background:#f3fbf6;border-radius:10px;padding:10px 12px;">
+                            <div style="font-size:10.5px;font-weight:600;color:var(--ac2);margin-bottom:6px;">建议改为（可编辑）</div>
+                            <textarea value="{{ s.after }}" onInput="{{ s.editAfter }}" style="width:100%;height:76px;border:1px solid #cfe9da;border-radius:7px;padding:7px 9px;font-size:12.5px;line-height:1.7;color:#1f6b4a;outline:none;background:#fff;"></textarea>
+                          </div>
+                        </div>
+                        <div style="display:flex;align-items:flex-start;gap:7px;font-size:12px;color:#6b7a96;margin-top:11px;background:#f7f9fc;border-radius:8px;padding:9px 11px;line-height:1.6;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93a0b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 16v-4M12 8h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"></path></svg>
+                          {{ s.reason }}
+                        </div>
                       </div>
                     </sc-for>
                   </div>
-                  <button onClick="{{ applyAnswersToNotes }}" style="margin-top:11px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">用我的选择填写补充说明 ↓</button>
-                  <textarea value="{{ rewriteUserNotes }}" onInput="{{ setRewriteUserNotes }}" placeholder="把你的真实补充写在这里，例如相关项目、课程作业、学习经历、可核实的数据等…" style="width:100%;height:104px;margin-top:12px;border:1px solid #e6d3a8;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;color:#5f420c;outline:none;background:#fff;"></textarea>
-                  <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
-                    <button onClick="{{ polishRewriteUserNotes }}" style="background:#fff;color:#9a6411;border:1px solid #e6d3a8;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ polishNotesBtnLabel }}</button>
-                    <span style="font-size:11.5px;color:#9a6411;">只润色你填写的真实内容，不新增经历。</span>
+
+                  <sc-if value="{{ hasRewriteQuestions }}" hint-placeholder-val="{{ false }}">
+                    <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:12px;padding:14px 16px;">
+                      <div style="font-size:12.5px;font-weight:700;color:#9a6411;margin-bottom:6px;">需要你补充确认</div>
+                      <div style="font-size:11.5px;color:#9a6411;margin-bottom:11px;line-height:1.6;">每题选「是 / 否」，或选「其他」自己补充说明；点下方按钮即可据此生成补充说明。</div>
+                      <div style="display:flex;flex-direction:column;gap:10px;">
+                        <sc-for list="{{ rewriteQuestionItems }}" as="q" hint-placeholder-count="0">
+                          <div style="background:#fff;border:1px solid #f0e2c2;border-radius:10px;padding:11px 13px;">
+                            <div style="font-size:12.5px;color:#5f420c;line-height:1.6;margin-bottom:9px;">{{ q.text }}</div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                              <button onClick="{{ q.pickYes }}" style="{{ q.yesStyle }}">是</button>
+                              <button onClick="{{ q.pickNo }}" style="{{ q.noStyle }}">否</button>
+                              <button onClick="{{ q.pickOther }}" style="{{ q.otherStyle }}">其他</button>
+                            </div>
+                            <sc-if value="{{ q.showOther }}" hint-placeholder-val="{{ false }}">
+                              <input value="{{ q.detail }}" onInput="{{ q.setDetail }}" placeholder="{{ q.detailHint }}" style="width:100%;margin-top:9px;border:1px solid #e6d3a8;border-radius:8px;padding:8px 11px;font-size:12.5px;color:#5f420c;outline:none;background:#fff;">
+                            </sc-if>
+                          </div>
+                        </sc-for>
+                      </div>
+                      <button onClick="{{ applyAnswersToNotes }}" style="margin-top:11px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">用我的选择填写补充说明 ↓</button>
+                      <textarea value="{{ rewriteUserNotes }}" onInput="{{ setRewriteUserNotes }}" placeholder="把你的真实补充写在这里，例如相关项目、课程作业、学习经历、可核实的数据等…" style="width:100%;height:104px;margin-top:12px;border:1px solid #e6d3a8;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;color:#5f420c;outline:none;background:#fff;"></textarea>
+                      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
+                        <button onClick="{{ polishRewriteUserNotes }}" style="background:#fff;color:#9a6411;border:1px solid #e6d3a8;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ polishNotesBtnLabel }}</button>
+                        <span style="font-size:11.5px;color:#9a6411;">只润色你填写的真实内容，不新增经历。</span>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div style="position:sticky;top:86px;background:#fff;border:1px solid #ebeef4;border-radius:14px;overflow:hidden;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
+                    <div>
+                      <div style="font-size:13px;font-weight:700;">Word 预览</div>
+                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">可直接点进页面编辑；保存时以右侧当前内容为准</div>
+                    </div>
+                    <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存当前预览</button>
+                  </div>
+                  <sc-if value="{{ previewHasUnlocated }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin:12px 16px 0;background:#fff8ee;border:1px solid #f5e3c3;border-radius:10px;padding:9px 11px;font-size:11.8px;color:#9a6411;line-height:1.6;">有 {{ previewUnlocatedCount }} 条建议未在简历中定位，未自动写入正文。请在右侧预览中手动修改，或调整建议原文后再采纳。</div>
+                  </sc-if>
+                  <div style="background:#f3f5f9;padding:18px;max-height:820px;overflow:auto;">
+                    <div id="jm-rewrite-preview-editor" contenteditable="true" spellcheck="false" style="width:100%;max-width:760px;min-height:860px;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 28px rgba(31,53,90,.10);padding:34px 42px;font-family:SimSun,'Noto Sans SC',serif;font-size:12.5px;line-height:1.65;color:#111827;outline:2px solid transparent;white-space:pre-wrap;">
+                      <sc-for list="{{ rewritePreviewLines }}" as="line" hint-placeholder-count="0">
+                        <div style="{{ line.style }}"><sc-for list="{{ line.segments }}" as="seg" hint-placeholder-count="0"><span style="{{ seg.style }}" title="{{ seg.title }}">{{ seg.text }}</span></sc-for></div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-top:1px solid #eef1f6;background:#fbfcfe;flex-wrap:wrap;">
+                    <div style="font-size:11.5px;color:#7e8aa3;">保存后会进入「简历版本」，再决定是否导出 Word。</div>
+                    <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存为简历版本</button>
                   </div>
                 </div>
-              </sc-if>
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;flex-wrap:wrap;">
-                <div style="font-size:12.5px;color:#6b7a96;">仅「已采纳且经你确认属实」的建议会替换简历对应文字，生成新版本（原文件不动）。</div>
-                <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存为简历版本</button>
               </div>
             </div>
           </sc-if>
@@ -1378,6 +1416,76 @@ class Component extends DCLogic {
   }
   copyText(t) { try { navigator.clipboard.writeText(t); this.showToast('已复制'); } catch (e) { this.showToast('复制失败，请手动选择'); } }
 
+  buildRewritePreview(resumeText, suggestions) {
+    const pieces = [{ text: resumeText || '', kind: 'plain' }];
+    const hits = (suggestions || []).map(() => false);
+    const unlocated = [];
+    (suggestions || []).forEach((s, index) => {
+      const before = (s && s.originalText) || '';
+      if (!before) { unlocated.push(index); return; }
+      const replacement = s.confirmed ? ((s.rewrittenText || before).trim() || before) : before;
+      const kind = s.confirmed ? 'accepted' : 'pending';
+      let found = false;
+      for (let i = 0; i < pieces.length; i++) {
+        const p = pieces[i];
+        if (!p || p.kind !== 'plain') continue;
+        const pos = p.text.indexOf(before);
+        if (pos < 0) continue;
+        const next = [];
+        if (pos > 0) next.push({ text: p.text.slice(0, pos), kind: 'plain' });
+        next.push({ text: replacement, kind, title: s.confirmed ? '已采纳：来自修改建议' : '待确认：点击左侧采纳后替换' });
+        if (pos + before.length < p.text.length) next.push({ text: p.text.slice(pos + before.length), kind: 'plain' });
+        pieces.splice(i, 1, ...next);
+        hits[index] = true;
+        found = true;
+        break;
+      }
+      if (!found) unlocated.push(index);
+    });
+    return {
+      lines: this.previewLinesFromPieces(pieces),
+      text: pieces.map(p => p.text).join('').trim(),
+      hits,
+      unlocated,
+      appliedCount: (suggestions || []).filter((s, i) => s.confirmed && hits[i]).length
+    };
+  }
+  previewLinesFromPieces(pieces) {
+    const lines = [{ segments: [] }];
+    const pushSeg = seg => {
+      const parts = String(seg.text || '').split('\n');
+      parts.forEach((part, i) => {
+        if (i > 0) lines.push({ segments: [] });
+        if (part) lines[lines.length - 1].segments.push(Object.assign({}, seg, { text: part }));
+      });
+    };
+    (pieces || []).forEach(pushSeg);
+    return lines.map(line => {
+      const text = line.segments.map(s => s.text).join('');
+      const isSection = this.isResumeSection(text.trim());
+      return {
+        style: isSection
+          ? 'font-size:15px;font-weight:700;border-bottom:1px solid #111827;margin:12px 0 5px;padding-bottom:2px;min-height:24px;'
+          : 'min-height:20px;margin:0 0 2px;',
+        segments: line.segments.length ? line.segments.map(s => this.previewSegmentView(s)) : [{ text: ' ', style: '', title: '' }]
+      };
+    });
+  }
+  previewSegmentView(seg) {
+    const base = 'border-radius:4px;padding:1px 2px;';
+    const styleMap = {
+      pending: base + 'background:#fff3c4;box-shadow:inset 0 -1px 0 #d8a72b;',
+      accepted: base + 'background:#e8f8ef;color:#176b4f;font-weight:600;box-shadow:inset 0 -1px 0 #63c18d;'
+    };
+    return { text: seg.text || '', style: styleMap[seg.kind] || '', title: seg.title || '' };
+  }
+  rewritePreviewEditorText() {
+    try {
+      const el = document.getElementById('jm-rewrite-preview-editor');
+      const text = el ? (el.innerText || el.textContent || '') : '';
+      return text.replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    } catch (e) { return ''; }
+  }
   saveVersionFromRewrite() {
     const jobId = this.curJobId();
     const job = this.state.db.jobs.find(j => j.id === jobId);
@@ -1386,24 +1494,14 @@ class Component extends DCLogic {
     const confirmed = (a.rewrite.rewriteSuggestions || []).filter(s => s.confirmed);
     if (!confirmed.length) return this.showToast('请先勾选「采纳」且确认属实的建议');
     const focus = confirmed.map(s => s.section).join('；');
-    let content = this.getResumeText();
-    const notApplied = [];
-    confirmed.forEach(s => {
-      if (s.originalText && content.indexOf(s.originalText) >= 0) {
-        content = content.split(s.originalText).join(s.rewrittenText || s.originalText); // 原文精确命中 → 直接替换
-      } else {
-        notApplied.push(s); // 未能精确定位 → 不静默丢弃，附到末尾供手动整合
-      }
-    });
-    if (notApplied.length) {
-      content += '\n\n—— 以下采纳的改写未能在原文中精确定位，请手动整合到对应位置 ——\n' +
-        notApplied.map(s => '【' + (s.section || '简历') + '】' + (s.rewrittenText || '')).join('\n');
-    }
+    const allSuggestions = a.rewrite.rewriteSuggestions || [];
+    const preview = this.buildRewritePreview(this.getResumeText(), allSuggestions);
+    const content = this.rewritePreviewEditorText() || preview.text || this.getResumeText();
+    const notApplied = confirmed.filter(s => !preview.hits[allSuggestions.indexOf(s)]);
     this.openModal('version', { name: ((job && (job.direction || job.role)) || '定制') + '版', targetJob: (job ? job.company + ' · ' + job.role : ''), focus, content });
-    const applied = confirmed.length - notApplied.length;
     this.showToast(notApplied.length
-      ? ('已生成新版本：' + applied + ' 条已自动替换，' + notApplied.length + ' 条已附在末尾待手动整合')
-      : '已按采纳的建议生成新版本，请核对后保存');
+      ? ('已用右侧预览生成版本；' + notApplied.length + ' 条未定位建议未自动写入')
+      : '已用右侧预览生成版本，请核对后保存');
   }
 
   async exportVersion(v) {
@@ -1539,7 +1637,20 @@ class Component extends DCLogic {
     let name = '';
     let contact = '';
     if (bodyLines[0] && !this.isResumeSection(bodyLines[0]) && !this.splitResumeDate(bodyLines[0]) && this.resumeVisualWidth(bodyLines[0]) <= 12) name = bodyLines.shift();
-    if (bodyLines[0] && /电话|手机|邮箱|@|mail/i.test(bodyLines[0])) contact = bodyLines.shift();
+    if (bodyLines[0] && /电话|手机|邮箱|@|mail/i.test(bodyLines[0])) {
+      let rawContact = bodyLines.shift().trim();
+      if (!name && profile.name && rawContact.indexOf(profile.name) === 0) {
+        name = profile.name;
+        rawContact = rawContact.slice(profile.name.length).replace(/^[\s｜|·:：-]+/, '').trim();
+      } else if (!name) {
+        const inlineName = rawContact.match(/^([\u4e00-\u9fa5·]{2,5})\s*(?=电话|手机|邮箱|[\w.-]+@)/);
+        if (inlineName) {
+          name = inlineName[1];
+          rawContact = rawContact.slice(inlineName[1].length).replace(/^[\s｜|·:：-]+/, '').trim();
+        }
+      }
+      contact = rawContact;
+    }
     if (!name) name = profile.name || '简历';
     if (!contact) {
       const bits = [];
@@ -1844,14 +1955,19 @@ class Component extends DCLogic {
     const ringDash = (circ * matchScore / 100).toFixed(1) + ' ' + circ.toFixed(1);
     const jdKeywords = (curJob && curJob.parsed && Array.isArray(curJob.parsed.keywords)) ? curJob.parsed.keywords : [];
     let suggestions = [], sugAcceptedCount = 0, sugTotal = 0;
+    let rewritePreview = { lines: [], text: '', hits: [], unlocated: [], appliedCount: 0 };
     if (hasRewrite) {
       const sugs = rew.rewriteSuggestions || [];
       sugTotal = sugs.length;
+      rewritePreview = this.buildRewritePreview(this.getResumeText(), sugs);
       suggestions = sugs.map((s, i) => {
         const on = !!s.confirmed; if (on) sugAcceptedCount++;
+        const located = !!rewritePreview.hits[i];
         return {
           section: s.section || '简历', before: s.originalText || '', after: s.rewrittenText || '', reason: s.reason || '', needConfirm: !!s.truthCheckRequired,
           cardStyle: 'background:#fff;border:1px solid ' + (on ? 'var(--ac2)' : '#ebeef4') + ';border-radius:14px;padding:17px 19px;',
+          locLabel: located ? (on ? '已替换到预览' : '已标注到预览') : '未定位',
+          locStyle: 'font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;' + (located ? (on ? 'color:#176b4f;background:#e8f8ef;' : 'color:#9a6411;background:#fff3c4;') : 'color:#c0392b;background:#fdecec;'),
           btnLabel: on ? '✓ 已采纳' : '采纳',
           btnStyle: 'margin-left:auto;border:none;border-radius:8px;padding:6px 15px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;' + (on ? 'background:var(--ac2);color:#fff;' : 'background:var(--ac2-soft);color:var(--ac2);'),
           toggle: () => this.toggleSug(curJobId, i),
@@ -1988,6 +2104,8 @@ class Component extends DCLogic {
       hasRisks: riskWarnings.length > 0, riskWarnings,
       hasQuestions: questionsForUser.length > 0, questionsForUser,
       suggestions, sugAcceptedCount, sugTotal,
+      rewritePreviewLines: rewritePreview.lines, previewAppliedCount: rewritePreview.appliedCount,
+      previewUnlocatedCount: rewritePreview.unlocated.length, previewHasUnlocated: rewritePreview.unlocated.length > 0,
       hasRewriteQuestions, rewriteQuestionItems, applyAnswersToNotes: () => this.applyAnswersToNotes(), rewriteUserNotes, setRewriteUserNotes: e => this.setRewriteUserNotes(e.target.value),
       polishRewriteUserNotes: () => this.polishRewriteUserNotes(), polishNotesBtnLabel: aiBusy ? '润色中…' : 'AI 自动润色',
       saveVersionFromRewrite: () => this.saveVersionFromRewrite(),
