@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&amp;display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
   window.JM_COOKIE = function (name) { try { var m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } };
   window.JM_USER = window.JM_COOKIE('jm_user');
@@ -225,7 +226,7 @@
               <div style="font-size:12px;color:#6b7a96;margin-bottom:3px;"><b style="color:#3a485f;font-weight:500;">对应岗位：</b>{{ v.targetJob }}</div>
               <div style="font-size:12px;color:#6b7a96;line-height:1.6;"><b style="color:#3a485f;font-weight:500;">修改重点：</b>{{ v.focus }}</div>
               <div style="display:flex;gap:8px;margin-top:13px;">
-                <button onClick="{{ v.export }}" style="background:var(--ac-soft);color:var(--ac);border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">导出文件</button>
+                <button onClick="{{ v.export }}" style="background:var(--ac-soft);color:var(--ac);border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">导出 Word</button>
                 <button onClick="{{ v.edit }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:500;font-family:inherit;cursor:pointer;">编辑</button>
                 <button onClick="{{ v.del }}" style="margin-left:auto;background:none;color:#c0392b;border:none;padding:6px;cursor:pointer;font-size:12.5px;font-family:inherit;">删除</button>
               </div>
@@ -1007,7 +1008,40 @@ class Component extends DCLogic {
     this.setDb(db => db.resumes.unshift({ id, fileId: fileId, fileName: file.name, fileType: ext, size: file.size, uploadedAt: Date.now(), text }));
     if (fileId || ext === 'txt') this.showToast(text ? '已保存并解析简历文字' : '已保存，未能自动提取文字，分析时可手动粘贴');
   }
-  async extractPdf(file) { const ab = await file.arrayBuffer(); const pdf = await window.pdfjsLib.getDocument({ data: ab }).promise; let out = ''; for (let i = 1; i <= pdf.numPages; i++) { const pg = await pdf.getPage(i); const tc = await pg.getTextContent(); out += tc.items.map(it => it.str).join(' ') + '\n'; } return out.trim(); }
+  async extractPdf(file) {
+    const ab = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: ab }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const pg = await pdf.getPage(i);
+      const tc = await pg.getTextContent();
+      const items = (tc.items || []).map(it => ({
+        text: it.str || '',
+        x: it.transform ? it.transform[4] : 0,
+        y: it.transform ? it.transform[5] : 0,
+        width: it.width || 0
+      })).filter(it => it.text.trim());
+      items.sort((a, b) => Math.abs(b.y - a.y) > 3 ? b.y - a.y : a.x - b.x);
+      const lines = [];
+      items.forEach(it => {
+        let line = lines.find(l => Math.abs(l.y - it.y) <= 3);
+        if (!line) { line = { y: it.y, items: [] }; lines.push(line); }
+        line.items.push(it);
+      });
+      lines.sort((a, b) => b.y - a.y);
+      pages.push(lines.map(line => {
+        line.items.sort((a, b) => a.x - b.x);
+        let text = '', endX = null;
+        line.items.forEach(it => {
+          if (text && endX != null && it.x - endX > 4) text += ' ';
+          text += it.text;
+          endX = it.x + it.width;
+        });
+        return text.trim();
+      }).filter(Boolean).join('\n'));
+    }
+    return pages.join('\n\n').trim();
+  }
   async downloadResume(r) {
     try { const blob = await this.idbGet(r.id); if (blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = r.fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); return; } } catch (e) {}
     if (r.fileId) { // 本机无缓存 → 从云端取（后端校验归属当前账号）
@@ -1342,7 +1376,252 @@ class Component extends DCLogic {
       : '已按采纳的建议生成新版本，请核对后保存');
   }
 
-  exportVersion(v) { const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body><pre style="font-family:\u5b8b\u4f53,serif;font-size:11pt;line-height:1.6;white-space:pre-wrap;">' + this.esc(v.content || '') + '</pre></body></html>'; const blob = new Blob(['\ufeff', html], { type: 'application/msword' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = v.name + '.doc'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出 ' + v.name + '.doc'); }
+  async exportVersion(v) {
+    if (!v || !(v.content || '').trim()) return this.showToast('没有可导出的简历内容');
+    if (!window.JSZip) return this.showToast('Word 导出组件加载失败，请刷新后重试');
+    try {
+      const photo = await this.resumeTemplatePhoto();
+      const blob = await this.buildResumeDocx(v, photo);
+      const name = this.safeFileName((v.name || '简历版本') + '.docx');
+      this.downloadBlob(blob, name);
+      this.showToast('已导出 ' + name);
+    } catch (err) {
+      console.error('[export docx]', err);
+      this.showToast('Word 导出失败：' + ((err && err.message) || '请稍后重试'));
+    }
+  }
+  async resumeTemplatePhoto() {
+    const resume = (this.state.db.resumes || []).find(r => r.fileType === 'pdf');
+    if (!resume || !window.pdfjsLib) return null;
+    let blob = null;
+    try { blob = await this.idbGet(resume.id); } catch (e) {}
+    if (!blob && resume.fileId) {
+      try {
+        const res = await fetch('/api/files/' + encodeURIComponent(resume.fileId), { credentials: 'same-origin' });
+        if (res.ok) blob = await res.blob();
+      } catch (e) {}
+    }
+    if (!blob) return null;
+    try { return await this.cropResumePhoto(blob); } catch (e) { return null; }
+  }
+  async cropResumePhoto(blob) {
+    const ab = await blob.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: ab }).promise;
+    const pg = await pdf.getPage(1);
+    const viewport = pg.getViewport({ scale: 2 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d');
+    await pg.render({ canvasContext: ctx, viewport }).promise;
+    const crop = {
+      x: Math.round(canvas.width * 0.825),
+      y: Math.round(canvas.height * 0.017),
+      w: Math.round(canvas.width * 0.095),
+      h: Math.round(canvas.height * 0.102)
+    };
+    const sample = ctx.getImageData(crop.x, crop.y, crop.w, crop.h).data;
+    let nonWhite = 0, total = 0;
+    for (let i = 0; i < sample.length; i += 64) {
+      total++;
+      if (sample[i] < 245 || sample[i + 1] < 245 || sample[i + 2] < 245) nonWhite++;
+    }
+    if (!total || nonWhite / total < 0.04) return null;
+    const out = document.createElement('canvas');
+    out.width = crop.w; out.height = crop.h;
+    out.getContext('2d').drawImage(canvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+    const photoBlob = await new Promise(resolve => out.toBlob(resolve, 'image/png', 0.92));
+    if (!photoBlob) return null;
+    return { ext: 'png', bytes: new Uint8Array(await photoBlob.arrayBuffer()), cx: 686000, cy: 990000 };
+  }
+  async buildResumeDocx(v, photo) {
+    const zip = new window.JSZip();
+    const lines = this.resumeLogicalLines(v.content || '');
+    const hasPhoto = !!(photo && photo.bytes);
+    zip.file('[Content_Types].xml', this.resumeContentTypesXml(hasPhoto));
+    zip.file('_rels/.rels', this.resumePackageRelsXml());
+    zip.file('docProps/core.xml', this.resumeCoreXml(v));
+    zip.file('docProps/app.xml', this.resumeAppXml());
+    zip.file('word/document.xml', this.resumeDocumentXml(v, lines, hasPhoto));
+    zip.file('word/_rels/document.xml.rels', this.resumeDocumentRelsXml(hasPhoto));
+    zip.file('word/styles.xml', this.resumeStylesXml());
+    zip.file('word/settings.xml', this.resumeSettingsXml());
+    zip.file('word/fontTable.xml', this.resumeFontTableXml());
+    zip.file('word/numbering.xml', this.resumeNumberingXml());
+    if (hasPhoto) zip.file('word/media/photo.png', photo.bytes);
+    return zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      compression: 'DEFLATE'
+    });
+  }
+  resumeLogicalLines(text) {
+    const normalized = this.normalizeResumeText(text);
+    const raw = normalized.split('\n').map(s => s.trim()).filter(Boolean);
+    const lines = [];
+    raw.forEach(line => {
+      const last = lines[lines.length - 1] || '';
+      if (lines.length && this.shouldJoinResumeLine(last, line)) lines[lines.length - 1] = last + line;
+      else lines.push(line);
+    });
+    return lines;
+  }
+  normalizeResumeText(text) {
+    let s = (text || '').replace(/\r/g, '\n').replace(/\u00a0/g, ' ');
+    const section = '(教育背景|实习经历|工作经历|项目经历|校园经历|社团经历|技能[\\\\/、]?证书及其他|技能证书及其他|证书及技能|专业技能|荣誉奖项)';
+    s = s.replace(new RegExp('\\s*' + section + '\\s*', 'g'), '\n$1\n');
+    s = s.replace(/\s*([•·])\s*/g, '\n$1 ');
+    s = s.replace(/([。；;])\s*(?=[•·])/g, '$1\n');
+    s = s.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/\n{3,}/g, '\n\n');
+    return s.trim();
+  }
+  shouldJoinResumeLine(prev, next) {
+    if (!prev || !next) return false;
+    if (this.isResumeSection(prev) || this.isResumeSection(next)) return false;
+    if (this.resumeStartsBullet(next) || this.splitResumeDate(next)) return false;
+    if (/^(专业成绩|核心课程|荣誉|语言能力|AI\s*与数字化办公|数据分析|技能|证书)[：:]/.test(next)) return false;
+    if (this.splitResumeDate(prev)) return false;
+    if (this.resumeStartsBullet(prev)) return true;
+    return /[，、；;：:及和与]$/.test(prev) || this.resumeVisualWidth(prev) > 42;
+  }
+  resumeFit(lines) {
+    const estimated = lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(this.resumeVisualWidth(line) / 47)), 5);
+    if (estimated <= 54) return { body: 21, title: 22, section: 28, name: 32, contact: 20, line: 270, titleLine: 270, sectionLine: 320, nameLine: 390, contactLine: 260, sectionBefore: 120, sectionAfter: 25, after: 18 };
+    if (estimated <= 64) return { body: 19, title: 20, section: 26, name: 30, contact: 19, line: 238, titleLine: 242, sectionLine: 286, nameLine: 360, contactLine: 238, sectionBefore: 95, sectionAfter: 18, after: 8 };
+    if (estimated <= 76) return { body: 18, title: 19, section: 24, name: 28, contact: 18, line: 218, titleLine: 222, sectionLine: 260, nameLine: 340, contactLine: 220, sectionBefore: 70, sectionAfter: 12, after: 4 };
+    return { body: 16, title: 17, section: 22, name: 26, contact: 17, line: 192, titleLine: 198, sectionLine: 230, nameLine: 310, contactLine: 204, sectionBefore: 45, sectionAfter: 4, after: 0 };
+  }
+  resumeVisualWidth(s) {
+    return Array.from(s || '').reduce((n, ch) => n + (/[\x00-\xff]/.test(ch) ? 0.55 : 1), 0);
+  }
+  isResumeSection(line) {
+    return /^(教育背景|实习经历|工作经历|项目经历|校园经历|社团经历|技能[\/、]?证书及其他|技能证书及其他|证书及技能|专业技能|荣誉奖项)$/.test((line || '').trim());
+  }
+  resumeStartsBullet(line) { return /^[•·]\s*/.test((line || '').trim()); }
+  stripResumeBullet(line) { return (line || '').trim().replace(/^[•·]\s*/, '').trim(); }
+  splitResumeDate(line) {
+    const m = (line || '').trim().match(/^(.+?)\s*((?:19|20)\d{2}[-./]\d{1,2}\s*(?:~|～|—|-)\s*(?:(?:19|20)\d{2}[-./]\d{1,2}|至今|现在))$/);
+    return m ? { left: m[1].trim(), date: m[2].replace(/\s+/g, ' ') } : null;
+  }
+  resumeDocumentXml(v, lines, hasPhoto) {
+    const fit = this.resumeFit(lines);
+    const profile = this.state.db.profile || {};
+    const bodyLines = lines.slice();
+    let name = '';
+    let contact = '';
+    if (bodyLines[0] && !this.isResumeSection(bodyLines[0]) && !this.splitResumeDate(bodyLines[0]) && this.resumeVisualWidth(bodyLines[0]) <= 12) name = bodyLines.shift();
+    if (bodyLines[0] && /电话|手机|邮箱|@|mail/i.test(bodyLines[0])) contact = bodyLines.shift();
+    if (!name) name = profile.name || '简历';
+    if (!contact) {
+      const bits = [];
+      if (profile.phone) bits.push('电话：' + profile.phone);
+      if (profile.email) bits.push('邮箱：' + profile.email);
+      contact = bits.join(' | ');
+    }
+    const parts = [this.resumeHeaderTableXml(name, contact, hasPhoto, fit)];
+    bodyLines.forEach(line => {
+      if (this.isResumeSection(line)) {
+        parts.push(this.docxP(line, { bold: true, size: fit.section, line: fit.sectionLine, before: fit.sectionBefore, after: fit.sectionAfter, border: true }));
+        return;
+      }
+      const wasBullet = this.resumeStartsBullet(line);
+      const clean = this.stripResumeBullet(line);
+      const dated = this.splitResumeDate(clean);
+      if (dated) {
+        parts.push(this.docxEntryP(dated.left, dated.date, fit, wasBullet));
+      } else if (wasBullet) {
+        parts.push(this.docxP(clean, { size: fit.body, line: fit.line, after: fit.after, num: true }));
+      } else {
+        const label = /^(专业成绩|核心课程|荣誉|语言能力|AI\s*与数字化办公|数据分析|技能|证书)[：:]/.test(clean);
+        parts.push(this.docxP(clean, { size: fit.body, line: fit.line, after: fit.after, boldPrefix: label }));
+      }
+    });
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" xmlns:cx1="http://schemas.microsoft.com/office/drawing/2015/9/8/chartex" xmlns:cx2="http://schemas.microsoft.com/office/drawing/2015/10/21/chartex" xmlns:cx3="http://schemas.microsoft.com/office/drawing/2016/5/9/chartex" xmlns:cx4="http://schemas.microsoft.com/office/drawing/2016/5/10/chartex" xmlns:cx5="http://schemas.microsoft.com/office/drawing/2016/5/11/chartex" xmlns:cx6="http://schemas.microsoft.com/office/drawing/2016/5/12/chartex" xmlns:cx7="http://schemas.microsoft.com/office/drawing/2016/5/13/chartex" xmlns:cx8="http://schemas.microsoft.com/office/drawing/2016/5/14/chartex" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:aink="http://schemas.microsoft.com/office/drawing/2016/ink" xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:w16cex="http://schemas.microsoft.com/office/word/2018/wordml/cex" xmlns:w16cid="http://schemas.microsoft.com/office/word/2016/wordml/cid" xmlns:w16="http://schemas.microsoft.com/office/word/2018/wordml" xmlns:w16du="http://schemas.microsoft.com/office/word/2023/wordml/word16du" xmlns:w16sdtdh="http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash" xmlns:w16se="http://schemas.microsoft.com/office/word/2015/wordml/symex" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" mc:Ignorable="w14 w15 w16se w16cid w16 w16cex w16sdtdh w16du wp14">' +
+      '<w:body>' + parts.join('') +
+      '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="280" w:right="720" w:bottom="340" w:left="720" w:header="0" w:footer="0" w:gutter="0"/><w:docGrid w:linePitch="240"/></w:sectPr>' +
+      '</w:body></w:document>';
+  }
+  resumeHeaderTableXml(name, contact, hasPhoto, fit) {
+    const w1 = 1500, w2 = 7466, w3 = 1500;
+    const center = this.docxP(name, { align: 'center', bold: true, size: fit.name, line: fit.nameLine, after: 20 }) +
+      this.docxP(contact || ' ', { align: 'center', size: fit.contact, line: fit.contactLine, after: 0 });
+    const right = hasPhoto ? this.docxP('', { align: 'center', runs: [this.docxImageXml('rIdPhoto', 686000, 990000)] }) : this.docxP(' ', { line: 990, after: 0 });
+    return '<w:tbl><w:tblPr><w:tblW w:w="10466" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="' + w1 + '"/><w:gridCol w:w="' + w2 + '"/><w:gridCol w:w="' + w3 + '"/></w:tblGrid><w:tr><w:trPr><w:trHeight w:val="1120" w:hRule="atLeast"/></w:trPr>' +
+      this.docxTc(w1, this.docxP(' ', { line: 990, after: 0 })) + this.docxTc(w2, center) + this.docxTc(w3, right) +
+      '</w:tr></w:tbl>';
+  }
+  docxEntryP(left, date, fit, bullet) {
+    return this.docxP('', {
+      size: fit.title, line: fit.titleLine, after: fit.after, bold: true, num: bullet, tab: 10466,
+      runs: [this.docxRun(left, { size: fit.title, bold: true }), '<w:r><w:tab/></w:r>', this.docxRun(date, { size: fit.title })]
+    });
+  }
+  docxP(text, opts) {
+    opts = opts || {};
+    const pPr = [];
+    if (opts.keep) pPr.push('<w:keepNext/>');
+    if (opts.num) pPr.push('<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>');
+    if (opts.tab) pPr.push('<w:tabs><w:tab w:val="right" w:pos="' + opts.tab + '"/></w:tabs>');
+    if (opts.align) pPr.push('<w:jc w:val="' + opts.align + '"/>');
+    if (opts.border) pPr.push('<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="000000"/></w:pBdr>');
+    if (opts.num) pPr.push('<w:ind w:left="260" w:hanging="180"/>');
+    pPr.push('<w:spacing w:before="' + (opts.before || 0) + '" w:after="' + (opts.after || 0) + '" w:line="' + (opts.line || 240) + '" w:lineRule="exact"/>');
+    const runs = opts.runs ? opts.runs.join('') : this.docxTextRuns(text || '', opts);
+    return '<w:p><w:pPr>' + pPr.join('') + '</w:pPr>' + runs + '</w:p>';
+  }
+  docxTextRuns(text, opts) {
+    if (!opts || !opts.boldPrefix) return this.docxRun(text, opts);
+    const idx = Math.max(text.indexOf('：'), text.indexOf(':'));
+    if (idx <= 0) return this.docxRun(text, opts);
+    return this.docxRun(text.slice(0, idx + 1), Object.assign({}, opts, { bold: true })) + this.docxRun(text.slice(idx + 1), opts);
+  }
+  docxRun(text, opts) {
+    opts = opts || {};
+    const size = opts.size || 20;
+    const preserve = /^\s|\s$| {2,}/.test(text || '');
+    return '<w:r><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun" w:cs="SimSun"/>' +
+      (opts.bold ? '<w:b/><w:bCs/>' : '') + '<w:sz w:val="' + size + '"/><w:szCs w:val="' + size + '"/></w:rPr><w:t' +
+      (preserve ? ' xml:space="preserve"' : '') + '>' + this.xml(text || '') + '</w:t></w:r>';
+  }
+  docxTc(width, inner) {
+    return '<w:tc><w:tcPr><w:tcW w:w="' + width + '" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>' + inner + '</w:tc>';
+  }
+  docxImageXml(rid, cx, cy) {
+    return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1" name="Resume Photo"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="photo.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="' + rid + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+  }
+  resumeContentTypesXml(hasPhoto) {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+      (hasPhoto ? '<Default Extension="png" ContentType="image/png"/>' : '') +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>';
+  }
+  resumePackageRelsXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>';
+  }
+  resumeDocumentRelsXml(hasPhoto) {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/><Relationship Id="rIdFontTable" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/><Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' + (hasPhoto ? '<Relationship Id="rIdPhoto" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/photo.png"/>' : '') + '</Relationships>';
+  }
+  resumeStylesXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun" w:cs="SimSun"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun" w:cs="SimSun"/></w:rPr></w:style></w:styles>';
+  }
+  resumeSettingsXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:zoom w:percent="100"/><w:defaultTabStop w:val="420"/><w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>';
+  }
+  resumeFontTableXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="SimSun"><w:charset w:val="86"/><w:family w:val="roman"/></w:font></w:fonts>';
+  }
+  resumeNumberingXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="hybridMultilevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="260" w:hanging="180"/></w:pPr><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+  }
+  resumeCoreXml(v) {
+    const now = new Date().toISOString();
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>' + this.xml(v.name || '简历版本') + '</dc:title><dc:creator>求职管家</dc:creator><cp:lastModifiedBy>求职管家</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">' + now + '</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">' + now + '</dcterms:modified></cp:coreProperties>';
+  }
+  resumeAppXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>求职管家</Application></Properties>';
+  }
+  xml(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  safeFileName(s) { return String(s || '简历.docx').replace(/[\\/:*?"<>|]/g, '_'); }
+  downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
   exportNote() {
     const jobId = this.curJobId(); const a = this.state.db.analyses[jobId]; const n = (a && a.note) || null;
     const job = this.state.db.jobs.find(j => j.id === jobId);
