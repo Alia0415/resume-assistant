@@ -1164,13 +1164,43 @@ class Component extends DCLogic {
     }
     this.setState(s => ({ form: Object.assign({}, s.form, { versionName: value, _manualAppVersion: false }) }));
   }
+  versionContentKey(v) {
+    return String((v && v.content) || '')
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+  duplicateVersion(db, draft, excludeId) {
+    const key = this.versionContentKey(draft);
+    if (!key) return null;
+    return ((db && db.versions) || []).find(v => v.id !== excludeId && this.versionContentKey(v) === key) || null;
+  }
   saveModal() {
     const t = this.state.modalType, f = this.state.form, id = this.state.editId;
     if (t === 'job') { if (!(f.company && f.role)) return this.showToast('请填写公司和岗位名称'); this.setDb(db => { if (id) Object.assign(db.jobs.find(x => x.id === id), f); else db.jobs.unshift(Object.assign({ id: this.uid(), createdAt: Date.now() }, f)); }); }
     else if (t === 'application') { if (!(f.company && f.role)) return this.showToast('请填写公司和岗位名称'); const clean = Object.assign({}, f); delete clean._manualAppCompany; delete clean._manualAppRole; delete clean._manualAppVersion; this.setDb(db => { if (id) Object.assign(db.applications.find(x => x.id === id), clean); else db.applications.unshift(Object.assign({ id: this.uid(), createdAt: Date.now(), status: clean.status || '待投递', date: clean.date || this.today() }, clean)); }); }
     else if (t === 'feedback') { if (!f.company) return this.showToast('请填写公司'); const clean = Object.assign({}, f); delete clean._manualCompany; delete clean._manualRole; this.setDb(db => { if (id) Object.assign(db.feedback.find(x => x.id === id), clean); else db.feedback.unshift(Object.assign({ id: this.uid(), createdAt: Date.now(), type: clean.type || '无反馈' }, clean)); }); }
     else if (t === 'todo') { if (!f.text) return this.showToast('请填写待办内容'); this.setDb(db => { if (id) Object.assign(db.todos.find(x => x.id === id), f); else db.todos.unshift(Object.assign({ id: this.uid(), done: false, source: 'manual' }, f)); }); }
-    else if (t === 'version') { if (!f.name) return this.showToast('请填写版本名称'); this.setDb(db => { if (id) Object.assign(db.versions.find(x => x.id === id), f, { updatedAt: Date.now() }); else db.versions.unshift(Object.assign({ id: this.uid(), updatedAt: Date.now() }, f)); }); }
+    else if (t === 'version') {
+      if (!f.name) return this.showToast('请填写版本名称');
+      const key = this.versionContentKey(f);
+      const dup = this.duplicateVersion(this.state.db, f, id);
+      if (dup) {
+        this.showToast('内容和「' + (dup.name || '已有版本') + '」完全一致，已跳过重复保存');
+        if (!id) this.closeModal();
+        return;
+      }
+      if (!id && key && this._lastVersionSaveKey === key && Date.now() - (this._lastVersionSaveAt || 0) < 5000) {
+        this.showToast('内容没有变化，已跳过重复保存');
+        this.closeModal();
+        return;
+      }
+      this.setDb(db => { if (id) Object.assign(db.versions.find(x => x.id === id), f, { updatedAt: Date.now() }); else db.versions.unshift(Object.assign({ id: this.uid(), updatedAt: Date.now() }, f)); });
+      if (!id && key) { this._lastVersionSaveKey = key; this._lastVersionSaveAt = Date.now(); }
+    }
     else if (t === 'profile') { this.setDb(db => { db.profile = Object.assign({}, f); }); }
     this.showToast('已保存'); this.closeModal();
   }
