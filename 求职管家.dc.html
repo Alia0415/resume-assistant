@@ -1021,6 +1021,7 @@ class Component extends DCLogic {
   go(p) { this.setState({ page: p }); const m = document.getElementById('jm-main'); if (m) m.scrollTop = 0; }
   fmt(ts) { if (!ts) return ''; const d = new Date(ts); return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
   esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  attr(s) { return this.esc(s).replace(/"/g, '&quot;'); }
 
   openIdb() { if (this._idb) return this._idb; this._idb = new Promise((res, rej) => { const r = indexedDB.open('jm_files', 1); r.onupgradeneeded = () => r.result.createObjectStore('files'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); return this._idb; }
   async idbPut(id, blob) { const db = await this.openIdb(); return new Promise((res, rej) => { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').put(blob, id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
@@ -1444,8 +1445,14 @@ class Component extends DCLogic {
     } catch (e) { this.setState({ aiLoading: false, aiError: e.message }); }
   }
 
-  toggleSug(jobId, i) { this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].confirmed = !a.rewrite.rewriteSuggestions[i].confirmed; }); }
-  editSug(jobId, i, v) { this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].rewrittenText = v; }); }
+  toggleSug(jobId, i) {
+    this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].confirmed = !a.rewrite.rewriteSuggestions[i].confirmed; });
+    this.refreshRewritePreviewEditor();
+  }
+  editSug(jobId, i, v) {
+    this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].rewrittenText = v; });
+    this.refreshRewritePreviewEditor();
+  }
   setRewriteUserNotes(v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) a.rewrite.userNotes = v; }); }
   setQAnswerChoice(i, val) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) { if (!a.rewrite.qAnswers) a.rewrite.qAnswers = {}; const cur = a.rewrite.qAnswers[i] || {}; cur.choice = (cur.choice === val ? '' : val); a.rewrite.qAnswers[i] = cur; } }); }
   setQAnswerDetail(i, val) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) { if (!a.rewrite.qAnswers) a.rewrite.qAnswers = {}; const cur = a.rewrite.qAnswers[i] || {}; cur.detail = val; a.rewrite.qAnswers[i] = cur; } }); }
@@ -1520,6 +1527,28 @@ class Component extends DCLogic {
   }
   copyText(t) { try { navigator.clipboard.writeText(t); this.showToast('已复制'); } catch (e) { this.showToast('复制失败，请手动选择'); } }
 
+  previewCompactText(str) {
+    const chars = [], map = [];
+    const skip = /[\s\u00a0•·\-—–,，.。;；:：、"'“”‘’()[\]（）【】{}《》<>]/;
+    String(str || '').split('').forEach((ch, i) => {
+      if (skip.test(ch)) return;
+      chars.push(ch.toLowerCase());
+      map.push(i);
+    });
+    return { text: chars.join(''), map };
+  }
+  findPreviewMatch(source, target) {
+    const raw = String(source || '');
+    const needle = String(target || '');
+    const exact = raw.indexOf(needle);
+    if (exact >= 0) return { start: exact, end: exact + needle.length };
+    const s = this.previewCompactText(raw);
+    const t = this.previewCompactText(needle).text;
+    if (!t || t.length < 6) return null;
+    const pos = s.text.indexOf(t);
+    if (pos < 0) return null;
+    return { start: s.map[pos], end: s.map[pos + t.length - 1] + 1 };
+  }
   buildRewritePreview(resumeText, suggestions) {
     const pieces = [{ text: resumeText || '', kind: 'plain' }];
     const hits = (suggestions || []).map(() => false);
@@ -1533,12 +1562,14 @@ class Component extends DCLogic {
       for (let i = 0; i < pieces.length; i++) {
         const p = pieces[i];
         if (!p || p.kind !== 'plain') continue;
-        const pos = p.text.indexOf(before);
-        if (pos < 0) continue;
+        const match = this.findPreviewMatch(p.text, before);
+        if (!match) continue;
+        const pos = match.start;
+        const rawEnd = match.end;
         const next = [];
         if (pos > 0) next.push({ text: p.text.slice(0, pos), kind: 'plain' });
         next.push({ text: replacement, kind, title: s.confirmed ? '已采纳：来自修改建议' : '待确认：点击左侧采纳后替换' });
-        if (pos + before.length < p.text.length) next.push({ text: p.text.slice(pos + before.length), kind: 'plain' });
+        if (rawEnd < p.text.length) next.push({ text: p.text.slice(rawEnd), kind: 'plain' });
         pieces.splice(i, 1, ...next);
         hits[index] = true;
         found = true;
@@ -1582,6 +1613,30 @@ class Component extends DCLogic {
       accepted: base + 'background:#e8f8ef;color:#176b4f;font-weight:600;box-shadow:inset 0 -1px 0 #63c18d;'
     };
     return { text: seg.text || '', style: styleMap[seg.kind] || '', title: seg.title || '' };
+  }
+  previewMarkup(lines) {
+    return (lines || []).map(line =>
+      '<div style="' + this.attr(line.style || '') + '">' +
+      ((line.segments || []).map(seg =>
+        '<span style="' + this.attr(seg.style || '') + '" title="' + this.attr(seg.title || '') + '">' + this.esc(seg.text || '') + '</span>'
+      ).join('')) +
+      '</div>'
+    ).join('');
+  }
+  currentRewritePreview() {
+    const jobId = this.curJobId();
+    const a = this.state.db.analyses[jobId];
+    const rew = a && a.rewrite;
+    return this.buildRewritePreview(this.getResumeText(), (rew && rew.rewriteSuggestions) || []);
+  }
+  refreshRewritePreviewEditor() {
+    clearTimeout(this._rewritePreviewTimer);
+    this._rewritePreviewTimer = setTimeout(() => {
+      const el = document.getElementById('jm-rewrite-preview-editor');
+      if (!el) return;
+      const preview = this.currentRewritePreview();
+      el.innerHTML = this.previewMarkup(preview.lines);
+    }, 0);
   }
   rewritePreviewEditorText() {
     try {
