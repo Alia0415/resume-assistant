@@ -7,7 +7,7 @@
  * - 密码哈希：Node 内置 crypto.scrypt + 随机盐，绝不明文保存。
  * - 会话：无状态 HMAC 签名 token，存放在 HttpOnly Cookie 里；
  *   签名密钥来自环境变量 SESSION_SECRET（未配置则用进程内临时密钥并告警）。
- * - 另写一个可被前端读取的 jm_user Cookie（仅含用户名，非凭证），
+ * - 另写可被前端读取的 jm_uid / jm_user Cookie（非凭证），
  *   方便前端按账号隔离本地数据、显示昵称。
  */
 
@@ -19,6 +19,7 @@ const DATA_DIR = path.resolve((process.env.AUTH_DATA_DIR || '').trim() || path.j
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 
 const SESSION_COOKIE = 'jm_session';
+const USER_ID_COOKIE = 'jm_uid';
 const USER_COOKIE = 'jm_user';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
 
@@ -453,10 +454,12 @@ function setAuthCookies(req, res, user) {
     secure: isSecure(req),
   };
   res.cookie(SESSION_COOKIE, createSession(rec), Object.assign({ httpOnly: true }, opts));
+  res.cookie(USER_ID_COOKIE, rec.uid, Object.assign({ httpOnly: false }, opts));
   res.cookie(USER_COOKIE, rec.displayName || rec.username, Object.assign({ httpOnly: false }, opts));
 }
 function clearAuthCookies(res) {
   res.clearCookie(SESSION_COOKIE, { path: '/' });
+  res.clearCookie(USER_ID_COOKIE, { path: '/' });
   res.clearCookie(USER_COOKIE, { path: '/' });
 }
 function getSession(req) {
@@ -466,6 +469,7 @@ function getSession(req) {
 
 module.exports = {
   SESSION_COOKIE,
+  USER_ID_COOKIE,
   USER_COOKIE,
   USERS_FILE,
   getSecret,

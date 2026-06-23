@@ -14,8 +14,10 @@
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script>
-  window.JM_USER = (function () { try { var m = document.cookie.match(/(?:^|; )jm_user=([^;]*)/); return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } })();
-  window.JM_STORE_KEY = function () { return window.JM_USER ? ('jm_data_v1::' + window.JM_USER) : 'jm_data_v1'; };
+  window.JM_COOKIE = function (name) { try { var m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } };
+  window.JM_USER = window.JM_COOKIE('jm_user');
+  window.JM_ACCOUNT = window.JM_COOKIE('jm_uid') || window.JM_USER;
+  window.JM_STORE_KEY = function () { return window.JM_ACCOUNT ? ('jm_data_v1::' + window.JM_ACCOUNT) : 'jm_data_v1'; };
   window.jmLogout = function () { fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).then(function () { location.href = '/login.html'; }).catch(function () { location.href = '/login.html'; }); };
 </script>
 <style>
@@ -824,9 +826,7 @@ class Component extends DCLogic {
     db: (() => {
       try {
         const key = window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1';
-        let raw = localStorage.getItem(key);
-        // 首次登录该账号时，沿用旧版未分账号的本地数据，避免丢失。
-        if (raw == null && key !== 'jm_data_v1') raw = localStorage.getItem('jm_data_v1');
+        const raw = localStorage.getItem(key);
         return JSON.parse(raw) || null;
       } catch (e) { return null; }
     })()
