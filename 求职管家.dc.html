@@ -14,6 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.js"></script>
 <script>
   window.JM_COOKIE = function (name) { try { var m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } };
   window.JM_USER = window.JM_COOKIE('jm_user');
@@ -527,8 +528,8 @@
                 <div style="position:sticky;top:86px;background:#fff;border:1px solid #ebeef4;border-radius:14px;overflow:hidden;">
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
                     <div>
-                      <div style="font-size:13px;font-weight:700;">Word 预览</div>
-                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">可直接点进页面编辑；保存时以右侧当前内容为准</div>
+                      <div style="font-size:13px;font-weight:700;">原文件与编辑稿</div>
+                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">上方是真实上传文件预览；下方是采纳建议后的可编辑稿</div>
                     </div>
                     <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存当前预览</button>
                   </div>
@@ -536,7 +537,15 @@
                     <div style="margin:12px 16px 0;background:#fff8ee;border:1px solid #f5e3c3;border-radius:10px;padding:9px 11px;font-size:11.8px;color:#9a6411;line-height:1.6;">有 {{ previewUnlocatedCount }} 条建议未在简历中定位，未自动写入正文。请在右侧预览中手动修改，或调整建议原文后再采纳。</div>
                   </sc-if>
                   <div style="background:#f3f5f9;padding:18px;max-height:820px;overflow:auto;">
-                    <div id="jm-rewrite-preview-editor" contenteditable="true" spellcheck="false" style="width:100%;max-width:760px;min-height:860px;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 28px rgba(31,53,90,.10);padding:34px 42px;font-family:SimSun,'Noto Sans SC',serif;font-size:12.5px;line-height:1.65;color:#111827;outline:2px solid transparent;white-space:pre-wrap;">
+                    <div style="width:100%;max-width:760px;margin:0 auto 16px;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 24px rgba(31,53,90,.08);">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
+                        <span style="font-size:12.5px;font-weight:700;color:#18223a;">原文件版式</span>
+                        <span style="font-size:11.5px;color:#93a0b8;">{{ sourcePreviewLabel }}</span>
+                      </div>
+                      <div id="jm-source-preview" data-source-key="{{ sourcePreviewKey }}" style="max-height:420px;overflow:auto;padding:14px;background:#eef2f7;display:flex;flex-direction:column;align-items:center;gap:14px;"></div>
+                    </div>
+                    <div style="width:100%;max-width:760px;margin:0 auto 8px;font-size:12.5px;font-weight:700;color:#18223a;">可编辑稿</div>
+                    <div id="jm-rewrite-preview-editor" contenteditable="true" spellcheck="false" style="width:100%;max-width:760px;min-height:620px;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 28px rgba(31,53,90,.10);padding:34px 42px;font-family:SimSun,'Noto Sans SC',serif;font-size:12.5px;line-height:1.65;color:#111827;outline:2px solid transparent;white-space:pre-wrap;">
                       <sc-for list="{{ rewritePreviewLines }}" as="line" hint-placeholder-count="0">
                         <div style="{{ line.style }}"><sc-for list="{{ line.segments }}" as="seg" hint-placeholder-count="0"><span style="{{ seg.style }}" title="{{ seg.title }}">{{ seg.text }}</span></sc-for></div>
                       </sc-for>
@@ -885,8 +894,9 @@ class Component extends DCLogic {
     if (window.pdfjsLib) { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } catch (e) {} }
     this.setupFlushOnHide();
     this.cloudLoad();
+    this.scheduleSourcePreviewRender();
   }
-  componentDidUpdate(prev) { if (prev.accentColor !== this.props.accentColor) this.applyAccent(); }
+  componentDidUpdate(prev) { if (prev.accentColor !== this.props.accentColor) this.applyAccent(); this.scheduleSourcePreviewRender(); }
   applyAccent() { const a = this.props.accentColor; if (a) document.documentElement.style.setProperty('--ac', a); }
 
   storeKey() { return window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1'; }
@@ -1016,6 +1026,100 @@ class Component extends DCLogic {
   async idbPut(id, blob) { const db = await this.openIdb(); return new Promise((res, rej) => { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').put(blob, id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
   async idbGet(id) { const db = await this.openIdb(); return new Promise((res, rej) => { const tx = db.transaction('files', 'readonly'); const rq = tx.objectStore('files').get(id); rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); }); }
   async idbDel(id) { const db = await this.openIdb(); return new Promise((res) => { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').delete(id); tx.oncomplete = () => res(); }); }
+  currentResumeFile() {
+    const db = this.state.db || {};
+    const id = this.curResumeId();
+    return (db.resumes || []).find(r => r.id === id) || null;
+  }
+  sourcePreviewKeyFor(r) {
+    return r ? [r.id || '', r.fileId || '', r.fileName || '', r.fileType || '', r.uploadedAt || ''].join('|') : 'none';
+  }
+  scheduleSourcePreviewRender() {
+    clearTimeout(this._sourcePreviewTimer);
+    this._sourcePreviewTimer = setTimeout(() => this.renderSourcePreview(), 80);
+  }
+  async resumeBlob(r) {
+    if (!r) return null;
+    let blob = null;
+    try { blob = await this.idbGet(r.id); } catch (e) {}
+    if (!blob && r.fileId) {
+      try {
+        const res = await fetch('/api/files/' + encodeURIComponent(r.fileId), { credentials: 'same-origin' });
+        if (res.ok) blob = await res.blob();
+      } catch (e) {}
+    }
+    return blob;
+  }
+  sourcePreviewMessage(box, text) {
+    if (!box) return;
+    box.innerHTML = '<div style="width:100%;background:#fff;border:1px dashed #cbd5e6;border-radius:10px;padding:18px;text-align:center;font-size:12.5px;color:#7e8aa3;line-height:1.7;">' + this.esc(text) + '</div>';
+  }
+  async renderSourcePreview() {
+    const box = document.getElementById('jm-source-preview');
+    if (!box) return;
+    const resume = this.currentResumeFile();
+    const key = this.sourcePreviewKeyFor(resume);
+    if (box.getAttribute('data-rendered-key') === key) return;
+    box.setAttribute('data-rendered-key', key);
+    box.innerHTML = '<div style="font-size:12.5px;color:#7e8aa3;padding:18px;">正在渲染原文件版式...</div>';
+    if (!resume) return this.sourcePreviewMessage(box, '当前没有选择简历文件。');
+    const ext = String(resume.fileType || '').toLowerCase();
+    const blob = await this.resumeBlob(resume);
+    if (!blob) return this.sourcePreviewMessage(box, '找不到原文件，只能显示下方文字编辑稿。');
+    try {
+      if (ext === 'pdf') return await this.renderPdfSourcePreview(box, blob);
+      if (ext === 'docx') return await this.renderDocxSourcePreview(box, blob);
+      if (ext === 'txt') return this.sourcePreviewMessage(box, 'TXT 没有原始版式，下方编辑稿就是可编辑内容。');
+      return this.sourcePreviewMessage(box, '暂不支持预览 .' + (ext || 'doc') + ' 原始版式；请上传 PDF 或 DOCX。');
+    } catch (e) {
+      console.error('[source preview]', e);
+      this.sourcePreviewMessage(box, '原文件预览失败，但下方编辑稿仍可使用。');
+    }
+  }
+  async renderPdfSourcePreview(box, blob) {
+    if (!window.pdfjsLib) return this.sourcePreviewMessage(box, 'PDF 预览组件加载失败，请刷新后重试。');
+    box.innerHTML = '';
+    const ab = await blob.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: ab }).promise;
+    const maxPages = Math.min(pdf.numPages || 1, 3);
+    for (let i = 1; i <= maxPages; i++) {
+      const pg = await pdf.getPage(i);
+      const viewport = pg.getViewport({ scale: 1.35 });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      canvas.style.width = '100%';
+      canvas.style.maxWidth = '680px';
+      canvas.style.background = '#fff';
+      canvas.style.boxShadow = '0 8px 20px rgba(31,53,90,.12)';
+      canvas.style.border = '1px solid #dfe5ee';
+      await pg.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      box.appendChild(canvas);
+    }
+    if (pdf.numPages > maxPages) {
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:11.5px;color:#7e8aa3;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;';
+      note.textContent = '仅预览前 ' + maxPages + ' 页，共 ' + pdf.numPages + ' 页。';
+      box.appendChild(note);
+    }
+  }
+  async renderDocxSourcePreview(box, blob) {
+    if (!(window.docx && window.docx.renderAsync)) return this.sourcePreviewMessage(box, 'Word 预览组件加载失败，请刷新后重试。');
+    box.innerHTML = '';
+    const holder = document.createElement('div');
+    holder.style.cssText = 'width:100%;max-width:680px;background:#fff;box-shadow:0 8px 20px rgba(31,53,90,.12);overflow:auto;';
+    box.appendChild(holder);
+    const ab = await blob.arrayBuffer();
+    await window.docx.renderAsync(ab, holder, null, {
+      className: 'jm-docx-preview',
+      inWrapper: true,
+      ignoreWidth: false,
+      ignoreHeight: false,
+      ignoreFonts: false,
+      breakPages: true,
+      useBase64URL: true
+    });
+  }
 
   triggerUpload() { const el = document.getElementById('jm-file'); if (el) el.click(); }
   async onFile(e) { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) await this.ingest(file); }
@@ -1944,6 +2048,8 @@ class Component extends DCLogic {
     const matchResumeOptions = resumes.map(r => ({ id: r.id, label: r.fileName + (r.text ? '' : '（未解析）') }));
     const curJob = jobs.find(j => j.id === curJobId);
     const curResume = resumes.find(r => r.id === curResumeId);
+    const sourcePreviewKey = this.sourcePreviewKeyFor(curResume);
+    const sourcePreviewLabel = curResume ? (((curResume.fileType || '').toUpperCase() || '文件') + ' · ' + (curResume.fileName || '未命名简历')) : '未选择简历';
     const matchNoResume = !((curResume && curResume.text) || (S.form.manualResume || '').trim());
     const an = curJobId ? (db.analyses[curJobId] || null) : null;
     const mat = an && an.match, rew = an && an.rewrite, note = an && an.note;
@@ -2106,6 +2212,7 @@ class Component extends DCLogic {
       suggestions, sugAcceptedCount, sugTotal,
       rewritePreviewLines: rewritePreview.lines, previewAppliedCount: rewritePreview.appliedCount,
       previewUnlocatedCount: rewritePreview.unlocated.length, previewHasUnlocated: rewritePreview.unlocated.length > 0,
+      sourcePreviewKey, sourcePreviewLabel,
       hasRewriteQuestions, rewriteQuestionItems, applyAnswersToNotes: () => this.applyAnswersToNotes(), rewriteUserNotes, setRewriteUserNotes: e => this.setRewriteUserNotes(e.target.value),
       polishRewriteUserNotes: () => this.polishRewriteUserNotes(), polishNotesBtnLabel: aiBusy ? '润色中…' : 'AI 自动润色',
       saveVersionFromRewrite: () => this.saveVersionFromRewrite(),
