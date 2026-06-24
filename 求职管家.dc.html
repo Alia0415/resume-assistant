@@ -32,21 +32,28 @@
   input,textarea,select{font-family:'Noto Sans SC',system-ui,sans-serif;}
   textarea{resize:vertical;}
   @keyframes jmspin{to{transform:rotate(360deg);}}
+  .jm-resize-handle:hover{background:#eaf1ff!important;border-color:#cfe0ff!important;color:var(--ac)!important;}
+  .jm-docx-preview-wrap .docx-wrapper{background:transparent!important;padding:0!important;}
+  .jm-docx-preview-wrap section.docx{margin:0!important;}
 </style>
 </helmet>
 <div style="display:flex;height:100vh;overflow:hidden;background:#f5f7fb;font-family:'Noto Sans SC',system-ui,sans-serif;color:#18223a;">
 
   <input id="jm-file" type="file" accept=".pdf,.doc,.docx,.txt" style="display:none;" onChange="{{ onFile }}">
 
+  <sc-if value="{{ sidebarOpen }}" hint-placeholder-val="{{ true }}">
   <aside style="width:230px;flex-shrink:0;background:#ffffff;border-right:1px solid #ebeef4;display:flex;flex-direction:column;height:100vh;">
-    <div style="padding:20px 18px 14px;display:flex;align-items:center;gap:10px;">
+    <div style="padding:20px 12px 14px 18px;display:flex;align-items:center;gap:10px;">
       <div style="width:34px;height:34px;border-radius:9px;background:var(--ac);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"></path></svg>
       </div>
-      <div>
+      <div style="min-width:0;flex:1;">
         <div style="font-size:14.5px;font-weight:700;">求职管家</div>
         <div style="font-size:11px;color:#93a0b8;margin-top:1px;">个人求职工作台</div>
       </div>
+      <button onClick="{{ collapseSidebar }}" title="收起侧边栏" style="width:30px;height:30px;border:none;border-radius:8px;background:#f5f7fb;color:#6b7a96;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      </button>
     </div>
 
     <nav style="flex:1;overflow-y:auto;padding:6px 11px;">
@@ -80,6 +87,13 @@
       </button>
     </sc-if>
   </aside>
+  </sc-if>
+
+  <sc-if value="{{ sidebarCollapsed }}" hint-placeholder-val="{{ false }}">
+    <button onClick="{{ expandSidebar }}" title="展开侧边栏" style="position:fixed;left:14px;top:76px;z-index:40;width:38px;height:38px;border-radius:11px;border:1px solid #dbe4f2;background:#fff;color:var(--ac);box-shadow:0 8px 20px rgba(31,53,90,.14);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path><path d="M4 5v14"></path></svg>
+    </button>
+  </sc-if>
 
   <main id="jm-main" style="flex:1;min-width:0;height:100vh;overflow-y:auto;">
     <header style="position:sticky;top:0;z-index:10;background:rgba(245,247,251,.88);backdrop-filter:blur(10px);border-bottom:1px solid #ebeef4;padding:17px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;">
@@ -95,7 +109,7 @@
       </sc-if>
     </header>
 
-    <div style="padding:24px 32px 60px;max-width:1180px;margin:0 auto;">
+    <div style="{{ contentShellStyle }}">
 
       <!-- ============ 工作台 ============ -->
       <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
@@ -456,8 +470,8 @@
                 </div>
               </div>
 
-              <div style="display:grid;grid-template-columns:minmax(330px,.85fr) minmax(460px,1.15fr);gap:16px;align-items:start;">
-                <div style="display:flex;flex-direction:column;gap:13px;">
+              <div id="jm-rewrite-workspace" style="display:flex;align-items:flex-start;gap:0;min-width:0;">
+                <div style="{{ rewriteLeftPaneStyle }}">
                   <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:14px 16px;">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
                       <div style="font-size:13px;font-weight:700;">修改建议</div>
@@ -525,19 +539,28 @@
                   </sc-if>
                 </div>
 
+                <button class="jm-resize-handle" onMouseDown="{{ startRewriteResize }}" onTouchStart="{{ startRewriteResize }}" title="拖拽调整原文件窗口宽度" style="{{ rewriteResizeHandleStyle }}">
+                  <span style="width:4px;height:46px;border-radius:999px;background:currentColor;opacity:.42;"></span>
+                </button>
+
+                <div style="{{ rewriteEditorPaneStyle }}">
                 <div style="position:sticky;top:86px;background:#fff;border:1px solid #ebeef4;border-radius:14px;overflow:hidden;">
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
                     <div>
                       <div style="font-size:13px;font-weight:700;">原文件编辑区</div>
-                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">直接在上传的 PDF / Word 版式上修改；采纳建议会写到这里</div>
+                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">拖拽中间分隔条调整窗口；Word 会按当前宽度完整适配</div>
                     </div>
-                    <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存当前编辑</button>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <button onClick="{{ widenRewriteEditor }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">放大窗口</button>
+                      <button onClick="{{ resetRewriteEditor }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">还原</button>
+                      <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存当前编辑</button>
+                    </div>
                   </div>
                   <sc-if value="{{ previewHasUnlocated }}" hint-placeholder-val="{{ false }}">
                     <div style="margin:12px 16px 0;background:#fff8ee;border:1px solid #f5e3c3;border-radius:10px;padding:9px 11px;font-size:11.8px;color:#9a6411;line-height:1.6;">有 {{ previewUnlocatedCount }} 条建议未在原文件中定位，未自动写入。请直接在右侧文件编辑区手动修改，或调整建议原文后再采纳。</div>
                   </sc-if>
                   <div style="background:#f3f5f9;padding:18px;max-height:820px;overflow:auto;">
-                    <div style="width:100%;max-width:760px;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 24px rgba(31,53,90,.08);">
+                    <div style="width:100%;max-width:none;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 24px rgba(31,53,90,.08);">
                       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
                         <span style="font-size:12.5px;font-weight:700;color:#18223a;">可直接编辑的原文件</span>
                         <span style="font-size:11.5px;color:#93a0b8;">{{ sourcePreviewLabel }}</span>
@@ -549,6 +572,7 @@
                     <div style="font-size:11.5px;color:#7e8aa3;">这里的当前内容会进入「简历版本」，再决定是否导出 Word。</div>
                     <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存当前文件编辑</button>
                   </div>
+                </div>
                 </div>
               </div>
             </div>
@@ -876,7 +900,8 @@ class Component extends DCLogic {
     page: 'dashboard', modalType: null, form: {}, editId: null,
     toast: null, aiLoading: false, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
-    jobSearch: '', appSearch: '', appStatus: '全部', syncErr: false
+    jobSearch: '', appSearch: '', appStatus: '全部', syncErr: false,
+    sidebarCollapsed: false, rewriteEditorWidth: 58
   };
 
   ACTIVE = ['待投递', '已投递', '笔试', '面试'];
@@ -887,10 +912,11 @@ class Component extends DCLogic {
     this.applyAccent();
     if (window.pdfjsLib) { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } catch (e) {} }
     this.setupFlushOnHide();
+    try { window.addEventListener('resize', () => this.scheduleSourcePreviewFit()); } catch (e) {}
     this.cloudLoad();
     this.scheduleSourcePreviewRender();
   }
-  componentDidUpdate(prev) { if (prev.accentColor !== this.props.accentColor) this.applyAccent(); this.scheduleSourcePreviewRender(); }
+  componentDidUpdate(prev) { if (prev.accentColor !== this.props.accentColor) this.applyAccent(); this.scheduleSourcePreviewRender(); this.scheduleSourcePreviewFit(); }
   applyAccent() { const a = this.props.accentColor; if (a) document.documentElement.style.setProperty('--ac', a); }
 
   storeKey() { return window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1'; }
@@ -1013,6 +1039,51 @@ class Component extends DCLogic {
   today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   showToast(t) { this.setState({ toast: t }); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: null }), 1900); }
   go(p) { this.setState({ page: p }); const m = document.getElementById('jm-main'); if (m) m.scrollTop = 0; }
+  collapseSidebar() { this.setState({ sidebarCollapsed: true }); }
+  expandSidebar() { this.setState({ sidebarCollapsed: false }); }
+  clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+  setRewriteEditorWidth(width) {
+    this.setState({ rewriteEditorWidth: this.clamp(Number(width) || 58, 44, 82) });
+    this.scheduleSourcePreviewFit();
+  }
+  widenRewriteEditor() { this.setRewriteEditorWidth(76); }
+  resetRewriteEditor() { this.setRewriteEditorWidth(58); }
+  pointerClientX(e) {
+    const t = e && e.touches && e.touches[0];
+    const c = e && e.changedTouches && e.changedTouches[0];
+    return (t && t.clientX) || (c && c.clientX) || (e && e.clientX) || 0;
+  }
+  startRewriteResize(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const wrap = document.getElementById('jm-rewrite-workspace');
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    if (!rect.width) return;
+    const prevCursor = document.body.style.cursor;
+    const prevSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const move = ev => {
+      const x = this.pointerClientX(ev);
+      const next = ((rect.right - x) / rect.width) * 100;
+      this.setRewriteEditorWidth(Math.round(next));
+      if (ev && ev.cancelable && ev.preventDefault) ev.preventDefault();
+    };
+    const up = () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      document.removeEventListener('touchmove', move);
+      document.removeEventListener('touchend', up);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
+      this.scheduleSourcePreviewFit();
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('touchend', up);
+    move(e);
+  }
   fmt(ts) { if (!ts) return ''; const d = new Date(ts); return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
   esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   attr(s) { return this.esc(s).replace(/"/g, '&quot;'); }
@@ -1032,6 +1103,24 @@ class Component extends DCLogic {
   scheduleSourcePreviewRender() {
     clearTimeout(this._sourcePreviewTimer);
     this._sourcePreviewTimer = setTimeout(() => this.renderSourcePreview(), 80);
+  }
+  scheduleSourcePreviewFit() {
+    clearTimeout(this._sourcePreviewFitTimer);
+    this._sourcePreviewFitTimer = setTimeout(() => this.fitSourcePreview(), 120);
+  }
+  fitSourcePreview() {
+    const box = document.getElementById('jm-source-preview');
+    if (!box) return;
+    const root = box.querySelector('[data-jm-source-edit-root="1"][data-jm-docx-root="1"]');
+    if (!root) return;
+    const page = root.querySelector('section.docx') || root.querySelector('.docx') || root.firstElementChild;
+    if (!page) return;
+    root.style.zoom = '1';
+    const pageWidth = Math.max(page.scrollWidth || 0, page.getBoundingClientRect().width || 0);
+    const available = Math.max(320, (box.clientWidth || 0) - 28);
+    const scale = pageWidth ? this.clamp(available / pageWidth, .68, 1) : 1;
+    root.style.zoom = String(Math.round(scale * 1000) / 1000);
+    box.setAttribute('data-fit-scale', Math.round(scale * 100) + '%');
   }
   async resumeBlob(r) {
     if (!r) return null;
@@ -1159,9 +1248,11 @@ class Component extends DCLogic {
     box.innerHTML = '';
     const holder = document.createElement('div');
     holder.setAttribute('data-jm-source-edit-root', '1');
+    holder.setAttribute('data-jm-docx-root', '1');
     holder.setAttribute('contenteditable', 'true');
     holder.setAttribute('spellcheck', 'false');
-    holder.style.cssText = 'width:100%;max-width:680px;background:#fff;box-shadow:0 8px 20px rgba(31,53,90,.12);overflow:auto;outline:2px solid transparent;';
+    holder.className = 'jm-docx-preview-wrap';
+    holder.style.cssText = 'width:max-content;max-width:none;min-width:100%;background:#fff;box-shadow:0 8px 20px rgba(31,53,90,.12);overflow:visible;outline:2px solid transparent;transform-origin:top center;';
     box.appendChild(holder);
     const ab = await blob.arrayBuffer();
     await window.docx.renderAsync(ab, holder, null, {
@@ -1177,6 +1268,7 @@ class Component extends DCLogic {
     holder.querySelectorAll('section,.docx-wrapper,.docx').forEach(el => {
       el.setAttribute('contenteditable', 'true');
     });
+    this.scheduleSourcePreviewFit();
     this.refreshRewritePreviewEditor();
   }
 
@@ -2174,6 +2266,13 @@ class Component extends DCLogic {
       settings: ['个人信息', '基本信息与数据管理']
     };
     const tt = titles[page] || ['', ''];
+    const sidebarOpen = !S.sidebarCollapsed;
+    const contentShellStyle = 'padding:24px 32px 60px;max-width:' + (page === 'match' ? '1480px' : '1180px') + ';margin:0 auto;';
+    const editorWidth = this.clamp(Number(S.rewriteEditorWidth) || 58, 44, 82);
+    const leftWidth = 100 - editorWidth;
+    const rewriteLeftPaneStyle = 'flex:0 0 calc(' + leftWidth + '% - 8px);min-width:260px;display:flex;flex-direction:column;gap:13px;padding-right:16px;min-height:1px;';
+    const rewriteEditorPaneStyle = 'flex:1 1 ' + editorWidth + '%;min-width:420px;min-height:1px;';
+    const rewriteResizeHandleStyle = 'align-self:stretch;position:sticky;top:86px;width:16px;min-height:720px;margin-right:16px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#93a0b8;display:flex;align-items:center;justify-content:center;cursor:col-resize;padding:0;flex-shrink:0;';
 
     const prof = db.profile || {};
     const profileName = prof.name || '未填写姓名';
@@ -2360,6 +2459,10 @@ class Component extends DCLogic {
 
     return {
       nav, pageTitle: tt[0], pageSubtitle: tt[1], headerAction,
+      sidebarOpen, sidebarCollapsed: !!S.sidebarCollapsed,
+      collapseSidebar: () => this.collapseSidebar(), expandSidebar: () => this.expandSidebar(),
+      contentShellStyle, rewriteLeftPaneStyle, rewriteEditorPaneStyle, rewriteResizeHandleStyle,
+      startRewriteResize: e => this.startRewriteResize(e), widenRewriteEditor: () => this.widenRewriteEditor(), resetRewriteEditor: () => this.resetRewriteEditor(),
       profileName, profileInitial, profileSub, profileFields,
       loginName: (typeof window !== 'undefined' && window.JM_USER) || '', logout: () => { if (window.jmLogout) window.jmLogout(); },
       cloudSyncError: !!S.syncErr, cloudSyncText: typeof S.syncErr === 'string' ? S.syncErr : '云同步失败，点击重试',
