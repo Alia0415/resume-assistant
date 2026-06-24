@@ -39,7 +39,7 @@
 </helmet>
 <div style="display:flex;height:100vh;overflow:hidden;background:#f5f7fb;font-family:'Noto Sans SC',system-ui,sans-serif;color:#18223a;">
 
-  <input id="jm-file" type="file" accept=".pdf,.doc,.docx,.txt" style="display:none;" onChange="{{ onFile }}">
+  <input id="jm-file" type="file" accept=".docx" style="display:none;" onChange="{{ onFile }}">
 
   <sc-if value="{{ sidebarOpen }}" hint-placeholder-val="{{ true }}">
   <aside style="width:230px;flex-shrink:0;background:#ffffff;border-right:1px solid #ebeef4;display:flex;flex-direction:column;height:100vh;">
@@ -187,14 +187,14 @@
       <section data-screen-label="简历">
         <div style="display: flex; align-items: flex-start; gap: 11px; border: 1px solid #d4ecdf; border-radius: 12px; padding: 13px 16px; margin-bottom: 20px; background-color: #125bfb">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ac2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px; stroke: #ffffff"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-          <div style="font-size: 12.5px; color: #ffffff; line-height: 1.7">上传你的真实简历后，系统会提取其中的文字用于岗位匹配分析。AI 只基于这些真实文字给建议，<b>不会编造你没有的经历</b>，也不会替你重排版式。.docx / .txt 可自动解析，PDF 多数可解析。</div>
+          <div style="font-size: 12.5px; color: #ffffff; line-height: 1.7">为保证修改质量和版式稳定，简历原文件仅支持上传 <b>.docx</b>。AI 只基于 Word 里提取出的真实文字和你的补充确认给建议，<b>不会编造你没有的经历</b>，PDF 建议先转成 Word 后再上传。</div>
         </div>
 
         <div style="font-size:14px;font-weight:700;margin-bottom:12px;">原始简历文件</div>
         <div onDragOver="{{ onDragOver }}" onDrop="{{ onDrop }}" onClick="{{ triggerUpload }}" style="border:1.5px dashed #cbd5e6;border-radius:14px;padding:26px;text-align:center;background:#fbfcfe;margin-bottom:16px;cursor:pointer;">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#93a0b8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:6px;"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"></path></svg>
           <div style="font-size:13.5px;color:#3a485f;">把简历文件拖到这里，或 <span style="color:var(--ac);font-weight:600;">点击上传</span></div>
-          <div style="font-size:11.5px;color:#a6b0c2;margin-top:5px;">支持 .docx / .pdf / .txt · 文件只保存在你本机</div>
+          <div style="font-size:11.5px;color:#a6b0c2;margin-top:5px;">仅支持 .docx · Word 原文件会用于定位、编辑和后续导出</div>
         </div>
 
         <sc-if value="{{ resumesEmpty }}" hint-placeholder-val="{{ true }}">
@@ -342,7 +342,7 @@
 
           <sc-if value="{{ matchNoResume }}" hint-placeholder-val="{{ false }}">
             <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:12.5px;color:#9a6411;line-height:1.7;">
-              当前没有可用于分析的简历文字。请先在「简历」页上传一份能解析文字的简历（.docx / .txt），或在下方手动粘贴简历内容。
+              当前没有可用于分析的简历文字。请先在「简历」页上传一份 .docx 简历，或在下方手动粘贴简历内容。
               <textarea value="{{ form.manualResume }}" onInput="{{ setManualResume }}" placeholder="把你的简历文字粘贴到这里…" style="width:100%;margin-top:10px;height:120px;border:1px solid #e6d3a8;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;outline:none;background:#fff;"></textarea>
             </div>
           </sc-if>
@@ -483,13 +483,27 @@
                     <div style="font-size:11.5px;color:#7e8aa3;line-height:1.6;">黄色表示右侧已定位但尚未采纳；绿色表示已采纳并替换到预览。未定位的建议不会自动写入正文。</div>
                   </div>
 
+                  <sc-if value="{{ hasRewriteOverallNotes }}" hint-placeholder-val="{{ false }}">
+                    <div style="background:#f7f9fc;border:1px solid #e4eaf3;border-radius:12px;padding:12px 14px;">
+                      <div style="font-size:12.5px;font-weight:700;color:#3a485f;margin-bottom:7px;">整体质检</div>
+                      <div style="display:flex;flex-direction:column;gap:6px;">
+                        <sc-for list="{{ rewriteOverallNotes }}" as="n" hint-placeholder-count="0">
+                          <div style="font-size:12px;color:#6b7a96;line-height:1.55;padding-left:13px;position:relative;"><span style="position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:#93a0b8;"></span>{{ n }}</div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+
                   <div style="display:flex;flex-direction:column;gap:13px;max-height:720px;overflow:auto;padding-right:3px;">
                     <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="0">
                       <div style="{{ s.cardStyle }}">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
                           <span style="font-size:13px;font-weight:700;">{{ s.section }}</span>
                           <span style="{{ s.locStyle }}">{{ s.locLabel }}</span>
+                          <span style="{{ s.qualityStyle }}">{{ s.qualityLabel }}</span>
+                          <span style="{{ s.confidenceStyle }}">{{ s.confidenceLabel }}</span>
                           <sc-if value="{{ s.needConfirm }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#c2710c;background:#fff3e6;border-radius:6px;padding:2px 8px;">需你核实真实性</span></sc-if>
+                          <sc-if value="{{ s.truthConfirmed }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#176b4f;background:#e8f8ef;border-radius:6px;padding:2px 8px;">已核实</span></sc-if>
                           <button onClick="{{ s.toggle }}" style="{{ s.btnStyle }}">{{ s.btnLabel }}</button>
                         </div>
                         <div style="display:flex;flex-direction:column;gap:10px;">
@@ -506,6 +520,9 @@
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93a0b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 16v-4M12 8h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"></path></svg>
                           {{ s.reason }}
                         </div>
+                        <sc-if value="{{ s.impact }}" hint-placeholder-val="{{ false }}">
+                          <div style="font-size:12px;color:#2a4a86;margin-top:9px;background:#eef4ff;border:1px solid #d6e3ff;border-radius:8px;padding:8px 10px;line-height:1.6;">岗位提升：{{ s.impact }}</div>
+                        </sc-if>
                       </div>
                     </sc-for>
                   </div>
@@ -1154,7 +1171,7 @@ class Component extends DCLogic {
       if (ext === 'pdf') return await this.renderPdfSourcePreview(box, blob);
       if (ext === 'docx') return await this.renderDocxSourcePreview(box, blob);
       if (ext === 'txt') return this.renderTextSourcePreview(box, resume.text || '');
-      return this.sourcePreviewMessage(box, '暂不支持预览 .' + (ext || 'doc') + ' 原始版式；请上传 PDF 或 DOCX。');
+      return this.sourcePreviewMessage(box, '暂不支持预览 .' + (ext || 'doc') + ' 原始版式；请上传 DOCX。');
     } catch (e) {
       console.error('[source preview]', e);
       this.sourcePreviewMessage(box, '原文件编辑区渲染失败，请刷新或重新上传文件。');
@@ -1278,28 +1295,24 @@ class Component extends DCLogic {
   async onDrop(e) { e.preventDefault(); const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (file) await this.ingest(file); }
   async ingest(file) {
     const ext = (file.name.split('.').pop() || '').toLowerCase();
-    if (!['pdf', 'doc', 'docx', 'txt'].includes(ext)) return this.showToast('仅支持 PDF / DOC / DOCX / TXT 文件');
+    if (ext !== 'docx') return this.showToast('为保证可编辑和不乱码，请上传 Word .docx 文件');
     if (file.size > 10 * 1024 * 1024) return this.showToast('文件超过 10MB 限制');
     this.showToast('正在处理「' + file.name + '」…');
     let text = '';
     try {
       if (ext === 'docx' && window.mammoth) { const ab = await file.arrayBuffer(); const r = await window.mammoth.extractRawText({ arrayBuffer: ab }); text = (r.value || '').trim(); }
-      else if (ext === 'pdf' && window.pdfjsLib) { text = await this.extractPdf(file); }
-      else if (ext === 'txt') { text = (await file.text()).trim(); }
     } catch (err) { text = ''; }
     const id = this.uid();
     try { await this.idbPut(id, file); } catch (e) {} // 本机缓存原文件
     let fileId = null;
-    if (ext !== 'txt') { // PDF/DOC/DOCX：原文件经后端上传到云存储（后端鉴权、按 uid 隔离）
-      try {
-        const res = await fetch('/api/files', { method: 'POST', credentials: 'same-origin', headers: { 'X-Filename': encodeURIComponent(file.name) }, body: file });
-        const out = await res.json().catch(() => ({}));
-        if (res.ok && out.file) fileId = out.file.fileId;
-        else this.showToast('原文件上传云端失败：' + (out.error || '请稍后重试') + '（已暂存本地）');
-      } catch (e) { this.showToast('原文件上传云端失败（网络问题，已暂存本地）'); }
-    }
+    try {
+      const res = await fetch('/api/files', { method: 'POST', credentials: 'same-origin', headers: { 'X-Filename': encodeURIComponent(file.name) }, body: file });
+      const out = await res.json().catch(() => ({}));
+      if (res.ok && out.file) fileId = out.file.fileId;
+      else this.showToast('原文件上传云端失败：' + (out.error || '请稍后重试') + '（已暂存本地）');
+    } catch (e) { this.showToast('原文件上传云端失败（网络问题，已暂存本地）'); }
     this.setDb(db => db.resumes.unshift({ id, fileId: fileId, fileName: file.name, fileType: ext, size: file.size, uploadedAt: Date.now(), text }));
-    if (fileId || ext === 'txt') this.showToast(text ? '已保存并解析简历文字' : '已保存，未能自动提取文字，分析时可手动粘贴');
+    if (fileId) this.showToast(text ? '已保存并解析 Word 简历文字' : '已保存 Word 文件，未能自动提取文字，分析时可手动粘贴');
   }
   async extractPdf(file) {
     const ab = await file.arrayBuffer();
@@ -1511,6 +1524,23 @@ class Component extends DCLogic {
   setMatchResume(e) { this.setState({ matchResumeId: e.target.value }); }
   setManualResume(e) { this.setForm('manualResume', e.target.value); }
   getResumeText() { const r = this.state.db.resumes.find(x => x.id === this.curResumeId()); return (r && r.text) || this.state.form.manualResume || ''; }
+  normalizeRewriteSuggestion(s) {
+    const out = Object.assign({}, s || {});
+    const score = this.clamp(Number(out.qualityScore) || 3, 1, 5);
+    const confidence = this.clamp(Number(out.confidence) || 0, 0, 1);
+    const checks = (out.qualityChecks && typeof out.qualityChecks === 'object') ? out.qualityChecks : {};
+    out.qualityScore = Math.round(score * 10) / 10;
+    out.confidence = Math.round(confidence * 100) / 100;
+    out.qualityChecks = {
+      jdFit: Math.round(this.clamp(Number(checks.jdFit) || score, 1, 5) * 10) / 10,
+      specificity: Math.round(this.clamp(Number(checks.specificity) || score, 1, 5) * 10) / 10,
+      truthSafety: Math.round(this.clamp(Number(checks.truthSafety) || (out.truthCheckRequired ? 3 : score), 1, 5) * 10) / 10,
+      readability: Math.round(this.clamp(Number(checks.readability) || score, 1, 5) * 10) / 10
+    };
+    out.confirmed = false;
+    out.truthConfirmed = false;
+    return out;
+  }
 
   // 调用后端 DeepSeek 代理（前端永远看不到 API Key）
   async aiCall(path, body) {
@@ -1573,7 +1603,7 @@ class Component extends DCLogic {
     this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在生成修改建议…', matchTab: 'rewrite' });
     try {
       const d = await this.aiCall('/api/ai/rewrite-resume', { resumeText, jdText: job.jd, targetSection: this.state.targetSection || '全部', userNotes });
-      (d.rewriteSuggestions || []).forEach(s => { s.confirmed = false; });
+      d.rewriteSuggestions = (d.rewriteSuggestions || []).map(s => this.normalizeRewriteSuggestion(s));
       this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.rewrite = d; if (userNotes) a.rewrite.userNotes = userNotes; a.rewrite.qAnswers = {}; a.rewroteAt = Date.now(); });
       this.setState({ aiLoading: false }); this.showToast(userNotes ? '已结合你的补充重新生成修改建议' : '已生成修改建议');
     } catch (e) { this.setState({ aiLoading: false, aiError: e.message }); }
@@ -1596,11 +1626,33 @@ class Component extends DCLogic {
   }
 
   toggleSug(jobId, i) {
-    this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].confirmed = !a.rewrite.rewriteSuggestions[i].confirmed; });
+    const cur = (((this.state.db.analyses[jobId] || {}).rewrite || {}).rewriteSuggestions || [])[i];
+    const willConfirm = cur && !cur.confirmed;
+    let markTruthConfirmed = false;
+    if (willConfirm && cur.truthCheckRequired && !cur.truthConfirmed) {
+      const ok = confirm('这条建议涉及需要你核实的事实或数据。请确认改写内容属实，且没有新增无法证明的信息。');
+      if (!ok) return;
+      markTruthConfirmed = true;
+    }
+    this.setDb(db => {
+      const a = db.analyses[jobId];
+      if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) {
+        const x = a.rewrite.rewriteSuggestions[i];
+        if (markTruthConfirmed) x.truthConfirmed = true;
+        x.confirmed = !x.confirmed;
+      }
+    });
     this.refreshRewritePreviewEditor();
   }
   editSug(jobId, i, v) {
-    this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) a.rewrite.rewriteSuggestions[i].rewrittenText = v; });
+    this.setDb(db => {
+      const a = db.analyses[jobId];
+      if (a && a.rewrite && a.rewrite.rewriteSuggestions[i]) {
+        const x = a.rewrite.rewriteSuggestions[i];
+        if (x.rewrittenText !== v && x.truthCheckRequired) x.truthConfirmed = false;
+        x.rewrittenText = v;
+      }
+    });
     this.refreshRewritePreviewEditor();
   }
   setRewriteUserNotes(v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) a.rewrite.userNotes = v; }); }
@@ -1886,6 +1938,8 @@ class Component extends DCLogic {
     if (!a || !a.rewrite) return;
     const confirmed = (a.rewrite.rewriteSuggestions || []).filter(s => s.confirmed);
     if (!confirmed.length) return this.showToast('请先勾选「采纳」且确认属实的建议');
+    const unverified = confirmed.filter(s => s.truthCheckRequired && !s.truthConfirmed);
+    if (unverified.length) return this.showToast('还有 ' + unverified.length + ' 条需核实建议未确认属实');
     const focus = confirmed.map(s => s.section).join('；');
     const allSuggestions = a.rewrite.rewriteSuggestions || [];
     const preview = this.buildRewritePreview(this.getResumeText(), allSuggestions);
@@ -2365,8 +2419,18 @@ class Component extends DCLogic {
       suggestions = sugs.map((s, i) => {
         const on = !!s.confirmed; if (on) sugAcceptedCount++;
         const located = !!rewritePreview.hits[i];
+        const score = this.clamp(Number(s.qualityScore) || 3, 1, 5);
+        const confidence = this.clamp(Number(s.confidence) || 0, 0, 1);
+        const qualityOk = score >= 4;
+        const confidenceOk = confidence >= .75;
         return {
           section: s.section || '简历', before: s.originalText || '', after: s.rewrittenText || '', reason: s.reason || '', needConfirm: !!s.truthCheckRequired,
+          truthConfirmed: !!s.truthConfirmed,
+          impact: s.impact || '',
+          qualityLabel: '质量 ' + score + '/5',
+          confidenceLabel: '可信度 ' + Math.round(confidence * 100) + '%',
+          qualityStyle: 'font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;' + (qualityOk ? 'color:#176b4f;background:#e8f8ef;' : 'color:#9a6411;background:#fff3c4;'),
+          confidenceStyle: 'font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;' + (confidenceOk ? 'color:#2a4a86;background:#eef4ff;' : 'color:#9a6411;background:#fff3c4;'),
           cardStyle: 'background:#fff;border:1px solid ' + (on ? 'var(--ac2)' : '#ebeef4') + ';border-radius:14px;padding:17px 19px;',
           locLabel: located ? (on ? '已替换到原文件' : '已标注到原文件') : '未定位',
           locStyle: 'font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;' + (located ? (on ? 'color:#176b4f;background:#e8f8ef;' : 'color:#9a6411;background:#fff3c4;') : 'color:#c0392b;background:#fdecec;'),
@@ -2407,6 +2471,8 @@ class Component extends DCLogic {
     });
     const hasRewriteQuestions = rewriteQuestionItems.length > 0;
     const rewriteUserNotes = (rew && rew.userNotes) || '';
+    const rewriteOverallNotes = rew ? arr(rew.overallNotes) : [];
+    const hasRewriteOverallNotes = rewriteOverallNotes.length > 0;
     const noteObj = note || {};
     const interviewPrep = arr(noteObj.interviewPrep);
     const followUpTodo = arr(noteObj.followUpTodo);
@@ -2514,6 +2580,7 @@ class Component extends DCLogic {
       previewUnlocatedCount: rewritePreview.unlocated.length, previewHasUnlocated: rewritePreview.unlocated.length > 0,
       sourcePreviewKey, sourcePreviewLabel,
       hasRewriteQuestions, rewriteQuestionItems, applyAnswersToNotes: () => this.applyAnswersToNotes(), rewriteUserNotes, setRewriteUserNotes: e => this.setRewriteUserNotes(e.target.value),
+      rewriteOverallNotes, hasRewriteOverallNotes,
       polishRewriteUserNotes: () => this.polishRewriteUserNotes(), polishNotesBtnLabel: aiBusy ? '润色中…' : 'AI 自动润色',
       saveVersionFromRewrite: () => this.saveVersionFromRewrite(),
       noteSummary: noteObj.applicationSummary || '', noteSubject: noteObj.emailSubject || '', noteBody: noteObj.emailBody || '',

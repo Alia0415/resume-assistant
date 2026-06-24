@@ -51,7 +51,7 @@ const FILESMETA_FILE = path.join(DATA_DIR, 'filesmeta.json');
 const FILES_DIR = path.join(DATA_DIR, 'files'); // 本地 fallback 的原文件目录（已被 .gitignore 忽略）
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 单个简历文件上限 10MB
-const ALLOWED_EXT = { pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+const ALLOWED_EXT = { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
 // 用户业务数据只允许项目实际使用的顶层字段，避免原样保存任意 JSON。
 const DATA_FIELDS = {
   profile: 'object', resumes: 'array', versions: 'array', jobs: 'array',
@@ -235,7 +235,7 @@ function allowedExt(fileName) {
 async function saveResumeFile(uid, fileName, buffer) {
   if (!uid) throw new Error('缺少用户标识');
   const ext = allowedExt(fileName);
-  if (!ext) { const e = new Error('仅支持 PDF / DOC / DOCX 文件'); e.code = 'BAD_TYPE'; throw e; }
+  if (!ext) { const e = new Error('仅支持 Word .docx 文件'); e.code = 'BAD_TYPE'; throw e; }
   if (!buffer || !buffer.length) { const e = new Error('文件为空'); e.code = 'BAD_FILE'; throw e; }
   if (buffer.length > MAX_FILE_BYTES) { const e = new Error('文件超过 10MB 限制'); e.code = 'TOO_LARGE'; throw e; }
   const fileId = crypto.randomBytes(12).toString('hex');

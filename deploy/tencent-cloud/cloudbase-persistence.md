@@ -10,7 +10,7 @@
 
 1. **账号**（用户名、scrypt 密码哈希、昵称）——云数据库集合 `jm_users`。
 2. **用户业务数据**（简历文字与版本、岗位、岗位匹配结果与修改记录、投递材料、个人信息、待办、反馈等整份 `db`）——云数据库集合 `jm_user_data`，每账号一条文档，按**不可变用户 ID** 绑定，带 `revision` 乐观锁。
-3. **简历原文件**（PDF / DOC / DOCX 本体）——**云存储**，路径按 `resumes/<uid>/<fileId>` 隔离；其元数据（fileId、原文件名、MIME、大小、上传时间、归属 uid）存云数据库集合 `jm_files`。
+3. **简历原文件**（DOCX 本体）——**云存储**，路径按 `resumes/<uid>/<fileId>` 隔离；其元数据（fileId、原文件名、MIME、大小、上传时间、归属 uid）存云数据库集合 `jm_files`。
 
 > 浏览器 localStorage / IndexedDB 现在只作为**前端缓存**（加速、离线可用），不再是唯一数据源。换设备 / 清缓存 / 换浏览器后重新登录即可从云端恢复简历文字、岗位、分析结果与原始简历文件。
 
@@ -19,7 +19,7 @@
 - 密码始终 **scrypt 加盐哈希**，库里无明文。
 - 云托管运行时访问云数据库 / 云存储的临时凭证由平台**自动注入**，无需 SecretId / SecretKey，前端永远拿不到管理端凭证。
 - 所有读写的用户身份只取自**登录会话**（不接受前端传入的用户 ID）；文件下载 / 删除都校验归属当前账号。
-- 简历原文件只允许 **PDF / DOC / DOCX**，单文件上限 **10MB**。
+- 简历原文件只允许 **DOCX**，单文件上限 **10MB**。
 - `/api/data` 有请求体上限，且后端只保存项目实际使用的字段（白名单），不会原样保存任意 JSON。
 - 数据保存用 `revision` 乐观锁，且是**原子 Compare-and-Set**：云端用「带 `revision` 条件的原子更新 + `_id` 唯一约束」实现，并发的相同 `baseRevision` 请求只有一个成功，其余返回 409；前端不直接覆盖，改为同步最新版本。
 
@@ -75,7 +75,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 1. 控制台手动创建 `jm_users`、`jm_user_data`、`jm_files`，权限均设为**仅管理端可读写**；开通**云存储**。
 2. 配置 `TCB_ENV_ID`、`SESSION_SECRET` 及其它必要环境变量，重新部署。
 3. 启动日志显示 `账号存储模式: cloudbase(jm_users,jm_user_data)`。
-4. 注册一个账号，并上传一份简历原文件（PDF/DOC/DOCX）——云存储 `resumes/<uid>/` 下出现文件，`jm_files` 出现对应元数据。
+4. 注册一个账号，并上传一份简历原文件（DOCX）——云存储 `resumes/<uid>/` 下出现文件，`jm_files` 出现对应元数据。
 5. 保存岗位与匹配数据——`jm_user_data` 出现以你的用户 ID 为 `_id` 的文档（`passHash` 不出现在此集合；账号在 `jm_users`）。
 6. 在云托管「重新部署」或重启服务，用同一账号重新登录。
 7. 清空浏览器 localStorage 与 IndexedDB（开发者工具 → Application → Clear storage）。

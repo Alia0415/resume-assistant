@@ -340,6 +340,8 @@ app.post('/api/ai/rewrite-resume', async (req, res) => {
           '你是严谨的简历改写顾问。' + ANTI_FABRICATION +
           '改写必须保留真实性：只能基于简历已有事实、以及用户在【补充确认】中提供的真实信息来优化措辞、结构与针对性，绝不新增这两者之外的经历、技能或数字。' +
           '用户在【补充确认】里提供的信息视为真实，应尽量自然地融入到对应模块的改写中。' +
+          '不要整篇重写，不要输出空泛套话；只改最值得改的原文句子。每条建议必须能说明它如何更贴合 JD、更具体、更简洁、更便于 HR/ATS 扫读。' +
+          '如果原文定位不稳、事实依据不足、或改后只是同义替换，请不要强行给建议，改为放进 questionsForUser 或 overallNotes。' +
           '若某处需要真实数据而简历与补充均未提供，请在 rewrittenText 中用 [请补充具体数据] 占位，并把 truthCheckRequired 设为 true。' +
           '凡涉及无法从简历或补充确认确认的信息，truthCheckRequired 必须为 true。',
       },
@@ -347,9 +349,11 @@ app.post('/api/ai/rewrite-resume', async (req, res) => {
         role: 'user',
         content:
           '请针对简历的「' + section + '」部分，结合岗位 JD 给出改写建议，并以 JSON 输出，字段固定为：' +
-          '{ "rewriteSuggestions": [ { "section": "", "originalText": "", "rewrittenText": "", "reason": "", "truthCheckRequired": true } ], ' +
+          '{ "rewriteSuggestions": [ { "section": "", "originalText": "", "rewrittenText": "", "reason": "", "truthCheckRequired": true, "qualityScore": 4, "confidence": 0.8, "impact": "", "qualityChecks": { "jdFit": 4, "specificity": 4, "truthSafety": 5, "readability": 4 } } ], ' +
           '"overallNotes": [], "questionsForUser": [ { "question": "", "type": "yesno", "detailOnYes": false, "detailHint": "" } ] }。' +
           '\n每条建议必须给出：对应模块 section、简历中的原文 originalText（务必从【原简历文本】中逐字摘录真实句子，便于自动替换）、改写后 rewrittenText、修改理由 reason、是否需要核实真实性 truthCheckRequired。' +
+          '\nqualityScore 为 1-5 的整体质量分，低于 4 的建议原则上不要输出；confidence 为 0-1，表示原文定位与事实依据的可信度；impact 用一句话说明对该岗位的提升点。' +
+          '\nqualityChecks 逐项 1-5：jdFit=贴合 JD，specificity=具体/量化，truthSafety=真实性安全，readability=简洁可扫读。' +
           '\noverallNotes 为整体注意事项。' +
           '\nquestionsForUser 为仍需用户补充真实信息的问题（如果用户的补充已覆盖，可减少或不再追问），每条是一个对象，目标是让用户用最少的输入就能回答：' +
           'question 为问题原文；type 取 "yesno"（用户只需选「是 / 否」）或 "text"（需要用户填一句话）；' +
@@ -366,6 +370,23 @@ app.post('/api/ai/rewrite-resume', async (req, res) => {
       maxTokens: 4096,
       model: PRO_MODEL || undefined,
     });
+    if (data && Array.isArray(data.rewriteSuggestions)) {
+      data.rewriteSuggestions = data.rewriteSuggestions.map(s => {
+        const score = Math.max(1, Math.min(5, Number(s && s.qualityScore) || 3));
+        const confidence = Math.max(0, Math.min(1, Number(s && s.confidence) || 0));
+        const checks = (s && typeof s.qualityChecks === 'object' && s.qualityChecks) || {};
+        return Object.assign({}, s, {
+          qualityScore: score,
+          confidence,
+          qualityChecks: {
+            jdFit: Math.max(1, Math.min(5, Number(checks.jdFit) || score)),
+            specificity: Math.max(1, Math.min(5, Number(checks.specificity) || score)),
+            truthSafety: Math.max(1, Math.min(5, Number(checks.truthSafety) || (s && s.truthCheckRequired ? 3 : score))),
+            readability: Math.max(1, Math.min(5, Number(checks.readability) || score))
+          }
+        });
+      });
+    }
     res.json(data);
   } catch (err) {
     handleError(res, err);
