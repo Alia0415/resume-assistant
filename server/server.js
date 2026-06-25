@@ -459,10 +459,11 @@ app.post('/api/ai/rewrite-resume', aiLimiter, async (req, res) => {
           '\n\n【岗位 JD】\n' + jdText,
       },
     ];
-    // 深度改写优先使用 Pro 模型（如已配置）。maxTokens 给足，避免结合补充信息后输出被截断导致 JSON 解析失败。
+    // 深度改写优先使用 Pro 模型（如已配置）。maxTokens 给足：结合补充信息 + 每条建议的质量评分字段后输出更长，
+    // 4096 会被截断导致 JSON 解析失败（502），提到 8192 留足余量。
     const data = await callDeepSeekJSON(messages, {
       temperature: 0.35,
-      maxTokens: 4096,
+      maxTokens: 8192,
       model: PRO_MODEL || undefined,
     });
     if (data && Array.isArray(data.rewriteSuggestions)) {
