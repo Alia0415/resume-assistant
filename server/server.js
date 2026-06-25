@@ -15,6 +15,8 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { callDeepSeekJSON } = require('./lib/deepseek');
+const { CAREER_REFERENCES, findCareerReferences, buildReferencePrompt, normalizeMatchResult } = require('./lib/careerReferences');
+const { crawlJobUrl } = require('./lib/jobCrawler');
 const auth = require('./lib/auth');
 
 const app = express();
@@ -26,6 +28,52 @@ const ALLOW_REGISTRATION = String(process.env.ALLOW_REGISTRATION || 'true').toLo
 app.use(cors());
 app.use(express.json({ limit: '4mb' })); // 放宽以容纳整份用户数据（/api/data）
 
+const rateBuckets = new Map();
+function clientIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return forwarded || req.ip || (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+function rateLimit(options) {
+  const windowMs = options.windowMs;
+  const max = options.max;
+  const prefix = options.prefix;
+  const message = options.message || '请求过于频繁，请稍后再试。';
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = prefix + ':' + clientIp(req);
+    const bucket = rateBuckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    bucket.count += 1;
+    if (bucket.count > max) {
+      res.setHeader('Retry-After', Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)));
+      return res.status(429).json({ error: message, code: 'RATE_LIMITED' });
+    }
+    return next();
+  };
+}
+
+const authLimiter = rateLimit({
+  prefix: 'auth',
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: '登录或注册尝试过于频繁，请稍后再试。',
+});
+const aiLimiter = rateLimit({
+  prefix: 'ai',
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'AI 请求过于频繁，请稍后再试。',
+});
+const crawlLimiter = rateLimit({
+  prefix: 'crawl',
+  windowMs: 60 * 1000,
+  max: 20,
+  message: '岗位抓取请求过于频繁，请稍后再试。',
+});
+
 // ============================================================
 // 账号认证（多用户：注册 / 登录 / 退出）
 // 登录态用 HttpOnly 签名 Cookie 保持；密码用 scrypt 加盐哈希存储。
@@ -33,7 +81,7 @@ app.use(express.json({ limit: '4mb' })); // 放宽以容纳整份用户数据（
 // ============================================================
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,32}$/;
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   if (!ALLOW_REGISTRATION) return res.status(403).json({ error: '当前未开放注册，请联系管理员。' });
   const { username, password, displayName } = req.body || {};
   const name = String(username || '').trim();
@@ -50,7 +98,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body || {};
     const user = await auth.findUser(username);
@@ -81,7 +129,12 @@ app.get('/api/auth/me', (req, res) => {
 
 // 健康检查：前端可用它判断后端与 Key 是否就绪
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, hasKey: !!(process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.trim()) });
+  res.json({
+    ok: true,
+    hasKey: !!(process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.trim()),
+    allowRegistration: ALLOW_REGISTRATION,
+    referenceCount: CAREER_REFERENCES.length,
+  });
 });
 
 // ---------- 登录门禁：保护前端页面与所有 AI 接口 ----------
@@ -233,6 +286,16 @@ function handleError(res, err) {
   });
 }
 
+function handleCrawlerError(res, err) {
+  const status = (err && err.status) || 500;
+  const msg = (err && err.message) || '岗位抓取失败，请稍后重试。';
+  if (status >= 500) console.error('[CRAWLER ERROR]', status, msg);
+  return res.status(status >= 400 && status < 600 ? status : 500).json({
+    error: msg,
+    code: (err && err.code) || 'CRAWLER_ERROR',
+  });
+}
+
 // 入参非空校验
 function requireText(value, fieldLabel, res) {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -246,11 +309,33 @@ const ANTI_FABRICATION =
   '严禁编造、补全或夸大用户未明确提供的任何信息，包括但不限于：学校、专业、实习、项目、技能、证书、工作成果、数字、公司、城市、投递结果或企业反馈。' +
   '凡是用户资料里没有的内容，绝不能凭空写出。只输出一个 JSON 对象，不要输出任何多余文字或解释。';
 
+// 资料库检索：匹配分析会自动调用；这个接口主要用于调试和后续前端预览。
+app.get('/api/reference/search', (req, res) => {
+  const q = String((req.query && req.query.q) || '').trim();
+  const references = findCareerReferences({ jdText: q, resumeText: '' }, { limit: 8 });
+  res.json({ references });
+});
+
+// 实时抓取公开岗位页面：尊重 robots.txt，不绕过登录、验证码或反爬限制。
+// POST /api/jobs/fetch-url  { url }
+app.post('/api/jobs/fetch-url', crawlLimiter, async (req, res) => {
+  try {
+    const url = req.body && req.body.url;
+    if (typeof url !== 'string' || !url.trim()) {
+      return res.status(400).json({ error: '请先填写岗位链接。', code: 'BAD_URL' });
+    }
+    const data = await crawlJobUrl(url);
+    return res.json(data);
+  } catch (err) {
+    return handleCrawlerError(res, err);
+  }
+});
+
 // ============================================================
 // 一、解析岗位 JD —— 只抽取，不猜测
 // POST /api/ai/analyze-jd  { jdText }
 // ============================================================
-app.post('/api/ai/analyze-jd', async (req, res) => {
+app.post('/api/ai/analyze-jd', aiLimiter, async (req, res) => {
   try {
     const { jdText } = req.body || {};
     if (!requireText(jdText, '岗位 JD（jdText）', res)) return;
@@ -285,37 +370,47 @@ app.post('/api/ai/analyze-jd', async (req, res) => {
 // 二、简历与 JD 匹配分析
 // POST /api/ai/match-resume  { resumeText, jdText }
 // ============================================================
-app.post('/api/ai/match-resume', async (req, res) => {
+app.post('/api/ai/match-resume', aiLimiter, async (req, res) => {
   try {
     const { resumeText, jdText } = req.body || {};
     if (!requireText(resumeText, '简历文本（resumeText）', res)) return;
     if (!requireText(jdText, '岗位 JD（jdText）', res)) return;
+    const references = findCareerReferences({ resumeText, jdText }, { limit: 6 });
+    const referenceContext = buildReferencePrompt(references);
+    const sourceIds = references.map(ref => ref.id).join(', ') || '无';
 
     const messages = [
       {
         role: 'system',
         content:
           '你是严谨的简历匹配顾问。' + ANTI_FABRICATION +
-          'matchScore 仅作辅助参考，不是绝对评分，不要包装成权威分数。' +
+          '你会收到【外部职业资料】。这些资料只能作为岗位能力基准和市场参照，不能覆盖用户提供的 JD，也不能推断用户未写出的经历。' +
+          'matchScore 由服务端按 scoreDimensions 加权汇总，你只需给出各维度判断、证据和理由，不要包装成权威分数。' +
           '必须区分“来自简历的内容”和“来自 JD 的要求”。' +
-          '当简历信息不足以判断时，把需要用户补充的问题放进 questionsForUser，绝不替用户编造。',
+          '当简历信息不足以判断时，把需要用户补充的问题放进 questionsForUser，绝不替用户编造。' +
+          'evidenceItems.sourceIds 只能引用本次提供的来源 ID：' + sourceIds + '。没有可引用来源时返回空数组。',
       },
       {
         role: 'user',
         content:
-          '请基于【我的简历文本】与【岗位 JD】做匹配分析，并以 JSON 输出，字段固定为：' +
+          '请基于【我的简历文本】、【岗位 JD】和【外部职业资料】做匹配分析，并以 JSON 输出，字段固定为：' +
           '{ "matchScore": 0, "matchedPoints": [], "missingPoints": [], "weakExpressions": [], ' +
-          '"suggestedResumeFocus": [], "riskWarnings": [], "questionsForUser": [] }。' +
-          '\nmatchScore 为 0-100 的整数参考值；matchedPoints 为简历中已满足 JD 的点；' +
+          '"suggestedResumeFocus": [], "riskWarnings": [], "questionsForUser": [], ' +
+          '"scoreDimensions": [ { "key": "hardRequirements", "score": 0, "reason": "", "evidence": [] } ], ' +
+          '"evidenceItems": [ { "claim": "", "resumeEvidence": "", "jdEvidence": "", "sourceIds": [], "confidence": 0.8 } ] }。' +
+          '\nscoreDimensions 必须覆盖这 5 个 key：hardRequirements、coreSkills、experienceDepth、domainFit、communicationReadability。每个 score 为 0-100 整数。' +
+          '\nmatchedPoints 为简历中已满足 JD 的点；' +
           'missingPoints 为 JD 要求但简历缺失的点；weakExpressions 为简历中表达偏弱、可加强的句子；' +
           'suggestedResumeFocus 为针对该岗位建议突出的方向；riskWarnings 为可能的风险（如经历不符、跨行等）；' +
           'questionsForUser 为信息不足、需要我补充真实信息的问题。' +
+          '\nevidenceItems 用于解释关键判断：claim 写判断，resumeEvidence 必须来自简历原文或写“简历未体现”，jdEvidence 必须来自 JD 原文或写“JD 未明确”，sourceIds 只填外部资料 ID。' +
+          '\n\n【外部职业资料】\n' + referenceContext +
           '\n\n【我的简历文本】\n' + resumeText +
           '\n\n【岗位 JD】\n' + jdText,
       },
     ];
-    const data = await callDeepSeekJSON(messages, { temperature: 0.2 });
-    res.json(data);
+    const data = await callDeepSeekJSON(messages, { temperature: 0.2, maxTokens: 3800 });
+    res.json(normalizeMatchResult(data, references));
   } catch (err) {
     handleError(res, err);
   }
@@ -325,7 +420,7 @@ app.post('/api/ai/match-resume', async (req, res) => {
 // 三、简历改写建议（保留真实性，逐条原文/改后/理由）
 // POST /api/ai/rewrite-resume  { resumeText, jdText, targetSection }
 // ============================================================
-app.post('/api/ai/rewrite-resume', async (req, res) => {
+app.post('/api/ai/rewrite-resume', aiLimiter, async (req, res) => {
   try {
     const { resumeText, jdText, targetSection, userNotes } = req.body || {};
     if (!requireText(resumeText, '简历文本（resumeText）', res)) return;
@@ -397,7 +492,7 @@ app.post('/api/ai/rewrite-resume', async (req, res) => {
 // 四、润色用户补充说明（只整理表达，不新增事实）
 // POST /api/ai/polish-confirmation-notes  { userNotes, questions, resumeText, jdText }
 // ============================================================
-app.post('/api/ai/polish-confirmation-notes', async (req, res) => {
+app.post('/api/ai/polish-confirmation-notes', aiLimiter, async (req, res) => {
   try {
     const { userNotes, questions } = req.body || {};
     if (!requireText(userNotes, '补充说明（userNotes）', res)) return;
@@ -435,7 +530,7 @@ app.post('/api/ai/polish-confirmation-notes', async (req, res) => {
 // 五、生成投递材料（投递摘要 + 邮件 + 面试准备 + 跟进待办）
 // POST /api/ai/generate-application-note  { company, position, jdText, resumeText }
 // ============================================================
-app.post('/api/ai/generate-application-note', async (req, res) => {
+app.post('/api/ai/generate-application-note', aiLimiter, async (req, res) => {
   try {
     const { company, position, jdText, resumeText } = req.body || {};
     if (!requireText(resumeText, '简历文本（resumeText）', res)) return;

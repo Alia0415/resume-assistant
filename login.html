@@ -84,15 +84,17 @@
 
     <button type="submit" class="submit" id="submit">登录</button>
     <div class="msg" id="msg"></div>
-    <div class="hint">数据保存在你本机浏览器，按账号隔离。</div>
+    <div class="hint">数据会先保存在本机缓存，并按账号同步到你部署的后端。</div>
   </form>
 
 <script>
 (function () {
   var mode = 'login';
+  var allowRegistration = true;
   var el = function (id) { return document.getElementById(id); };
   var msg = el('msg');
   function setMode(m) {
+    if (m === 'register' && !allowRegistration) m = 'login';
     mode = m;
     el('tab-login').classList.toggle('on', m === 'login');
     el('tab-register').classList.toggle('on', m === 'register');
@@ -104,6 +106,11 @@
     msg.textContent = '';
   }
   function show(kind, text) { msg.className = 'msg ' + kind; msg.textContent = text; }
+  function applyServerConfig(cfg) {
+    allowRegistration = !cfg || cfg.allowRegistration !== false;
+    el('tab-register').style.display = allowRegistration ? '' : 'none';
+    if (!allowRegistration && mode === 'register') setMode('login');
+  }
   function clearMessage() {
     msg.className = 'msg';
     msg.textContent = '';
@@ -151,6 +158,10 @@
   });
 
   resetEntryState();
+  fetch('/api/health', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(applyServerConfig)
+    .catch(function () {});
   window.addEventListener('pageshow', resetEntryState);
   window.setTimeout(resetEntryState, 0);
 })();

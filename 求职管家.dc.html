@@ -40,6 +40,7 @@
 <div style="display:flex;height:100vh;overflow:hidden;background:#f5f7fb;font-family:'Noto Sans SC',system-ui,sans-serif;color:#18223a;">
 
   <input id="jm-file" type="file" accept=".docx" style="display:none;" onChange="{{ onFile }}">
+  <input id="jm-backup-file" type="file" accept=".json,application/json" style="display:none;" onChange="{{ onBackupFile }}">
 
   <sc-if value="{{ sidebarOpen }}" hint-placeholder-val="{{ true }}">
   <aside style="width:230px;flex-shrink:0;background:#ffffff;border-right:1px solid #ebeef4;display:flex;flex-direction:column;height:100vh;">
@@ -120,7 +121,7 @@
               <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"></path></svg>
             </div>
             <div style="font-size:17px;font-weight:700;">欢迎使用求职管家</div>
-            <div style="font-size:13.5px;color:#6b7a96;margin-top:8px;line-height:1.7;max-width:440px;margin-left:auto;margin-right:auto;">这是一个完全空白、为你自己准备的工具。所有数据都保存在本机浏览器里。<br>从上传一份你的真实简历，或添加一个想投的岗位开始。</div>
+            <div style="font-size:13.5px;color:#6b7a96;margin-top:8px;line-height:1.7;max-width:440px;margin-left:auto;margin-right:auto;">这是一个完全空白、为你自己准备的工具。数据会先保存在本机缓存，并同步到你自己部署的后端。<br>从上传一份你的真实简历，或添加一个想投的岗位开始。</div>
             <div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap;">
               <button onClick="{{ triggerUpload }}" style="background:var(--ac);color:#fff;border:none;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">上传简历</button>
               <button onClick="{{ openJobModal }}" style="background:#fff;color:#3a485f;border:1px solid #e2e8f0;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">添加岗位</button>
@@ -387,6 +388,70 @@
               </div>
             </div>
 
+            <sc-if value="{{ hasScoreDimensions }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px 22px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+                <div style="font-size:14px;font-weight:700;">评分维度<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">服务端按固定权重汇总</span></div>
+                <div style="font-size:11.5px;color:#7e8aa3;">{{ scoreBasisText }}</div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;">
+                <sc-for list="{{ scoreDimensions }}" as="d" hint-placeholder-count="0">
+                  <div style="border:1px solid #eef1f6;border-radius:10px;padding:13px 14px;background:#fbfcfe;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+                      <div style="font-size:12.8px;font-weight:700;color:#3a485f;">{{ d.label }}</div>
+                      <div style="font-size:12px;font-weight:700;color:var(--ac);">{{ d.scoreLabel }}</div>
+                    </div>
+                    <div style="height:7px;border-radius:7px;background:#eef1f6;overflow:hidden;"><div style="{{ d.barStyle }}"></div></div>
+                    <div style="font-size:11.5px;color:#93a0b8;margin-top:7px;">权重 {{ d.weightLabel }}</div>
+                    <div style="font-size:12px;color:#5b6b85;line-height:1.6;margin-top:7px;">{{ d.reason }}</div>
+                    <sc-if value="{{ d.hasEvidence }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#7e8aa3;line-height:1.6;margin-top:6px;">{{ d.evidenceText }}</div></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ hasReferenceCards }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px 22px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+                <div style="font-size:14px;font-weight:700;">引用依据<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">外部职业资料与市场参照</span></div>
+                <div style="font-size:11.5px;color:#7e8aa3;">{{ referenceCoverageText }}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <sc-for list="{{ referenceCards }}" as="r" hint-placeholder-count="0">
+                  <div style="border:1px solid #eef1f6;border-radius:10px;padding:13px 14px;background:#fbfcfe;">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+                      <div style="min-width:0;">
+                        <div style="font-size:13px;font-weight:700;color:#3a485f;line-height:1.5;">{{ r.title }}</div>
+                        <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">{{ r.meta }}</div>
+                      </div>
+                      <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer" style="font-size:11.5px;color:var(--ac);text-decoration:none;white-space:nowrap;">查看来源</a>
+                    </div>
+                    <div style="font-size:12px;color:#5b6b85;line-height:1.6;margin-top:8px;">{{ r.summary }}</div>
+                    <sc-if value="{{ r.hasKeywords }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;"><sc-for list="{{ r.keywords }}" as="k" hint-placeholder-count="0"><span style="font-size:11px;border-radius:6px;padding:3px 7px;background:#eef4ff;color:#2a4a86;">{{ k }}</span></sc-for></div></sc-if>
+                    <sc-if value="{{ r.hasRequirements }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#7e8aa3;line-height:1.6;margin-top:7px;">{{ r.requirementsText }}</div></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ hasEvidenceItems }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px 22px;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:12px;">关键证据<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">简历、JD 与资料来源交叉校验</span></div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <sc-for list="{{ evidenceItems }}" as="ev" hint-placeholder-count="0">
+                  <div style="border-left:3px solid var(--ac);padding:2px 0 2px 12px;">
+                    <div style="font-size:12.8px;font-weight:700;color:#3a485f;line-height:1.6;">{{ ev.claim }}</div>
+                    <div style="font-size:11.8px;color:#5b6b85;line-height:1.6;margin-top:5px;">简历：{{ ev.resumeEvidence }}</div>
+                    <div style="font-size:11.8px;color:#5b6b85;line-height:1.6;">JD：{{ ev.jdEvidence }}</div>
+                    <div style="font-size:11.5px;color:#93a0b8;margin-top:4px;">来源：{{ ev.sourceLabel }} · 可信度 {{ ev.confidenceLabel }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            </sc-if>
+
             <sc-if value="{{ hasJdKeywords }}" hint-placeholder-val="{{ false }}">
             <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px 22px;">
               <div style="font-size:14px;font-weight:700;margin-bottom:12px;">JD 关键词<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">来自岗位 JD 解析</span></div>
@@ -564,13 +629,13 @@
                 <div style="position:sticky;top:86px;background:#fff;border:1px solid #ebeef4;border-radius:14px;overflow:hidden;">
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
                     <div>
-                      <div style="font-size:13px;font-weight:700;">原文件编辑区</div>
-                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">拖拽中间分隔条调整窗口；Word 会按当前宽度完整适配</div>
+                      <div style="font-size:13px;font-weight:700;">导出前 Word 预览</div>
+                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">这里渲染的就是即将导出的 DOCX；拖拽中间分隔条可放大查看</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                       <button onClick="{{ widenRewriteEditor }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">放大窗口</button>
                       <button onClick="{{ resetRewriteEditor }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">还原</button>
-                      <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存当前编辑</button>
+                      <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存为版本</button>
                     </div>
                   </div>
                   <sc-if value="{{ previewHasUnlocated }}" hint-placeholder-val="{{ false }}">
@@ -579,15 +644,15 @@
                   <div style="background:#f3f5f9;padding:18px;max-height:820px;overflow:auto;">
                     <div style="width:100%;max-width:none;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 24px rgba(31,53,90,.08);">
                       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
-                        <span style="font-size:12.5px;font-weight:700;color:#18223a;">可直接编辑的原文件</span>
+                        <span style="font-size:12.5px;font-weight:700;color:#18223a;">即将导出的 Word</span>
                         <span style="font-size:11.5px;color:#93a0b8;">{{ sourcePreviewLabel }}</span>
                       </div>
                       <div id="jm-source-preview" data-source-key="{{ sourcePreviewKey }}" style="min-height:640px;max-height:780px;overflow:auto;padding:14px;background:#eef2f7;display:flex;flex-direction:column;align-items:center;gap:14px;"></div>
                     </div>
                   </div>
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-top:1px solid #eef1f6;background:#fbfcfe;flex-wrap:wrap;">
-                    <div style="font-size:11.5px;color:#7e8aa3;">这里的当前内容会进入「简历版本」，再决定是否导出 Word。</div>
-                    <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存当前文件编辑</button>
+                    <div style="font-size:11.5px;color:#7e8aa3;">预览和下载使用同一个 DOCX 模板文件，所见即所得。</div>
+                    <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存为简历版本</button>
                   </div>
                 </div>
                 </div>
@@ -601,6 +666,7 @@
                 <div style="font-size:14px;font-weight:700;">投递材料草稿<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">可直接编辑，确认后导出 Word</span></div>
                 <div style="display:flex;align-items:center;gap:8px;">
                   <button onClick="{{ exportNote }}" style="display:flex;align-items:center;gap:6px;background:var(--ac);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>导出 Word</button>
+                  <button onClick="{{ createAppFromCurrentJob }}" style="background:var(--ac2-soft);color:var(--ac2);border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">创建投递记录</button>
                   <button onClick="{{ generateNote }}" style="background:#fff;color:#3a485f;border:1px solid #e2e8f0;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">重新生成</button>
                 </div>
               </div>
@@ -798,7 +864,7 @@
           </sc-if>
 
           <sc-if value="{{ hasAutoTodos }}" hint-placeholder-val="{{ false }}">
-            <div style="font-size:13px;font-weight:700;color:#6b7a96;margin-bottom:10px;">来自投递记录的下一步</div>
+            <div style="font-size:13px;font-weight:700;color:#6b7a96;margin-bottom:10px;">来自投递 / 反馈的下一步</div>
             <div style="display:flex;flex-direction:column;gap:9px;">
               <sc-for list="{{ autoTodos }}" as="t" hint-placeholder-count="0">
                 <div style="display:flex;align-items:center;gap:13px;background:#fff;border:1px solid #ebeef4;border-radius:12px;padding:13px 16px;">
@@ -821,7 +887,7 @@
             <div style="font-size:15px;font-weight:700;">基本信息</div>
             <button onClick="{{ openProfileModal }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;">编辑</button>
           </div>
-          <div style="font-size:12.5px;color:#93a0b8;margin-bottom:14px;line-height:1.7;">这些信息只用于自动填充投递材料里的称呼，存在你本机，不会上传。</div>
+          <div style="font-size:12.5px;color:#93a0b8;margin-bottom:14px;line-height:1.7;">这些信息用于自动填充投递材料，会先保存在本机缓存，并随账号数据同步到你自己部署的后端。</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 24px;">
             <sc-for list="{{ profileFields }}" as="p" hint-placeholder-count="6">
               <div><div style="font-size:11.5px;color:#93a0b8;margin-bottom:4px;">{{ p.label }}</div><div style="font-size:13.5px;color:#3a485f;">{{ p.value }}</div></div>
@@ -831,9 +897,10 @@
 
         <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:22px;max-width:680px;">
           <div style="font-size:15px;font-weight:700;margin-bottom:6px;">数据管理</div>
-          <div style="font-size:12.5px;color:#93a0b8;margin-bottom:16px;line-height:1.7;">所有数据保存在本机浏览器（localStorage + IndexedDB），刷新不会丢失。建议定期导出备份。</div>
+          <div style="font-size:12.5px;color:#93a0b8;margin-bottom:16px;line-height:1.7;">数据会先保存在本机浏览器缓存，登录后同步到你自己部署的后端。简历原文件会保存到后端文件存储；建议定期导出 JSON 备份。</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
             <button onClick="{{ exportAll }}" style="background:var(--ac-soft);color:var(--ac);border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">导出全部数据（JSON 备份）</button>
+            <button onClick="{{ triggerImportBackup }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">导入备份</button>
             <button onClick="{{ exportCsv }}" style="background:#fff;color:#3a485f;border:1px solid #e2e8f0;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;">导出投递记录 CSV</button>
             <button onClick="{{ clearAll }}" style="margin-left:auto;background:#fff;color:#c0392b;border:1px solid #f0d0cc;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;">清空全部数据</button>
           </div>
@@ -881,6 +948,12 @@
               </sc-if>
             </div>
           </sc-for>
+          <sc-if value="{{ modalCrawlAction.show }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ modalCrawlAction.onClick }}" style="align-self:flex-start;display:flex;align-items:center;gap:7px;background:#eef4ff;color:var(--ac);border:none;border-radius:9px;padding:9px 15px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"></path><path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"></path></svg>
+              {{ modalCrawlAction.label }}
+            </button>
+          </sc-if>
           <sc-if value="{{ modalAction.show }}" hint-placeholder-val="{{ false }}">
             <button onClick="{{ modalAction.onClick }}" style="align-self:flex-start;display:flex;align-items:center;gap:7px;background:var(--ac2-soft);color:var(--ac2);border:none;border-radius:9px;padding:9px 15px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.4 2.3 7.2-6.3-4.6L5.7 21l2.3-7.2-6-4.4h7.6z"></path></svg>
@@ -915,7 +988,7 @@ class Component extends DCLogic {
     })()
       || { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [] },
     page: 'dashboard', modalType: null, form: {}, editId: null,
-    toast: null, aiLoading: false, aiError: null,
+    toast: null, aiLoading: false, crawlLoading: false, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
     jobSearch: '', appSearch: '', appStatus: '全部', syncErr: false,
     sidebarCollapsed: false, rewriteEditorWidth: 58
@@ -937,6 +1010,24 @@ class Component extends DCLogic {
   applyAccent() { const a = this.props.accentColor; if (a) document.documentElement.style.setProperty('--ac', a); }
 
   storeKey() { return window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1'; }
+  emptyDb() { return { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [] }; }
+  normalizeDb(input) {
+    const src = (input && typeof input === 'object' && !Array.isArray(input)) ? input : {};
+    const out = this.emptyDb();
+    out.profile = (src.profile && typeof src.profile === 'object' && !Array.isArray(src.profile)) ? src.profile : {};
+    out.analyses = (src.analyses && typeof src.analyses === 'object' && !Array.isArray(src.analyses)) ? src.analyses : {};
+    ['resumes', 'versions', 'jobs', 'applications', 'feedback', 'todos'].forEach(k => {
+      out[k] = Array.isArray(src[k]) ? src[k] : [];
+    });
+    if (typeof src._updatedAt === 'number') out._updatedAt = src._updatedAt;
+    return out;
+  }
+  dbHasData(db) {
+    return !!(db && (((db.resumes || []).length) || ((db.versions || []).length) ||
+      ((db.jobs || []).length) || (Object.keys(db.analyses || {}).length) ||
+      ((db.applications || []).length) || ((db.feedback || []).length) ||
+      ((db.todos || []).length) || (db.profile && Object.keys(db.profile).length)));
+  }
   // 本地缓存（即时、加速首屏、离线可用）。localStorage 只是缓存，不再是唯一数据源。
   cacheLocal(db) { try { localStorage.setItem(this.storeKey(), JSON.stringify(db)); } catch (e) {} }
   // 数据改动：盖时间戳 → 写本地缓存 → 防抖触发「串行保存队列」同步到云端。
@@ -1039,10 +1130,7 @@ class Component extends DCLogic {
       const cloudAt = (cloud && Number(cloud._updatedAt)) || (out && Number(out.updatedAt)) || 0;
       const local = this.state.db || {};
       const localAt = Number(local._updatedAt) || 0;
-      const localHasData = !!(((local.resumes || []).length) || ((local.versions || []).length) ||
-        ((local.jobs || []).length) || (Object.keys(local.analyses || {}).length) ||
-        ((local.applications || []).length) || ((local.feedback || []).length) ||
-        ((local.todos || []).length) || (local.profile && Object.keys(local.profile).length));
+      const localHasData = this.dbHasData(local);
       this._loaded = true;
       if (cloud && cloudAt >= localAt) {
         this.setState({ db: cloud }); this.cacheLocal(cloud);          // 云端较新 → 以云端为准
@@ -1115,7 +1203,7 @@ class Component extends DCLogic {
     return (db.resumes || []).find(r => r.id === id) || null;
   }
   sourcePreviewKeyFor(r) {
-    return r ? [r.id || '', r.fileId || '', r.fileName || '', r.fileType || '', r.uploadedAt || ''].join('|') : 'none';
+    return r ? [r.id || '', r.fileId || '', r.fileName || '', r.fileType || '', r.uploadedAt || '', this.rewriteDocxPatchKey()].join('|') : 'none';
   }
   scheduleSourcePreviewRender() {
     clearTimeout(this._sourcePreviewTimer);
@@ -1151,6 +1239,116 @@ class Component extends DCLogic {
     }
     return blob;
   }
+  rewriteDocxPatchKey() {
+    const jobId = this.curJobId && this.curJobId();
+    const a = jobId ? (this.state.db.analyses[jobId] || null) : null;
+    const sugs = (a && a.rewrite && a.rewrite.rewriteSuggestions) || [];
+    return sugs.filter(s => s && s.confirmed).map(s => [
+      s.originalText || '',
+      s.rewrittenText || '',
+      s.truthConfirmed ? '1' : '0'
+    ].join('=>')).join('|');
+  }
+  docxReplacementsFromSuggestions(suggestions) {
+    return (suggestions || []).map((s, i) => ({
+      index: i,
+      before: String((s && s.originalText) || '').trim(),
+      after: String((s && s.rewrittenText) || (s && s.originalText) || '').trim()
+    })).filter(r => r.before && r.after);
+  }
+  currentDocxReplacements() {
+    const jobId = this.curJobId();
+    const a = this.state.db.analyses[jobId];
+    const sugs = (a && a.rewrite && a.rewrite.rewriteSuggestions) || [];
+    return this.docxReplacementsFromSuggestions(sugs.filter(s => s && s.confirmed));
+  }
+  compactDocxText(s) {
+    const out = { text: '', map: [] };
+    String(s || '').split('').forEach((ch, i) => {
+      if (/[\s\u00a0•·\-—–,，.。;；:：、"'“”‘’()[\]（）【】{}《》<>]/.test(ch)) return;
+      out.text += ch.toLowerCase();
+      out.map.push(i);
+    });
+    return out;
+  }
+  findDocxTextRange(fullText, target) {
+    const exact = fullText.indexOf(target);
+    if (exact >= 0) return { start: exact, end: exact + target.length };
+    const hay = this.compactDocxText(fullText);
+    const needle = this.compactDocxText(target).text;
+    if (!needle || needle.length < 6) return null;
+    const pos = hay.text.indexOf(needle);
+    if (pos < 0) return null;
+    const start = hay.map[pos];
+    const end = hay.map[pos + needle.length - 1] + 1;
+    return start == null || end == null ? null : { start, end };
+  }
+  replaceDocxTextNodes(nodes, start, end, replacement) {
+    let cursor = 0, inserted = false;
+    nodes.forEach(node => {
+      const text = node.textContent || '';
+      const nodeStart = cursor;
+      const nodeEnd = cursor + text.length;
+      cursor = nodeEnd;
+      if (end <= nodeStart || start >= nodeEnd) return;
+      const localStart = Math.max(0, start - nodeStart);
+      const localEnd = Math.min(text.length, end - nodeStart);
+      if (!inserted) {
+        node.textContent = text.slice(0, localStart) + replacement + (end <= nodeEnd ? text.slice(localEnd) : '');
+        inserted = true;
+      } else {
+        node.textContent = end <= nodeEnd ? text.slice(localEnd) : '';
+      }
+    });
+    return inserted;
+  }
+  patchDocxXmlString(xml, replacements) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('Word XML 解析失败');
+    const paragraphs = Array.from(doc.getElementsByTagName('w:p'));
+    const applied = [];
+    replacements.forEach(rep => {
+      for (const p of paragraphs) {
+        const nodes = Array.from(p.getElementsByTagName('w:t'));
+        if (!nodes.length) continue;
+        const fullText = nodes.map(n => n.textContent || '').join('');
+        const range = this.findDocxTextRange(fullText, rep.before);
+        if (!range) continue;
+        if (this.replaceDocxTextNodes(nodes, range.start, range.end, rep.after)) {
+          applied.push(rep.index);
+          break;
+        }
+      }
+    });
+    return { xml: new XMLSerializer().serializeToString(doc), applied };
+  }
+  async buildPatchedDocxFromResume(resume, replacements, sourceBlob) {
+    if (!window.JSZip) throw new Error('Word 组件加载失败，请刷新后重试');
+    if (!resume || String(resume.fileType || '').toLowerCase() !== 'docx') throw new Error('当前简历不是 DOCX 原文件');
+    const blob = sourceBlob || await this.resumeBlob(resume);
+    if (!blob) throw new Error('找不到原始 Word 文件');
+    const zip = await window.JSZip.loadAsync(await blob.arrayBuffer());
+    const fileNames = Object.keys(zip.files).filter(name => /^word\/(document|header\d+|footer\d+)\.xml$/.test(name));
+    const applied = {};
+    for (const name of fileNames) {
+      const todo = (replacements || []).filter(r => !applied[r.index]);
+      if (!todo.length) break;
+      const file = zip.file(name);
+      if (!file) continue;
+      const patched = this.patchDocxXmlString(await file.async('string'), todo);
+      if (patched.applied.length) {
+        zip.file(name, patched.xml);
+        patched.applied.forEach(idx => { applied[idx] = true; });
+      }
+    }
+    const missing = (replacements || []).filter(r => !applied[r.index]);
+    const out = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
+    return { blob: out, missing, appliedCount: (replacements || []).length - missing.length };
+  }
   sourcePreviewMessage(box, text) {
     if (!box) return;
     box.innerHTML = '<div style="width:100%;background:#fff;border:1px dashed #cbd5e6;border-radius:10px;padding:18px;text-align:center;font-size:12.5px;color:#7e8aa3;line-height:1.7;">' + this.esc(text) + '</div>';
@@ -1169,7 +1367,12 @@ class Component extends DCLogic {
     if (!blob) return this.sourcePreviewMessage(box, '找不到原文件，无法进入原文件编辑区。');
     try {
       if (ext === 'pdf') return await this.renderPdfSourcePreview(box, blob);
-      if (ext === 'docx') return await this.renderDocxSourcePreview(box, blob);
+      if (ext === 'docx') {
+        const replacements = this.currentDocxReplacements();
+        const preview = replacements.length ? await this.buildPatchedDocxFromResume(resume, replacements, blob) : { blob, missing: [] };
+        this._lastDocxPatchMissing = preview.missing || [];
+        return await this.renderDocxSourcePreview(box, preview.blob);
+      }
       if (ext === 'txt') return this.renderTextSourcePreview(box, resume.text || '');
       return this.sourcePreviewMessage(box, '暂不支持预览 .' + (ext || 'doc') + ' 原始版式；请上传 DOCX。');
     } catch (e) {
@@ -1266,7 +1469,7 @@ class Component extends DCLogic {
     const holder = document.createElement('div');
     holder.setAttribute('data-jm-source-edit-root', '1');
     holder.setAttribute('data-jm-docx-root', '1');
-    holder.setAttribute('contenteditable', 'true');
+    holder.setAttribute('contenteditable', 'false');
     holder.setAttribute('spellcheck', 'false');
     holder.className = 'jm-docx-preview-wrap';
     holder.style.cssText = 'width:max-content;max-width:none;min-width:100%;background:#fff;box-shadow:0 8px 20px rgba(31,53,90,.12);overflow:visible;outline:2px solid transparent;transform-origin:top center;';
@@ -1281,18 +1484,33 @@ class Component extends DCLogic {
       breakPages: true,
       useBase64URL: true
     });
-    holder.setAttribute('contenteditable', 'true');
+    holder.setAttribute('contenteditable', 'false');
     holder.querySelectorAll('section,.docx-wrapper,.docx').forEach(el => {
-      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('contenteditable', 'false');
     });
     this.scheduleSourcePreviewFit();
-    this.refreshRewritePreviewEditor();
   }
 
   triggerUpload() { const el = document.getElementById('jm-file'); if (el) el.click(); }
   async onFile(e) { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) await this.ingest(file); }
   onDragOver(e) { e.preventDefault(); }
   async onDrop(e) { e.preventDefault(); const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (file) await this.ingest(file); }
+  triggerImportBackup() { const el = document.getElementById('jm-backup-file'); if (el) el.click(); }
+  async onBackupFile(e) { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) await this.importBackup(file); }
+  async importBackup(file) {
+    if (!file || !/\.json$/i.test(file.name || '')) return this.showToast('请选择 JSON 备份文件');
+    try {
+      const raw = await file.text();
+      const db = this.normalizeDb(JSON.parse(raw));
+      if (!this.dbHasData(db)) return this.showToast('备份文件里没有可恢复的数据');
+      if (!confirm('导入备份会替换当前账号下的全部数据。建议先导出当前备份，确定继续？')) return;
+      this.persist(db);
+      this.setState({ db, page: 'dashboard', modalType: null, form: {}, editId: null });
+      this.showToast('已导入备份，正在同步到后端');
+    } catch (e) {
+      this.showToast('导入失败：JSON 文件无法解析');
+    }
+  }
   async ingest(file) {
     const ext = (file.name.split('.').pop() || '').toLowerCase();
     if (ext !== 'docx') return this.showToast('为保证可编辑和不乱码，请上传 Word .docx 文件');
@@ -1542,18 +1760,48 @@ class Component extends DCLogic {
     return out;
   }
 
-  // 调用后端 DeepSeek 代理（前端永远看不到 API Key）
-  async aiCall(path, body) {
+  async postJson(path, body, connectMessage) {
     const base = (this.props.apiBase || '').replace(/\/+$/, '');
     let res;
     try { res = await fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
-    catch (e) { throw new Error('无法连接后端服务，请先按 server/README.md 启动 Node 服务并配置 DEEPSEEK_API_KEY。'); }
+    catch (e) { throw new Error(connectMessage || '无法连接后端服务，请先按 server/README.md 启动 Node 服务。'); }
     let data = null;
     try { data = await res.json(); } catch (e) { throw new Error('后端返回了非 JSON 内容（HTTP ' + res.status + '），请检查服务日志。'); }
     if (!res.ok || (data && data.error)) throw new Error((data && data.error) || ('请求失败（HTTP ' + res.status + '）'));
     return data;
   }
+  // 调用后端 DeepSeek 代理（前端永远看不到 API Key）
+  async aiCall(path, body) {
+    return this.postJson(path, body, '无法连接后端服务，请先按 server/README.md 启动 Node 服务并配置 DEEPSEEK_API_KEY。');
+  }
   ensureAnalysis(db, jobId) { if (!db.analyses[jobId]) db.analyses[jobId] = {}; return db.analyses[jobId]; }
+
+  // 岗位弹窗：从公开网页链接抓取岗位内容（POST /api/jobs/fetch-url）
+  async crawlJobFromLink() {
+    const url = (this.state.form.link || '').trim();
+    if (!url) return this.showToast('请先填写投递链接');
+    if (this.state.crawlLoading) return;
+    this.setState({ crawlLoading: true });
+    try {
+      const data = await this.postJson('/api/jobs/fetch-url', { url }, '无法连接后端服务，请先启动 Node 服务。');
+      const job = (data && data.job) || {};
+      const warnings = Array.isArray(job.crawlerWarnings) ? job.crawlerWarnings : [];
+      this.setState(s => ({ crawlLoading: false, form: Object.assign({}, s.form, {
+        company: s.form.company || job.company || '',
+        role: s.form.role || job.role || '',
+        city: s.form.city || job.city || '',
+        direction: s.form.direction || job.direction || '',
+        link: job.link || s.form.link || url,
+        jd: job.jd || s.form.jd || '',
+        source: s.form.source || job.source || '网页抓取',
+        crawlerWarnings: warnings
+      }) }));
+      this.showToast(warnings.length ? ('已抓取岗位内容，请核对：' + warnings[0]) : '已抓取岗位内容，请核对后保存');
+    } catch (e) {
+      this.setState({ crawlLoading: false });
+      this.showToast(e.message);
+    }
+  }
 
   // 岗位弹窗：解析 JD 自动填表（POST /api/ai/analyze-jd）
   async analyzeJd() {
@@ -1642,7 +1890,7 @@ class Component extends DCLogic {
         x.confirmed = !x.confirmed;
       }
     });
-    this.refreshRewritePreviewEditor();
+    this.scheduleSourcePreviewRender();
   }
   editSug(jobId, i, v) {
     this.setDb(db => {
@@ -1653,7 +1901,7 @@ class Component extends DCLogic {
         x.rewrittenText = v;
       }
     });
-    this.refreshRewritePreviewEditor();
+    this.scheduleSourcePreviewRender();
   }
   setRewriteUserNotes(v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) a.rewrite.userNotes = v; }); }
   setQAnswerChoice(i, val) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) { if (!a.rewrite.qAnswers) a.rewrite.qAnswers = {}; const cur = a.rewrite.qAnswers[i] || {}; cur.choice = (cur.choice === val ? '' : val); a.rewrite.qAnswers[i] = cur; } }); }
@@ -1726,6 +1974,44 @@ class Component extends DCLogic {
     if (!items.length) return this.showToast('没有可加入的待办');
     this.setDb(db => { items.forEach(t => db.todos.unshift({ id: this.uid(), done: false, source: 'manual', text: t + (job ? '（' + (job.company || '') + '）' : ''), due: '' })); });
     this.showToast('已加入 ' + items.length + ' 条待办');
+  }
+  suggestApplicationVersionName(job) {
+    const db = this.state.db || {};
+    const tokens = [job && job.company, job && job.role, job && job.direction].filter(Boolean).map(x => String(x).toLowerCase());
+    const versions = db.versions || [];
+    const matched = versions.find(v => {
+      const hay = [v.name, v.targetJob, v.focus].filter(Boolean).join(' ').toLowerCase();
+      return tokens.some(t => t && hay.indexOf(t) >= 0);
+    });
+    if (matched && matched.name) return matched.name;
+    if (versions[0] && versions[0].name) return versions[0].name;
+    const curResume = (db.resumes || []).find(r => r.id === this.curResumeId());
+    return (curResume && curResume.fileName) || '';
+  }
+  createApplicationFromCurrentJob() {
+    const jobId = this.curJobId();
+    const db = this.state.db || {};
+    const job = (db.jobs || []).find(j => j.id === jobId);
+    if (!job) return this.showToast('请先选择岗位');
+    const existing = (db.applications || []).find(a => this.normChoice(a.company) === this.normChoice(job.company) && this.normChoice(a.role) === this.normChoice(job.role));
+    if (existing && !confirm('这个公司和岗位已经有投递记录。仍然新建一条？')) {
+      this.go('apps');
+      return;
+    }
+    const note = ((db.analyses[jobId] || {}).note) || {};
+    const draft = {
+      company: job.company || '',
+      role: job.role || '',
+      city: job.city || '',
+      channel: '',
+      date: this.today(),
+      versionName: this.suggestApplicationVersionName(job),
+      status: '待投递',
+      nextStep: (Array.isArray(note.followUpTodo) && note.followUpTodo[0]) || '确认投递渠道并提交',
+      note: note.applicationSummary ? ('投递定位：' + note.applicationSummary) : ''
+    };
+    this.openModal('application', draft);
+    this.showToast('已填好投递记录草稿，确认后保存');
   }
   copyText(t) { try { navigator.clipboard.writeText(t); this.showToast('已复制'); } catch (e) { this.showToast('复制失败，请手动选择'); } }
 
@@ -1912,6 +2198,7 @@ class Component extends DCLogic {
     this._rewritePreviewTimer = setTimeout(() => {
       const root = this.sourceEditRoot();
       if (!root) return;
+      if (root.getAttribute('data-jm-docx-root') === '1') return;
       this.resetSourceSuggestionMarks(root);
       const jobId = this.curJobId();
       const a = this.state.db.analyses[jobId];
@@ -1931,7 +2218,7 @@ class Component extends DCLogic {
       return text.replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
     } catch (e) { return ''; }
   }
-  saveVersionFromRewrite() {
+  async saveVersionFromRewrite() {
     const jobId = this.curJobId();
     const job = this.state.db.jobs.find(j => j.id === jobId);
     const a = this.state.db.analyses[jobId];
@@ -1940,23 +2227,50 @@ class Component extends DCLogic {
     if (!confirmed.length) return this.showToast('请先勾选「采纳」且确认属实的建议');
     const unverified = confirmed.filter(s => s.truthCheckRequired && !s.truthConfirmed);
     if (unverified.length) return this.showToast('还有 ' + unverified.length + ' 条需核实建议未确认属实');
+    const resume = this.currentResumeFile();
+    if (!resume || String(resume.fileType || '').toLowerCase() !== 'docx') return this.showToast('请先选择一份 DOCX 原简历');
+    const replacements = this.docxReplacementsFromSuggestions(confirmed);
+    let patched = null;
+    try {
+      patched = await this.buildPatchedDocxFromResume(resume, replacements);
+    } catch (e) {
+      console.error('[patch docx]', e);
+      return this.showToast('生成 Word 预览失败：' + ((e && e.message) || '请稍后重试'));
+    }
+    if (patched.missing.length) return this.showToast('有 ' + patched.missing.length + ' 条建议无法写入原 Word，请调整建议原文后再保存');
     const focus = confirmed.map(s => s.section).join('；');
     const allSuggestions = a.rewrite.rewriteSuggestions || [];
     const preview = this.buildRewritePreview(this.getResumeText(), allSuggestions);
-    const content = this.sourceEditorText() || this.rewritePreviewEditorText() || preview.text || this.getResumeText();
-    const notApplied = confirmed.filter(s => !preview.hits[allSuggestions.indexOf(s)]);
-    this.openModal('version', { name: ((job && (job.direction || job.role)) || '定制') + '版', targetJob: (job ? job.company + ' · ' + job.role : ''), focus, content });
-    this.showToast(notApplied.length
-      ? ('已用右侧文件编辑区生成版本；' + notApplied.length + ' 条未定位建议未自动写入')
-      : '已用右侧文件编辑区生成版本，请核对后保存');
+    this.openModal('version', {
+      name: ((job && (job.direction || job.role)) || '定制') + '版',
+      targetJob: (job ? job.company + ' · ' + job.role : ''),
+      focus,
+      content: preview.text || this.getResumeText(),
+      exactDocx: true,
+      sourceResumeId: resume.id,
+      sourceResumeFileId: resume.fileId || '',
+      sourceResumeFileName: resume.fileName || '',
+      sourceResumeUploadedAt: resume.uploadedAt || '',
+      docxReplacements: replacements
+    });
+    this.showToast('已生成所见即所得 Word 版本，请确认名称后保存');
   }
 
   async exportVersion(v) {
-    if (!v || !(v.content || '').trim()) return this.showToast('没有可导出的简历内容');
+    if (!v || (!(v.content || '').trim() && !v.exactDocx)) return this.showToast('没有可导出的简历内容');
     if (!window.JSZip) return this.showToast('Word 导出组件加载失败，请刷新后重试');
     try {
-      const photo = await this.resumeTemplatePhoto();
-      const blob = await this.buildResumeDocx(v, photo);
+      let blob = null;
+      if (v.exactDocx && Array.isArray(v.docxReplacements)) {
+        const resume = (this.state.db.resumes || []).find(r => r.id === v.sourceResumeId || (v.sourceResumeFileId && r.fileId === v.sourceResumeFileId));
+        if (!resume) throw new Error('找不到该版本对应的原始 Word 文件');
+        const patched = await this.buildPatchedDocxFromResume(resume, v.docxReplacements);
+        if (patched.missing.length) throw new Error('有 ' + patched.missing.length + ' 条修改无法写入原 Word');
+        blob = patched.blob;
+      } else {
+        const photo = await this.resumeTemplatePhoto();
+        blob = await this.buildResumeDocx(v, photo);
+      }
       const name = this.safeFileName((v.name || '简历版本') + '.docx');
       this.downloadBlob(blob, name);
       this.showToast('已导出 ' + name);
@@ -2232,7 +2546,7 @@ class Component extends DCLogic {
   }
   exportCsv() { const rows = this.state.db.applications; if (!rows.length) return this.showToast('暂无投递记录'); const head = ['公司', '岗位', '城市', '投递渠道', '投递日期', '简历版本', '状态', '下一步', '备注']; const keys = ['company', 'role', 'city', 'channel', 'date', 'versionName', 'status', 'nextStep', 'note']; const csv = [head.join(',')].concat(rows.map(r => keys.map(k => '"' + String(r[k] == null ? '' : r[k]).replace(/"/g, '""') + '"').join(','))).join('\r\n'); const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = '\u6295\u9012\u8bb0\u5f55.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出 CSV'); }
   exportAll() { const blob = new Blob([JSON.stringify(this.state.db, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = '\u6c42\u804c\u6570\u636e\u5907\u4efd.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); this.showToast('已导出备份'); }
-  clearAll() { if (!confirm('确定清空全部数据？此操作不可恢复（建议先导出备份）。')) return; const empty = { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [] }; this.persist(empty); this.setState({ db: empty }); this.showToast('已清空'); }
+  clearAll() { if (!confirm('确定清空全部数据？此操作不可恢复（建议先导出备份）。')) return; const empty = this.emptyDb(); this.persist(empty); this.setState({ db: empty }); this.showToast('已清空'); }
 
   buildFields() {
     const t = this.state.modalType, f = this.state.form;
@@ -2270,6 +2584,7 @@ class Component extends DCLogic {
     if (t === 'application') return [combo('company', '公司名称', '直接输入新公司', this.applicationCompanyOptions(), v => this.selectApplicationCompany(v, f.role || ''), '选择已匹配公司', '手动输入新公司', '_manualAppCompany'), combo('role', '岗位名称', '直接输入新岗位', this.applicationRoleOptions(f.company), v => this.selectApplicationRole(v), f.company ? '选择该公司的已匹配岗位' : '先选择公司', '手动输入新岗位', '_manualAppRole'), inp('city', '城市', ''), inp('channel', '投递渠道', '如：官网 / BOSS / 内推 / 邮件'), inp('date', '投递日期', '', 'date'), combo('versionName', '使用的简历版本', '直接输入简历版本', this.resumeVersionOptions(), v => this.selectApplicationVersion(v), '选择已有简历版本', '手动输入简历版本', '_manualAppVersion'), sel('status', '当前状态', this.STATUSES), inp('nextStep', '下一步事项', '如：3 天后跟进 HR'), area('note', '备注', '')];
     if (t === 'feedback') return [combo('company', '公司名称', '直接输入新公司', this.feedbackCompanyOptions(), v => this.selectFeedbackCompany(v, f.role || ''), '选择已记录公司', '手动输入新公司', '_manualCompany'), combo('role', '岗位名称', '直接输入新岗位', this.feedbackRoleOptions(f.company), v => this.selectFeedbackRole(v), f.company ? '选择该公司的已记录岗位' : '先选择公司', '手动输入新岗位', '_manualRole'), sel('type', '反馈类型', this.FBTYPES), area('content', '反馈原文（可粘贴邮件 / 短信）', '把企业的回复原文如实粘贴到这里…', true), area('summary', '要点小结（手填）', ''), inp('nextStep', '我的下一步', '')];
     if (t === 'todo') return [inp('text', '待办内容', '如：周五前完成某岗位网申'), inp('due', '截止日期', '', 'date')];
+    if (t === 'version' && f.exactDocx) return [inp('name', '版本名称', '如：资金管理版'), inp('targetJob', '对应岗位', '如：腾讯音乐 · 资金管理实习生'), inp('focus', '修改重点', '如：突出资金账户、台账、对账经历')];
     if (t === 'version') return [inp('name', '版本名称', '如：资金管理版'), inp('targetJob', '对应岗位', '如：腾讯音乐 · 资金管理实习生'), inp('focus', '修改重点', '如：突出资金账户、台账、对账经历'), area('content', '简历内容', '该版本的简历文字…', true)];
     if (t === 'profile') return [inp('name', '姓名', ''), inp('school', '学校', ''), inp('major', '专业', ''), inp('phone', '电话', ''), inp('email', '邮箱', ''), inp('city', '期望城市', '')];
     return [];
@@ -2353,6 +2668,7 @@ class Component extends DCLogic {
     const todoItems = [];
     pendingTodos.forEach(t => todoItems.push({ text: t.text, sub: t.due ? '截止 ' + t.due : '我的待办', dot: 'var(--ac)' }));
     activeAppsAll.filter(a => a.nextStep).forEach(a => todoItems.push({ text: a.nextStep, sub: a.company + ' · ' + a.role, dot: 'var(--ac2)' }));
+    db.feedback.filter(f => f.nextStep).forEach(f => todoItems.push({ text: f.nextStep, sub: ((f.company || '') + (f.role ? ' · ' + f.role : '') + ' · 反馈记录').replace(/^ · /, ''), dot: '#c2710c' }));
     const stats = [
       { label: '简历版本', value: db.versions.length, unit: '个', go: () => this.go('resume') },
       { label: '岗位', value: db.jobs.length, unit: '个', go: () => this.go('jobs') },
@@ -2410,6 +2726,61 @@ class Component extends DCLogic {
     const matchScore = mat ? (typeof mat.matchScore === 'number' ? mat.matchScore : (parseInt(mat.matchScore, 10) || 0)) : 0;
     const ringDash = (circ * matchScore / 100).toFixed(1) + ' ' + circ.toFixed(1);
     const jdKeywords = (curJob && curJob.parsed && Array.isArray(curJob.parsed.keywords)) ? curJob.parsed.keywords : [];
+    const scoreDimensions = mat ? arr(mat.scoreDimensions).map((raw, i) => {
+      const d = (raw && typeof raw === 'object') ? raw : {};
+      const score = this.clamp(Number(d.score) || 0, 0, 100);
+      const weight = Math.max(0, Number(d.weight) || 0);
+      const evidence = arr(d.evidence).map(x => String(x || '').trim()).filter(Boolean).slice(0, 3);
+      return {
+        label: d.label || d.key || ('维度 ' + (i + 1)),
+        scoreLabel: score + '/100',
+        weightLabel: weight ? Math.round(weight * 100) + '%' : '—',
+        reason: d.reason || '暂无说明',
+        evidenceText: evidence.join('；'),
+        hasEvidence: evidence.length > 0,
+        barStyle: 'height:100%;width:' + score + '%;border-radius:7px;background:' + (score >= 80 ? 'var(--ac2)' : (score >= 60 ? 'var(--ac)' : '#d8a72b')) + ';'
+      };
+    }) : [];
+    const refTypeLabel = {
+      occupational_database: '职业数据库',
+      labor_market_outlook: '劳动力市场',
+      skills_taxonomy: '技能分类',
+      official_standard_portal: '官方标准入口',
+      public_job_market_sample: '岗位样本'
+    };
+    const refReliabilityLabel = { high: '高可信', medium: '中可信', low: '低可信' };
+    const referenceCards = mat ? arr(mat.authoritativeReferences).map(r => {
+      const reqs = arr(r.requirements).slice(0, 4);
+      const keywords = arr(r.matchedKeywords).slice(0, 6);
+      return {
+        id: r.id || '',
+        title: r.title || '外部资料',
+        url: r.url || '#',
+        summary: r.summary || '',
+        meta: [r.issuer, r.region, refTypeLabel[r.sourceType] || r.sourceType, refReliabilityLabel[r.reliability] || r.reliability].filter(Boolean).join(' · '),
+        keywords,
+        hasKeywords: keywords.length > 0,
+        requirementsText: reqs.length ? ('常见要求：' + reqs.join('；')) : '',
+        hasRequirements: reqs.length > 0
+      };
+    }) : [];
+    const referenceTitleById = {};
+    referenceCards.forEach(r => { if (r.id) referenceTitleById[r.id] = r.title; });
+    const evidenceItems = mat ? arr(mat.evidenceItems).map(ev => {
+      const ids = arr(ev.sourceIds).map(id => String(id || '')).filter(Boolean);
+      const labels = ids.map(id => referenceTitleById[id] || id);
+      const confidence = Math.round(this.clamp(Number(ev.confidence) || 0, 0, 1) * 100);
+      return {
+        claim: ev.claim || '',
+        resumeEvidence: ev.resumeEvidence || '未提供',
+        jdEvidence: ev.jdEvidence || '未提供',
+        sourceLabel: labels.length ? labels.join('，') : '未引用外部来源',
+        confidenceLabel: confidence + '%'
+      };
+    }).filter(ev => ev.claim) : [];
+    const coverage = (mat && mat.referenceCoverage) || {};
+    const referenceCoverageText = coverage.note || (referenceCards.length ? ('已引用 ' + referenceCards.length + ' 条资料') : '');
+    const scoreBasisText = (mat && mat.scoreBasis && mat.scoreBasis.method === 'server_weighted_dimensions') ? '硬性要求 35% · 核心技能 25% · 经历深度 20%' : '';
     let suggestions = [], sugAcceptedCount = 0, sugTotal = 0;
     let rewritePreview = { lines: [], text: '', hits: [], unlocated: [], appliedCount: 0 };
     if (hasRewrite) {
@@ -2517,7 +2888,8 @@ class Component extends DCLogic {
       checkStyle: 'width:22px;height:22px;border-radius:7px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;border:1.5px solid ' + (t.done ? 'var(--ac2)' : '#cbd5e6') + ';background:' + (t.done ? 'var(--ac2)' : '#fff') + ';',
       toggle: () => this.toggleTodo(t), edit: () => this.openModal('todo', t), del: () => this.delTodo(t)
     }));
-    const autoTodos = activeAppsAll.filter(a => a.nextStep).map(a => ({ text: a.nextStep, sub: a.company + ' · ' + a.role + ' · ' + (a.status || '') }));
+    const autoTodos = activeAppsAll.filter(a => a.nextStep).map(a => ({ text: a.nextStep, sub: a.company + ' · ' + a.role + ' · ' + (a.status || '') }))
+      .concat(db.feedback.filter(f => f.nextStep).map(f => ({ text: f.nextStep, sub: (f.company || '') + (f.role ? ' · ' + f.role : '') + ' · 反馈记录' })));
 
     // modal
     const modalFields = this.buildFields();
@@ -2568,6 +2940,9 @@ class Component extends DCLogic {
       selectMatchTab: () => this.setState({ matchTab: 'match' }), selectRewriteTab: () => this.setState({ matchTab: 'rewrite' }), selectNoteTab: () => this.setState({ matchTab: 'note' }),
       exportNote: () => this.exportNote(),
       matchScore, matchTime: mat ? this.fmt(an.matchedAt) : '', ringDash,
+      hasScoreDimensions: scoreDimensions.length > 0, scoreDimensions, scoreBasisText,
+      hasReferenceCards: referenceCards.length > 0, referenceCards, referenceCoverageText,
+      hasEvidenceItems: evidenceItems.length > 0, evidenceItems,
       hasJdKeywords: jdKeywords.length > 0, jdKeywords,
       matchedPoints, matchedEmpty: hasMatch && matchedPoints.length === 0,
       missingPoints, missingEmpty: hasMatch && missingPoints.length === 0,
@@ -2585,7 +2960,7 @@ class Component extends DCLogic {
       saveVersionFromRewrite: () => this.saveVersionFromRewrite(),
       noteSummary: noteObj.applicationSummary || '', noteSubject: noteObj.emailSubject || '', noteBody: noteObj.emailBody || '',
       setNoteSubject: e => this.setNoteField('emailSubject', e.target.value), setNoteBody: e => this.setNoteField('emailBody', e.target.value),
-      copyNoteEmail: () => this.copyNoteEmail(), addNoteTodos: () => this.addNoteTodos(),
+      copyNoteEmail: () => this.copyNoteEmail(), addNoteTodos: () => this.addNoteTodos(), createAppFromCurrentJob: () => this.createApplicationFromCurrentJob(),
       hasPrep: interviewPrep.length > 0, interviewPrep, hasFollowUp: followUpTodo.length > 0, followUpTodo,
 
       appsEmpty: db.applications.length === 0, appsHas: db.applications.length > 0,
@@ -2599,10 +2974,11 @@ class Component extends DCLogic {
       allTodosEmpty: manualTodos.length === 0 && autoTodos.length === 0, todosHas: manualTodos.length > 0 || autoTodos.length > 0,
       manualTodos, autoTodos, hasManualTodos: manualTodos.length > 0, hasAutoTodos: autoTodos.length > 0,
 
-      exportAll: () => this.exportAll(), clearAll: () => this.clearAll(),
+      exportAll: () => this.exportAll(), triggerImportBackup: () => this.triggerImportBackup(), onBackupFile: e => this.onBackupFile(e), clearAll: () => this.clearAll(),
 
       modalOpen: !!S.modalType, modalType: S.modalType, modalTitle: modalTitleMap[S.modalType] || '',
       modalFields, modalAction: S.modalType === 'job' ? { show: true, label: S.aiLoading ? '解析中…' : '用 AI 解析 JD 自动填表', onClick: () => this.analyzeJd() } : { show: false },
+      modalCrawlAction: S.modalType === 'job' ? { show: true, label: S.crawlLoading ? '抓取中…' : '从链接抓取 JD', onClick: () => this.crawlJobFromLink() } : { show: false },
       closeModal: () => this.closeModal(), saveModal: () => this.saveModal(), stop: e => this.stop(e),
 
       toast: S.toast

@@ -29,6 +29,9 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 | `DEEPSEEK_MODEL` | 默认模型 | `deepseek-v4-flash` |
 | `DEEPSEEK_MODEL_PRO` | 深度改写（rewrite-resume）优先使用的模型 | `deepseek-v4-pro` |
 | `PORT` | 服务端口 | `3000` |
+| `JOB_CRAWLER_USER_AGENT` | 岗位页面抓取使用的 User-Agent | `ResumeAssistantBot/1.0...` |
+| `JOB_CRAWLER_TIMEOUT_MS` | 单次抓取超时 | `12000` |
+| `JOB_CRAWLER_CACHE_TTL_MS` | 同一岗位链接抓取结果缓存时间 | `300000` |
 | `SESSION_SECRET` | 登录会话签名密钥，生产环境必须固定配置 | 进程内临时密钥 |
 | `ALLOW_REGISTRATION` | 是否开放注册；建好账号后建议设为 `false` | `true` |
 | `AUTH_DATA_DIR` | 本地文件账号/数据目录；容器平台应指向持久磁盘 | `server/data` |
@@ -54,12 +57,32 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 ```
 
 ### `POST /api/ai/match-resume`
-简历 × JD 匹配分析（matchScore 仅供参考）。
+简历 × JD 匹配分析（matchScore 由服务端按维度权重汇总，仍仅供参考）。
 ```json
 请求: { "resumeText": "...", "jdText": "..." }
 响应: { "matchScore":0,"matchedPoints":[],"missingPoints":[],"weakExpressions":[],
-        "suggestedResumeFocus":[],"riskWarnings":[],"questionsForUser":[] }
+        "suggestedResumeFocus":[],"riskWarnings":[],"questionsForUser":[],
+        "scoreDimensions":[],"evidenceItems":[],"authoritativeReferences":[],
+        "referenceCoverage":{},"scoreBasis":{} }
 ```
+
+匹配前后端会自动从 `server/lib/careerReferences.js` 的职业资料库中检索相关来源，并把命中的资料片段作为外部参照传给模型。模型负责给出维度判断和证据，服务端再按固定权重汇总 `matchScore`。
+
+### `GET /api/reference/search?q=...`
+检索本地职业资料库，主要用于调试和后续前端预览。
+```json
+响应: { "references": [ { "id":"","title":"","issuer":"","url":"","summary":"" } ] }
+```
+
+### `POST /api/jobs/fetch-url`
+实时抓取公开岗位页面，优先解析页面里的 schema.org `JobPosting` 结构化数据，失败时退回到正文文本抽取。
+```json
+请求: { "url": "https://example.com/jobs/123" }
+响应: { "ok": true, "job": { "company":"","role":"","city":"","link":"","jd":"","source":"" },
+        "meta": { "pageTitle":"","warnings":[] } }
+```
+
+抓取器会校验 URL，阻止内网地址，尊重 robots.txt，设置超时、页面大小上限、同域名冷却和短缓存。它不会绕过登录、验证码、付费墙或招聘网站反爬限制；抓取不到时请手动粘贴 JD。
 
 ### `POST /api/ai/rewrite-resume`
 逐条改写建议（原文 / 改后 / 理由 / 是否需核实）。
@@ -77,7 +100,7 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 ```
 
 ### `GET /api/health`
-`{ "ok": true, "hasKey": true|false }` —— 前端用它判断后端与 Key 是否就绪。
+`{ "ok": true, "hasKey": true|false, "referenceCount": 10 }` —— 前端用它判断后端、Key 与资料库是否就绪。
 
 ---
 
