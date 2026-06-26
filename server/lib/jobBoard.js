@@ -10,6 +10,15 @@ const CRAWL_DETAIL_LIMIT = Math.max(0, Math.min(12, Number(process.env.JOB_BOARD
 const GENERIC_PAGE_TIMEOUT_MS = Math.max(2000, Math.min(SEARCH_TIMEOUT_MS, Number(process.env.JOB_BOARD_PAGE_TIMEOUT_MS) || 5000));
 const SEARCH_PROVIDER = (process.env.JOB_BOARD_SEARCH_PROVIDER || 'official-sources').trim();
 const DEFAULT_OFFICIAL_SOURCES = process.env.JOB_BOARD_OFFICIAL_SOURCES || '';
+const BUILTIN_OFFICIAL_SOURCES = [
+  'https://join.qq.com/post.html?query=p_104',
+  'https://careers.tencent.com/',
+  'https://zhaopin.meituan.com/web/campus',
+  'https://zhaopin.meituan.com/web/social',
+  'https://zhaopin.jd.com/web/job/job_list',
+  'https://talent.baidu.com/jobs/social-list',
+  'https://careers.citics.com/',
+];
 
 const SKILL_TERMS = [
   'Excel', 'SQL', 'Python', 'R', 'Tableau', 'Power BI', 'SPSS', 'SAS', 'Pandas', 'NumPy',
@@ -83,7 +92,9 @@ function normalizeSourceUrls(value) {
 
 function configuredOfficialUrls(value) {
   return uniqueBy(
-    normalizeSourceUrls(DEFAULT_OFFICIAL_SOURCES).concat(normalizeSourceUrls(value)),
+    normalizeSourceUrls(BUILTIN_OFFICIAL_SOURCES)
+      .concat(normalizeSourceUrls(DEFAULT_OFFICIAL_SOURCES))
+      .concat(normalizeSourceUrls(value)),
     item => item
   ).slice(0, MAX_SOURCE_URLS);
 }
@@ -302,6 +313,9 @@ function detectAtsSource(inputUrl) {
   const url = new URL(href);
   const host = url.hostname.toLowerCase();
   const parts = url.pathname.split('/').filter(Boolean);
+  if (host === 'join.qq.com') {
+    return { type: 'tencent-campus', url: href };
+  }
   if (host === 'careers.tencent.com') {
     return { type: 'tencent', url: href };
   }
@@ -463,6 +477,103 @@ async function fetchTencentJobs(source, options = {}) {
       source: '腾讯招聘官网',
       datePosted: cleanText(merged.LastUpdateTime || ''),
       boardWarnings: ['来自腾讯招聘官网公开岗位接口；请打开原链接核对最新状态。'],
+    }));
+  }
+  return jobs;
+}
+
+function tencentCampusProjectId(source, options = {}) {
+  try {
+    const url = new URL(source && source.url ? source.url : 'https://join.qq.com/post.html');
+    const query = cleanText(url.searchParams.get('query') || url.searchParams.get('project') || '');
+    const match = query.match(/p_(\d+)/i) || query.match(/^(\d+)$/);
+    if (match) return Number(match[1]);
+  } catch (e) {}
+  return hasInternshipIntent(options) ? 104 : null;
+}
+
+function tencentCampusKeyword(options = {}) {
+  return cleanText(options.keywords || '')
+    .replace(/实习生?|校招|校园招聘|应届生?|岗位|招聘/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 30);
+}
+
+function tencentCampusHeaders(source) {
+  return {
+    'User-Agent': 'Mozilla/5.0 ResumeAssistantBot/1.0',
+    'Accept': 'application/json, text/plain, */*',
+    'Content-Type': 'application/json;charset=UTF-8',
+    'Origin': 'https://join.qq.com',
+    'Referer': source && source.url ? source.url : 'https://join.qq.com/post.html?query=p_104',
+  };
+}
+
+async function fetchTencentCampusDetail(postId, source) {
+  if (!postId) return null;
+  try {
+    const url = 'https://join.qq.com/api/v1/jobDetails/getJobDetailsByPostId?postId=' + encodeURIComponent(postId);
+    const data = await fetchJson(url, { headers: tencentCampusHeaders(source) });
+    return data && data.status === 0 ? data.data : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function fetchTencentCampusJobs(source, options = {}) {
+  const limit = Math.max(3, Math.min(MAX_LIMIT, Number(options.limit) || DEFAULT_LIMIT));
+  const pageSize = Math.max(limit, Math.min(50, limit * 3));
+  const projectId = tencentCampusProjectId(source, options);
+  const payload = {
+    keyword: tencentCampusKeyword(options),
+    bgList: [],
+    workCityList: [],
+    recruitCityList: [],
+    positionFidList: [],
+    pageIndex: 1,
+    pageSize,
+  };
+  if (projectId) payload.projectId = projectId;
+  const data = await fetchJson('https://join.qq.com/api/v1/position/searchPosition', {
+    method: 'POST',
+    headers: tencentCampusHeaders(source),
+    body: JSON.stringify(payload),
+  });
+  const list = data && data.status === 0 && data.data && Array.isArray(data.data.positionList)
+    ? data.data.positionList
+    : [];
+  const jobs = [];
+  for (const item of list.slice(0, pageSize)) {
+    const detail = await fetchTencentCampusDetail(item.postId, source);
+    const merged = Object.assign({}, item, detail || {});
+    const departments = [];
+    (merged.intentionBGDList || []).slice(0, 4).forEach(bg => {
+      const bgName = cleanText((bg && (bg.showTitle || bg.title)) || '');
+      (bg && Array.isArray(bg.departmentList) ? bg.departmentList : []).slice(0, 3).forEach(dep => {
+        const depName = cleanText(dep && dep.name);
+        if (depName) departments.push(bgName ? bgName + '-' + depName : depName);
+      });
+    });
+    jobs.push(officialJob({
+      id: apiJobId('tencent-campus', merged.postId || merged.id || merged.positionTitle),
+      company: '腾讯',
+      role: cleanText(merged.title || merged.positionTitle || ''),
+      city: cleanText((merged.workCityList || []).join('、') || merged.workCities || ''),
+      direction: cleanText([
+        merged.projectName,
+        merged.recruitLabelName,
+        merged.tidName,
+        merged.bgs,
+      ].filter(Boolean).join(' / ')),
+      link: merged.postId ? 'https://join.qq.com/post_detail.html?postid=' + encodeURIComponent(merged.postId) : 'https://join.qq.com/post.html?query=p_104',
+      jd: cleanText([
+        merged.desc ? '岗位职责：\n' + merged.desc : '',
+        merged.request ? '岗位要求：\n' + merged.request : '',
+        departments.length ? '可选团队：' + departments.slice(0, 10).join('；') : '',
+      ].filter(Boolean).join('\n\n')),
+      source: '腾讯校招官网',
+      boardWarnings: ['来自腾讯校招官网公开岗位接口；请打开原链接核对最新状态。'],
     }));
   }
   return jobs;
@@ -705,6 +816,7 @@ async function fetchCareerPageJobs(source, options = {}) {
 
 async function fetchOfficialSource(source, options = {}) {
   if (!source) return [];
+  if (source.type === 'tencent-campus') return fetchTencentCampusJobs(source, options);
   if (source.type === 'tencent') return fetchTencentJobs(source, options);
   if (source.type === 'baidu') return fetchBaiduJobs(source, options);
   if (source.type === 'jd') return fetchJdJobs(source, options);

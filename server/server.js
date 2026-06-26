@@ -339,10 +339,6 @@ app.post('/api/jobs/board-refresh', crawlLimiter, async (req, res) => {
     const body = req.body || {};
     const keywords = String(body.keywords || '').trim();
     const sourceUrls = body.sourceUrls;
-    const sourceText = Array.isArray(sourceUrls) ? sourceUrls.join('\n').trim() : String(sourceUrls || '').trim();
-    if (!sourceText && !process.env.JOB_BOARD_OFFICIAL_SOURCES) {
-      return res.status(400).json({ error: '请先提供企业官网招聘页或官方 ATS 链接，再刷新职位看板。', code: 'NO_OFFICIAL_SOURCE' });
-    }
     const data = await refreshJobBoard({
       keywords,
       city: String(body.city || '').trim(),

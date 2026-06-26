@@ -334,20 +334,7 @@
               <button onClick="{{ setBoardAnyExpMode }}" style="{{ boardAnyExpStyle }}">不限</button>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-top:12px;">
-            <div>
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">
-                <label style="font-size:12px;color:#6b7a96;display:block;">企业官网 / 官方 ATS 来源</label>
-                <div style="display:flex;gap:7px;flex-wrap:wrap;">
-                  <button onClick="{{ useBigTechSources }}" title="填入腾讯、字节、阿里、美团等大厂官方招聘入口" style="background:#eef4ff;color:var(--ac);border:1px solid #d9e6ff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;">大厂</button>
-                  <button onClick="{{ useBrokerageSources }}" title="填入中信证券、中金、华泰等券商官方招聘入口" style="background:#f2fbf7;color:#158a52;border:1px solid #d6f1e3;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;">券商</button>
-                  <button onClick="{{ useShenzhenSources }}" title="填入深圳重点企业官方招聘入口，并把城市设为深圳" style="background:#eef8ff;color:#1667a8;border:1px solid #d9edf8;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;">深圳</button>
-                  <button onClick="{{ useGuangzhouSources }}" title="填入广州重点企业官方招聘入口，并把城市设为广州" style="background:#fff7ed;color:#a15c08;border:1px solid #f6e2c5;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;">广州</button>
-                  <button onClick="{{ clearBoardSources }}" title="清空当前来源" style="background:#fff;color:#6b7a96;border:1px solid #e2e8f0;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">清空</button>
-                </div>
-              </div>
-              <textarea value="{{ boardSources }}" onInput="{{ setBoardSources }}" placeholder="点“大厂 / 券商 / 深圳 / 广州”自动填入官方来源；也可以一行一个粘贴企业官网招聘页或官方 ATS 链接" style="width:100%;height:82px;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.55;outline:none;resize:vertical;background:#fff;"></textarea>
-            </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:14px;">
             <button onClick="{{ refreshJobBoard }}" style="height:42px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:0 20px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;">{{ boardRefreshLabel }}</button>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap;">
@@ -357,13 +344,12 @@
           </div>
           <sc-if value="{{ boardError }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#c0392b;background:#fdecec;border:1px solid #f0d0cc;border-radius:9px;padding:8px 10px;margin-top:10px;">{{ boardError }}</div></sc-if>
           <sc-if value="{{ boardNoResume }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#9a6411;background:#fff8ee;border:1px solid #f5e3c3;border-radius:9px;padding:8px 10px;margin-top:10px;">请先上传一份可解析的简历，再刷新职位看板。</div></sc-if>
-          <div style="font-size:11.5px;color:#93a0b8;line-height:1.6;margin-top:9px;">职位看板只抓企业官网或官方招聘系统，不使用第三方泛搜索结果。已适配腾讯、百度、京东、美团、中信证券官网，以及 Greenhouse、Lever、Ashby；其他官网入口会按公开页面尽力解析。</div>
         </div>
 
         <sc-if value="{{ boardEmpty }}" hint-placeholder-val="{{ true }}">
           <div style="background:#fff;border:1px solid #ebeef4;border-radius:16px;padding:48px 28px;text-align:center;">
             <div style="font-size:16px;font-weight:700;">还没有职位</div>
-            <div style="font-size:13px;color:#6b7a96;margin-top:7px;line-height:1.7;">选择“大厂 / 券商 / 深圳 / 广州”来源后刷新，职位会按当前简历自动显示匹配度。</div>
+            <div style="font-size:13px;color:#6b7a96;margin-top:7px;line-height:1.7;">输入关键词和城市后刷新，职位会按当前简历自动显示匹配度。</div>
             <button onClick="{{ refreshJobBoard }}" style="margin-top:20px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">{{ boardRefreshLabel }}</button>
           </div>
         </sc-if>
@@ -1091,116 +1077,13 @@ class Component extends DCLogic {
     page: 'dashboard', modalType: null, form: {}, editId: null,
     toast: null, aiLoading: false, crawlLoading: false, boardLoading: false, boardError: null, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
-    jobSearch: '', boardKeywords: '', boardCity: '', boardSources: '', boardSourcesDirty: false, boardJobType: '', boardNoWorkExp: null, boardLimit: '12', boardMinScore: null, appSearch: '', appStatus: '全部', syncErr: false,
+    jobSearch: '', boardKeywords: '', boardCity: '', boardJobType: '', boardNoWorkExp: null, boardLimit: '12', boardMinScore: null, appSearch: '', appStatus: '全部', syncErr: false,
     sidebarCollapsed: false, rewriteEditorWidth: 58
   };
 
   ACTIVE = ['待投递', '已投递', '笔试', '面试'];
   STATUSES = ['待投递', '已投递', '笔试', '面试', '已拒', '已offer', '暂停'];
   FBTYPES = ['收到笔试', '收到面试', '被拒', '无反馈', '需要补材料'];
-  BOARD_SOURCE_PRESETS = {
-    bigtech: [
-      'https://careers.tencent.com/',
-      'https://jobs.bytedance.com/experienced/position',
-      'https://talent-holding.alibaba.com/off-campus/position-list',
-      'https://zhaopin.meituan.com/web/social',
-      'https://zhaopin.jd.com/web/job/job_list',
-      'https://talent.baidu.com/jobs/social-list',
-      'https://hr.163.com/job-list.html',
-      'https://career.huawei.com/reccampportal/portal5/social-recruitment.html',
-      'https://job.xiaohongshu.com/',
-      'https://jobs.bilibili.com/'
-    ],
-    brokerage: [
-      'https://careers.citics.com/',
-      'https://cicc.zhiye.com/',
-      'https://wecruit.hotjob.cn/SU6013d14e5d83dc11e4a8ae4d/pb/index.html',
-      'https://hr.gtja.com/',
-      'https://cmschina.zhiye.com/',
-      'https://gfzq.zhiye.com/',
-      'https://haitong.hotjob.cn/',
-      'https://swhy.zhiye.com/'
-    ],
-    shenzhen: [
-      'https://careers.tencent.com/',
-      'https://career.huawei.com/reccampportal/portal5/campus-recruitment.html',
-      'https://career.huawei.com/reccampportal/portal5/social-recruitment.html',
-      'https://jobs.bytedance.com/campus/position',
-      'https://jobs.bytedance.com/experienced/position',
-      'https://talent-holding.alibaba.com/campus/position-list',
-      'https://talent-holding.alibaba.com/off-campus/position-list',
-      'https://talent.antgroup.com/campus-recruitment',
-      'https://talent.antgroup.com/off-campus',
-      'https://zhaopin.meituan.com/web/campus',
-      'https://zhaopin.meituan.com/web/social',
-      'https://zhaopin.jd.com/web/job/job_list',
-      'https://hr.xiaomi.com/campus',
-      'https://careers.oppo.com/university/oppo/campus',
-      'https://hr.vivo.com/wt/vivo/web/index/campus',
-      'https://we.dji.com/zh-CN/campus',
-      'https://job.byd.com/',
-      'https://webank.zhiye.com/',
-      'https://career.cmbchina.com/',
-      'https://talent.pingan.com/',
-      'https://campus.pingan.com/',
-      'https://cmschina.zhiye.com/',
-      'https://guosen.zhiye.com/Campus',
-      'https://hr.sf-express.com/',
-      'https://join.futunn.com/',
-      'https://career.futuhk.com/',
-      'https://join.tencentmusic.com/',
-      'https://hr.xunlei.com/',
-      'https://vop2mwhhcp.jobs.feishu.cn/',
-      'https://idreamsky.jobs.feishu.cn/campus',
-      'https://app.mokahr.com/campus-recruitment/huolala',
-      'https://kingdee.zhiye.com/',
-      'https://hr.sangfor.com/',
-      'https://www.insta360.com/cn/jobs',
-      'https://longshine.zhiye.com/',
-      'https://www.lexin.com/campusRecruitment.html',
-      'https://www.welab.co/en/careers/',
-      'https://www.welab.net/',
-      'https://www.airwallex.com/careers',
-      'https://www.xtransfer.com/about-us/career',
-      'https://www.mindray.com/cn/career/campus-recruiting',
-      'https://tclcsot.zhiye.com/'
-    ],
-    guangzhou: [
-      'https://careers.tencent.com/',
-      'https://hr.163.com/job-list.html',
-      'https://game.campus.163.com/',
-      'https://zhaopin.37.com/',
-      'https://hr.duoyi.com/',
-      'https://u.4399.com/hr/zhaopin?cid=1',
-      'https://kurogame.jobs.feishu.cn/campus/',
-      'https://www.shiyue.com/m/join.html',
-      'https://xiaopeng.jobs.feishu.cn/campus/',
-      'https://gac.zhiye.com/',
-      'https://gacaion.zhiye.com/',
-      'https://campus.vip.com/',
-      'https://job.vip.com/',
-      'https://www.lizhi.fm/about/',
-      'https://join.tencentmusic.com/',
-      'https://talent-holding.alibaba.com/campus/position-list',
-      'https://talent-holding.alibaba.com/off-campus/position-list',
-      'https://jobs.bytedance.com/campus/position',
-      'https://jobs.bytedance.com/experienced/position',
-      'https://zhaopin.meituan.com/web/campus',
-      'https://zhaopin.meituan.com/web/social',
-      'https://zhaopin.jd.com/web/job/job_list',
-      'https://careers.trip.com/',
-      'https://hr.joyy.com/',
-      'https://campus.cvte.com/',
-      'https://hr.cvte.com/',
-      'https://gfzq.zhiye.com/',
-      'https://www.cgbchina.com.cn/Channel/11581868',
-      'https://www.hsbc.com/careers',
-      'https://zhaopin.csg.cn/',
-      'https://www.pcitech.com/career/35.html',
-      'https://mingyuanyun.zhiye.com/'
-    ]
-  };
-
   componentDidMount() {
     this.applyAccent();
     if (window.pdfjsLib) { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } catch (e) {} }
@@ -2021,7 +1904,7 @@ class Component extends DCLogic {
     return {
       keywords: (this.state.boardKeywords || saved.keywords || '').trim(),
       city: (this.state.boardCity || saved.city || '').trim(),
-      sourceUrls: (this.state.boardSourcesDirty ? this.state.boardSources : (this.state.boardSources || saved.sourceUrls || '')).trim(),
+      sourceUrls: '',
       limit: this.clamp(parseInt(this.state.boardLimit || saved.limit || 12, 10) || 12, 3, 24),
       minScore,
       jobType: (this.state.boardJobType || saved.jobType || 'internship'),
@@ -2046,25 +1929,10 @@ class Component extends DCLogic {
   setBoardExperienceMode(noWorkExperience) {
     this.setState({ boardNoWorkExp: !!noWorkExperience, boardError: null });
   }
-  applyBoardSourcePreset(kind) {
-    const list = this.BOARD_SOURCE_PRESETS[kind] || [];
-    const labels = { brokerage: '券商', bigtech: '大厂', shenzhen: '深圳', guangzhou: '广州' };
-    const next = { boardSources: list.join('\n'), boardSourcesDirty: true, boardError: null };
-    if (kind === 'shenzhen') next.boardCity = '深圳';
-    if (kind === 'guangzhou') next.boardCity = '广州';
-    this.setState(next);
-    const label = labels[kind] || '官方';
-    this.showToast('已填入' + label + '官方招聘来源');
-  }
-  clearBoardSources() {
-    this.setState({ boardSources: '', boardSourcesDirty: true, boardError: null });
-    this.showToast('已清空职位来源');
-  }
   async refreshJobBoard() {
     const resumeText = this.getResumeText();
     if (!resumeText.trim()) return this.showToast('请先上传或粘贴一份可解析的简历');
     const filters = this.currentBoardFilters();
-    if (!filters.sourceUrls) return this.showToast('请先选择“大厂/券商”来源，或粘贴企业官网招聘页');
     if (this.state.boardLoading) return;
     this.setState({ boardLoading: true, boardError: null });
     try {
@@ -3305,12 +3173,6 @@ class Component extends DCLogic {
 
       boardKeywords: boardFilters.keywords, setBoardKeywords: e => this.setState({ boardKeywords: e.target.value }),
       boardCity: boardFilters.city, setBoardCity: e => this.setState({ boardCity: e.target.value }),
-      boardSources: boardFilters.sourceUrls, setBoardSources: e => this.setState({ boardSources: e.target.value }),
-      useBigTechSources: () => this.applyBoardSourcePreset('bigtech'),
-      useBrokerageSources: () => this.applyBoardSourcePreset('brokerage'),
-      useShenzhenSources: () => this.applyBoardSourcePreset('shenzhen'),
-      useGuangzhouSources: () => this.applyBoardSourcePreset('guangzhou'),
-      clearBoardSources: () => this.clearBoardSources(),
       boardLimit: String(boardFilters.limit), setBoardLimit: e => this.setState({ boardLimit: e.target.value }),
       boardMinScore: (typeof S.boardMinScore === 'string') ? S.boardMinScore : String(boardFilters.minScore),
       setBoardMinScore: e => this.setBoardMinScore(e.target.value),
