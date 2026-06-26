@@ -32,6 +32,10 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 | `JOB_CRAWLER_USER_AGENT` | 岗位页面抓取使用的 User-Agent | `ResumeAssistantBot/1.0...` |
 | `JOB_CRAWLER_TIMEOUT_MS` | 单次抓取超时 | `12000` |
 | `JOB_CRAWLER_CACHE_TTL_MS` | 同一岗位链接抓取结果缓存时间 | `300000` |
+| `JOB_BOARD_DEFAULT_LIMIT` | 职位看板默认刷新数量 | `12` |
+| `JOB_BOARD_CRAWL_DETAIL_LIMIT` | 普通企业官网 Careers 页最多深抓的岗位链接数 | `6` |
+| `JOB_BOARD_OFFICIAL_SOURCES` | 默认企业官网/官方 ATS 来源，一行一个或逗号分隔；前端也内置“大厂 / 券商”来源按钮 | 无 |
+| `JOB_BOARD_SEARCH_PROVIDER` | 职位发现方式；默认只抓企业官方来源。可设 `bing-rss` 做调试，但不建议用于真实看板 | `official-sources` |
 | `SESSION_SECRET` | 登录会话签名密钥，生产环境必须固定配置 | 进程内临时密钥 |
 | `ALLOW_REGISTRATION` | 是否开放注册；建好账号后建议设为 `false` | `true` |
 | `AUTH_DATA_DIR` | 本地文件账号/数据目录；容器平台应指向持久磁盘 | `server/data` |
@@ -83,6 +87,17 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 ```
 
 抓取器会校验 URL，阻止内网地址，尊重 robots.txt，设置超时、页面大小上限、同域名冷却和短缓存。它不会绕过登录、验证码、付费墙或招聘网站反爬限制；抓取不到时请手动粘贴 JD。
+
+### `POST /api/jobs/board-refresh`
+职位看板刷新：从企业官网招聘页或官方 ATS 抓取真实职位，并用当前简历做快速匹配。已适配腾讯、百度、京东、美团、中信证券官网，以及 Greenhouse、Lever、Ashby；其他企业官网入口会按公开页面尽力解析。看板匹配是轻量关键词匹配，适合批量预筛；保存岗位后仍可调用 `/api/ai/match-resume` 做深度分析。
+```json
+请求: { "keywords":"AI Engineer", "city":"", "sourceUrls":"https://careers.tencent.com/\nhttps://careers.citics.com/", "limit":12, "resumeText":"..." }
+响应: { "jobs": [ { "company":"","role":"","city":"","jd":"","link":"",
+          "boardMatch": { "matchScore":82,"matchedKeywords":[],"missingKeywords":[] } } ],
+        "fetchedAt": 0, "provider": "official-sources" }
+```
+
+如果没有在请求里传 `sourceUrls`，也没有配置 `JOB_BOARD_OFFICIAL_SOURCES`，接口会拒绝刷新，避免用泛搜索结果冒充企业官网职位。
 
 ### `POST /api/ai/rewrite-resume`
 逐条改写建议（原文 / 改后 / 理由 / 是否需核实）。

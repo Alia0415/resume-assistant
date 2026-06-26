@@ -300,6 +300,92 @@
       </section>
       </sc-if>
 
+      <!-- ============ 职位看板 ============ -->
+      <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
+      <section data-screen-label="职位看板">
+        <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:18px 20px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:1.2fr .75fr .45fr .45fr;gap:12px;align-items:end;">
+            <div>
+              <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">职位关键词</label>
+              <input value="{{ boardKeywords }}" onInput="{{ setBoardKeywords }}" placeholder="如：数据分析实习 / 财务分析 / AI 运营" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">城市</label>
+              <input value="{{ boardCity }}" onInput="{{ setBoardCity }}" placeholder="如：上海 / 深圳 / 远程" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">数量</label>
+              <input value="{{ boardLimit }}" onInput="{{ setBoardLimit }}" type="number" min="3" max="24" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">最低分</label>
+              <input value="{{ boardMinScore }}" onInput="{{ setBoardMinScore }}" type="number" min="0" max="95" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-top:12px;">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">
+                <label style="font-size:12px;color:#6b7a96;display:block;">企业官网 / 官方 ATS 来源</label>
+                <div style="display:flex;gap:7px;flex-wrap:wrap;">
+                  <button onClick="{{ useBigTechSources }}" title="填入腾讯、字节、阿里、美团等大厂官方招聘入口" style="background:#eef4ff;color:var(--ac);border:1px solid #d9e6ff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;">大厂</button>
+                  <button onClick="{{ useBrokerageSources }}" title="填入中信证券、中金、华泰等券商官方招聘入口" style="background:#f2fbf7;color:#158a52;border:1px solid #d6f1e3;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;">券商</button>
+                  <button onClick="{{ clearBoardSources }}" title="清空当前来源" style="background:#fff;color:#6b7a96;border:1px solid #e2e8f0;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">清空</button>
+                </div>
+              </div>
+              <textarea value="{{ boardSources }}" onInput="{{ setBoardSources }}" placeholder="点“大厂”或“券商”自动填入官方来源；也可以一行一个粘贴企业官网招聘页或官方 ATS 链接" style="width:100%;height:82px;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.55;outline:none;resize:vertical;background:#fff;"></textarea>
+            </div>
+            <button onClick="{{ refreshJobBoard }}" style="height:42px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:0 20px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;">{{ boardRefreshLabel }}</button>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap;">
+            <div style="font-size:11.5px;color:#93a0b8;">{{ boardRefreshedText }}</div>
+            <div style="font-size:11.5px;color:#93a0b8;">{{ boardCountText }}</div>
+          </div>
+          <sc-if value="{{ boardError }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#c0392b;background:#fdecec;border:1px solid #f0d0cc;border-radius:9px;padding:8px 10px;margin-top:10px;">{{ boardError }}</div></sc-if>
+          <sc-if value="{{ boardNoResume }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#9a6411;background:#fff8ee;border:1px solid #f5e3c3;border-radius:9px;padding:8px 10px;margin-top:10px;">请先上传一份可解析的简历，再刷新职位看板。</div></sc-if>
+          <div style="font-size:11.5px;color:#93a0b8;line-height:1.6;margin-top:9px;">职位看板只抓企业官网或官方招聘系统，不使用第三方泛搜索结果。已适配腾讯、百度、京东、美团、中信证券官网，以及 Greenhouse、Lever、Ashby；其他官网入口会按公开页面尽力解析。</div>
+        </div>
+
+        <sc-if value="{{ boardEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#fff;border:1px solid #ebeef4;border-radius:16px;padding:48px 28px;text-align:center;">
+            <div style="font-size:16px;font-weight:700;">还没有职位</div>
+            <div style="font-size:13px;color:#6b7a96;margin-top:7px;line-height:1.7;">选择“大厂”或“券商”来源后刷新，职位会按当前简历自动显示匹配度。</div>
+            <button onClick="{{ refreshJobBoard }}" style="margin-top:20px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">{{ boardRefreshLabel }}</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ boardHasItems }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;">
+            <sc-for list="{{ boardRows }}" as="b" hint-placeholder-count="0">
+              <div style="background:#fff;border:1px solid #ebeef4;border-radius:13px;padding:17px 18px;position:relative;min-height:245px;display:flex;flex-direction:column;">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
+                  <div style="min-width:0;padding-right:4px;">
+                    <div style="font-size:14.5px;font-weight:800;line-height:1.45;">{{ b.role }}</div>
+                    <div style="font-size:12.5px;color:#6b7a96;margin-top:3px;">{{ b.company }}{{ b.cityText }}</div>
+                  </div>
+                  <span style="{{ b.scoreStyle }}">{{ b.scoreLabel }}</span>
+                </div>
+                <div style="font-size:11.5px;color:#93a0b8;margin-bottom:9px;">{{ b.source }}</div>
+                <div style="font-size:12.2px;color:#5b6b85;line-height:1.65;max-height:80px;overflow:hidden;">{{ b.jdPreview }}</div>
+                <sc-if value="{{ b.hasMatchedKeywords }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;">
+                    <sc-for list="{{ b.matchedKeywords }}" as="k" hint-placeholder-count="0"><span style="font-size:11px;border-radius:6px;padding:3px 7px;background:var(--ac2-soft);color:var(--ac2);">{{ k }}</span></sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ b.hasMissingKeywords }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:11.5px;color:#9a6411;line-height:1.5;margin-top:9px;">缺口：{{ b.missingText }}</div>
+                </sc-if>
+                <sc-if value="{{ b.hasWarning }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#9a6411;line-height:1.5;margin-top:8px;">{{ b.warningText }}</div></sc-if>
+                <div style="display:flex;gap:8px;margin-top:auto;padding-top:14px;align-items:center;">
+                  <button onClick="{{ b.save }}" style="background:var(--ac);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;">保存岗位</button>
+                  <sc-if value="{{ b.hasLink }}" hint-placeholder-val="{{ false }}"><a href="{{ b.link }}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px;color:#5b6b85;text-decoration:none;border:1px solid #e2e8f0;border-radius:8px;padding:7px 12px;">打开链接</a></sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </section>
+      </sc-if>
+
       <!-- ============ 匹配分析 ============ -->
       <sc-if value="{{ isMatch }}" hint-placeholder-val="{{ false }}">
       <section data-screen-label="匹配分析">
@@ -986,17 +1072,41 @@ class Component extends DCLogic {
         return JSON.parse(raw) || null;
       } catch (e) { return null; }
     })()
-      || { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [] },
+      || { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [], jobBoard: { filters: {}, items: [] } },
     page: 'dashboard', modalType: null, form: {}, editId: null,
-    toast: null, aiLoading: false, crawlLoading: false, aiError: null,
+    toast: null, aiLoading: false, crawlLoading: false, boardLoading: false, boardError: null, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
-    jobSearch: '', appSearch: '', appStatus: '全部', syncErr: false,
+    jobSearch: '', boardKeywords: '', boardCity: '', boardSources: '', boardSourcesDirty: false, boardLimit: '12', boardMinScore: '0', appSearch: '', appStatus: '全部', syncErr: false,
     sidebarCollapsed: false, rewriteEditorWidth: 58
   };
 
   ACTIVE = ['待投递', '已投递', '笔试', '面试'];
   STATUSES = ['待投递', '已投递', '笔试', '面试', '已拒', '已offer', '暂停'];
   FBTYPES = ['收到笔试', '收到面试', '被拒', '无反馈', '需要补材料'];
+  BOARD_SOURCE_PRESETS = {
+    bigtech: [
+      'https://careers.tencent.com/',
+      'https://jobs.bytedance.com/experienced/position',
+      'https://talent-holding.alibaba.com/off-campus/position-list',
+      'https://zhaopin.meituan.com/web/social',
+      'https://zhaopin.jd.com/web/job/job_list',
+      'https://talent.baidu.com/jobs/social-list',
+      'https://hr.163.com/job-list.html',
+      'https://career.huawei.com/reccampportal/portal5/social-recruitment.html',
+      'https://job.xiaohongshu.com/',
+      'https://jobs.bilibili.com/'
+    ],
+    brokerage: [
+      'https://careers.citics.com/',
+      'https://cicc.zhiye.com/',
+      'https://wecruit.hotjob.cn/SU6013d14e5d83dc11e4a8ae4d/pb/index.html',
+      'https://hr.gtja.com/',
+      'https://cmschina.zhiye.com/',
+      'https://gfzq.zhiye.com/',
+      'https://haitong.hotjob.cn/',
+      'https://swhy.zhiye.com/'
+    ]
+  };
 
   componentDidMount() {
     this.applyAccent();
@@ -1010,12 +1120,15 @@ class Component extends DCLogic {
   applyAccent() { const a = this.props.accentColor; if (a) document.documentElement.style.setProperty('--ac', a); }
 
   storeKey() { return window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1'; }
-  emptyDb() { return { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [] }; }
+  emptyDb() { return { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [], jobBoard: { filters: {}, items: [] } }; }
   normalizeDb(input) {
     const src = (input && typeof input === 'object' && !Array.isArray(input)) ? input : {};
     const out = this.emptyDb();
     out.profile = (src.profile && typeof src.profile === 'object' && !Array.isArray(src.profile)) ? src.profile : {};
     out.analyses = (src.analyses && typeof src.analyses === 'object' && !Array.isArray(src.analyses)) ? src.analyses : {};
+    out.jobBoard = (src.jobBoard && typeof src.jobBoard === 'object' && !Array.isArray(src.jobBoard)) ? src.jobBoard : { filters: {}, items: [] };
+    if (!Array.isArray(out.jobBoard.items)) out.jobBoard.items = [];
+    if (!out.jobBoard.filters || typeof out.jobBoard.filters !== 'object' || Array.isArray(out.jobBoard.filters)) out.jobBoard.filters = {};
     ['resumes', 'versions', 'jobs', 'applications', 'feedback', 'todos'].forEach(k => {
       out[k] = Array.isArray(src[k]) ? src[k] : [];
     });
@@ -1025,6 +1138,7 @@ class Component extends DCLogic {
   dbHasData(db) {
     return !!(db && (((db.resumes || []).length) || ((db.versions || []).length) ||
       ((db.jobs || []).length) || (Object.keys(db.analyses || {}).length) ||
+      (db.jobBoard && Array.isArray(db.jobBoard.items) && db.jobBoard.items.length) ||
       ((db.applications || []).length) || ((db.feedback || []).length) ||
       ((db.todos || []).length) || (db.profile && Object.keys(db.profile).length)));
   }
@@ -1801,6 +1915,102 @@ class Component extends DCLogic {
       this.setState({ crawlLoading: false });
       this.showToast(e.message);
     }
+  }
+
+  currentBoardFilters() {
+    const board = (this.state.db && this.state.db.jobBoard) || {};
+    const saved = board.filters || {};
+    return {
+      keywords: (this.state.boardKeywords || saved.keywords || '').trim(),
+      city: (this.state.boardCity || saved.city || '').trim(),
+      sourceUrls: (this.state.boardSourcesDirty ? this.state.boardSources : (this.state.boardSources || saved.sourceUrls || '')).trim(),
+      limit: this.clamp(parseInt(this.state.boardLimit || saved.limit || 12, 10) || 12, 3, 24),
+      minScore: this.clamp(parseInt(this.state.boardMinScore || saved.minScore || 0, 10) || 0, 0, 95)
+    };
+  }
+  applyBoardSourcePreset(kind) {
+    const list = this.BOARD_SOURCE_PRESETS[kind] || [];
+    const label = kind === 'brokerage' ? '券商' : '大厂';
+    this.setState({ boardSources: list.join('\n'), boardSourcesDirty: true, boardError: null });
+    this.showToast('已填入' + label + '官方招聘来源');
+  }
+  clearBoardSources() {
+    this.setState({ boardSources: '', boardSourcesDirty: true, boardError: null });
+    this.showToast('已清空职位来源');
+  }
+  async refreshJobBoard() {
+    const resumeText = this.getResumeText();
+    if (!resumeText.trim()) return this.showToast('请先上传或粘贴一份可解析的简历');
+    const filters = this.currentBoardFilters();
+    if (!filters.sourceUrls) return this.showToast('请先选择“大厂/券商”来源，或粘贴企业官网招聘页');
+    if (this.state.boardLoading) return;
+    this.setState({ boardLoading: true, boardError: null });
+    try {
+      const data = await this.postJson('/api/jobs/board-refresh', {
+        keywords: filters.keywords,
+        city: filters.city,
+        sourceUrls: filters.sourceUrls,
+        limit: filters.limit,
+        resumeText
+      }, '无法连接后端服务，请先启动 Node 服务。');
+      const items = Array.isArray(data && data.jobs) ? data.jobs : [];
+      this.setDb(db => {
+        db.jobBoard = {
+          filters,
+          items,
+          refreshedAt: (data && data.fetchedAt) || Date.now(),
+          provider: (data && data.provider) || ''
+        };
+      });
+      this.setState({ boardLoading: false });
+      this.showToast(items.length ? ('已刷新 ' + items.length + ' 个职位') : '暂未抓到职位，可换关键词或添加来源链接');
+    } catch (e) {
+      this.setState({ boardLoading: false, boardError: e.message });
+      this.showToast(e.message);
+    }
+  }
+  boardJobToSavedJob(item) {
+    return {
+      company: item.company || '',
+      role: item.role || '',
+      city: item.city || '',
+      direction: item.direction || '',
+      link: item.link || '',
+      jd: item.jd || '',
+      source: item.source || '职位看板'
+    };
+  }
+  saveBoardJob(item) {
+    if (!item) return;
+    let savedId = null;
+    this.setDb(db => {
+      const linkKey = this.normChoice(item.link || '');
+      const titleKey = this.normChoice((item.company || '') + '|' + (item.role || ''));
+      const existing = (db.jobs || []).find(j => (linkKey && this.normChoice(j.link || '') === linkKey) || this.normChoice((j.company || '') + '|' + (j.role || '')) === titleKey);
+      if (existing) {
+        savedId = existing.id;
+      } else {
+        const job = Object.assign({ id: this.uid(), createdAt: Date.now() }, this.boardJobToSavedJob(item));
+        db.jobs.unshift(job);
+        savedId = job.id;
+      }
+      if (savedId && item.boardMatch) {
+        const a = this.ensureAnalysis(db, savedId);
+        a.match = {
+          matchScore: item.boardMatch.matchScore,
+          matchedPoints: (item.boardMatch.matchedKeywords || []).map(x => '简历体现：' + x),
+          missingPoints: (item.boardMatch.missingKeywords || []).map(x => 'JD 提到但简历未明显体现：' + x),
+          weakExpressions: [],
+          suggestedResumeFocus: item.boardMatch.summary ? [item.boardMatch.summary] : [],
+          riskWarnings: item.boardMatch.warnings || [],
+          questionsForUser: [],
+          scoreBasis: { method: item.boardMatch.method || 'fast_keyword_overlap', note: '职位看板快速匹配结果，保存后可重新运行深度匹配分析。' }
+        };
+        a.matchedAt = Date.now();
+      }
+    });
+    this.setState({ matchJobId: savedId });
+    this.showToast('已保存到岗位库，可继续深度匹配分析');
   }
 
   // 岗位弹窗：解析 JD 自动填表（POST /api/ai/analyze-jd）
@@ -2609,6 +2819,7 @@ class Component extends DCLogic {
       ['dashboard', '工作台', 'M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z', 0],
       ['resume', '简历', 'M6 2h9l4 4v16H6z M15 2v5h5', db.versions.length],
       ['jobs', '岗位', 'M3 7h18v13H3z M8 7V4h8v3', db.jobs.length],
+      ['board', '职位看板', 'M4 6h16M4 12h16M4 18h10', ((db.jobBoard && db.jobBoard.items) || []).length],
       ['match', '匹配分析', 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-4-4', 0],
       ['apps', '投递记录', 'M4 5h16v15H4z M8 3v4M16 3v4M4 10h16', db.applications.length],
       ['feedback', '反馈记录', 'M4 5h16v11H9l-4 4z', db.feedback.length],
@@ -2628,6 +2839,7 @@ class Component extends DCLogic {
       dashboard: ['工作台', '你的求职进度一览'],
       resume: ['简历', '上传真实简历，管理不同岗位版本'],
       jobs: ['岗位', '自己添加想投的岗位与 JD'],
+      board: ['职位看板', '自动发现岗位，并按当前简历显示匹配度'],
       match: ['匹配分析', '基于真实 JD 和简历，给出可确认的修改建议'],
       apps: ['投递记录', '跟踪每一次真实投递的进度'],
       feedback: ['反馈记录', '手动记录企业反馈与后续动作'],
@@ -2636,7 +2848,7 @@ class Component extends DCLogic {
     };
     const tt = titles[page] || ['', ''];
     const sidebarOpen = !S.sidebarCollapsed;
-    const contentShellStyle = 'padding:24px 32px 60px;max-width:' + (page === 'match' ? '1480px' : '1180px') + ';margin:0 auto;';
+    const contentShellStyle = 'padding:24px 32px 60px;max-width:' + ((page === 'match' || page === 'board') ? '1480px' : '1180px') + ';margin:0 auto;';
     const editorWidth = this.clamp(Number(S.rewriteEditorWidth) || 58, 44, 82);
     const leftWidth = 100 - editorWidth;
     const rewriteLeftPaneStyle = 'flex:0 0 calc(' + leftWidth + '% - 8px);min-width:260px;display:flex;flex-direction:column;gap:13px;padding-right:16px;min-height:1px;';
@@ -2656,6 +2868,7 @@ class Component extends DCLogic {
     const headerActions = {
       resume: { show: true, label: '上传简历', onClick: () => this.triggerUpload() },
       jobs: { show: db.jobs.length > 0, label: '添加岗位', onClick: () => this.openModal('job') },
+      board: { show: true, label: S.boardLoading ? '刷新中…' : '刷新职位', onClick: () => this.refreshJobBoard() },
       apps: { show: db.applications.length > 0, label: '新增记录', onClick: () => this.openModal('application') },
       feedback: { show: true, label: '记录反馈', onClick: () => this.openModal('feedback') },
       todos: { show: true, label: '添加待办', onClick: () => this.openModal('todo') }
@@ -2676,7 +2889,7 @@ class Component extends DCLogic {
       { label: '待办', value: pendingTodos.length, unit: '条', go: () => this.go('todos') }
     ];
     const activeApps = activeAppsAll.slice(0, 6).map(a => ({ role: a.role, company: a.company, status: a.status, statusStyle: this.statusStyle(a.status) }));
-    const dashHasData = db.resumes.length || db.versions.length || db.jobs.length || db.applications.length || db.todos.length || db.feedback.length;
+    const dashHasData = db.resumes.length || db.versions.length || db.jobs.length || (((db.jobBoard || {}).items || []).length) || db.applications.length || db.todos.length || db.feedback.length;
 
     // resume
     const resumeFiles = db.resumes.map(r => ({
@@ -2706,6 +2919,44 @@ class Component extends DCLogic {
         edit: () => this.openModal('job', j), del: () => this.delJob(j)
       };
     });
+
+    // job board
+    const board = db.jobBoard || { filters: {}, items: [] };
+    const boardFilters = this.currentBoardFilters();
+    const boardItemsRaw = Array.isArray(board.items) ? board.items : [];
+    const boardRows = boardItemsRaw.map(item => {
+      const match = item.boardMatch || {};
+      const score = this.clamp(Number(match.matchScore) || 0, 0, 100);
+      const matched = Array.isArray(match.matchedKeywords) ? match.matchedKeywords.slice(0, 8) : [];
+      const missing = Array.isArray(match.missingKeywords) ? match.missingKeywords.slice(0, 8) : [];
+      const warnings = []
+        .concat(Array.isArray(item.boardWarnings) ? item.boardWarnings : [])
+        .concat(Array.isArray(match.warnings) ? match.warnings : [])
+        .filter(Boolean);
+      return {
+        company: item.company || '未知公司',
+        role: item.role || '未命名岗位',
+        cityText: item.city ? ' · ' + item.city : '',
+        source: item.source || '公开来源',
+        jdPreview: (item.jd || '暂无 JD 摘要').slice(0, 150),
+        score,
+        scoreLabel: score ? score : '—',
+        scoreStyle: 'font-size:12px;font-weight:800;border-radius:8px;padding:5px 9px;white-space:nowrap;color:#fff;background:' + this.matchColor(score) + ';',
+        matchedKeywords: matched,
+        hasMatchedKeywords: matched.length > 0,
+        missingKeywords: missing,
+        missingText: missing.join('、'),
+        hasMissingKeywords: missing.length > 0,
+        warningText: warnings[0] || '',
+        hasWarning: warnings.length > 0,
+        hasLink: !!(item.link && item.link.trim()),
+        link: item.link || '#',
+        save: () => this.saveBoardJob(item)
+      };
+    }).filter(item => item.score >= boardFilters.minScore);
+    const boardEmpty = boardRows.length === 0;
+    const boardHasItems = boardRows.length > 0;
+    const boardRefreshedText = board.refreshedAt ? ('上次刷新 ' + this.fmt(board.refreshedAt)) : '还没有刷新';
 
     // match
     const jobs = db.jobs, resumes = db.resumes;
@@ -2911,7 +3162,7 @@ class Component extends DCLogic {
       openFeedbackModal: () => this.openModal('feedback'), openTodoModal: () => this.openModal('todo'),
       openVersionModal: () => this.openModal('version'), openProfileModal: () => this.openModal('profile', db.profile),
 
-      isDashboard: page === 'dashboard', isResume: page === 'resume', isJobs: page === 'jobs', isMatch: page === 'match',
+      isDashboard: page === 'dashboard', isResume: page === 'resume', isJobs: page === 'jobs', isBoard: page === 'board', isMatch: page === 'match',
       isApps: page === 'apps', isFeedback: page === 'feedback', isTodos: page === 'todos', isSettings: page === 'settings',
 
       dashEmpty: !dashHasData, dashHasData: !!dashHasData,
@@ -2921,6 +3172,19 @@ class Component extends DCLogic {
 
       jobsEmpty: db.jobs.length === 0, jobsHas: db.jobs.length > 0, jobCards, jobCount: jobsFiltered.length,
       jobSearch: S.jobSearch, setJobSearch: e => this.setState({ jobSearch: e.target.value }),
+
+      boardKeywords: boardFilters.keywords, setBoardKeywords: e => this.setState({ boardKeywords: e.target.value }),
+      boardCity: boardFilters.city, setBoardCity: e => this.setState({ boardCity: e.target.value }),
+      boardSources: boardFilters.sourceUrls, setBoardSources: e => this.setState({ boardSources: e.target.value }),
+      useBigTechSources: () => this.applyBoardSourcePreset('bigtech'),
+      useBrokerageSources: () => this.applyBoardSourcePreset('brokerage'),
+      clearBoardSources: () => this.clearBoardSources(),
+      boardLimit: String(boardFilters.limit), setBoardLimit: e => this.setState({ boardLimit: e.target.value }),
+      boardMinScore: String(boardFilters.minScore), setBoardMinScore: e => this.setState({ boardMinScore: e.target.value }),
+      refreshJobBoard: () => this.refreshJobBoard(), boardRefreshLabel: S.boardLoading ? '刷新中…' : '刷新职位',
+      boardRows, boardEmpty, boardHasItems, boardError: S.boardError || '',
+      boardRefreshedText, boardCountText: boardRows.length + ' / ' + boardItemsRaw.length + ' 个职位',
+      boardNoResume: !this.getResumeText().trim(),
 
       matchNoJobs: jobs.length === 0, matchReady: jobs.length > 0,
       matchJobId: curJobId, matchResumeId: curResumeId, matchJobOptions, matchResumeOptions,

@@ -17,6 +17,7 @@ const cors = require('cors');
 const { callDeepSeekJSON } = require('./lib/deepseek');
 const { CAREER_REFERENCES, findCareerReferences, buildReferencePrompt, normalizeMatchResult } = require('./lib/careerReferences');
 const { crawlJobUrl } = require('./lib/jobCrawler');
+const { refreshJobBoard } = require('./lib/jobBoard');
 const auth = require('./lib/auth');
 
 const app = express();
@@ -325,6 +326,30 @@ app.post('/api/jobs/fetch-url', crawlLimiter, async (req, res) => {
       return res.status(400).json({ error: '请先填写岗位链接。', code: 'BAD_URL' });
     }
     const data = await crawlJobUrl(url);
+    return res.json(data);
+  } catch (err) {
+    return handleCrawlerError(res, err);
+  }
+});
+
+// 职位看板：从企业官网/官方招聘系统抓取岗位，并用简历做快速匹配。
+// POST /api/jobs/board-refresh  { keywords, city, sourceUrls, limit, resumeText }
+app.post('/api/jobs/board-refresh', crawlLimiter, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const keywords = String(body.keywords || '').trim();
+    const sourceUrls = body.sourceUrls;
+    const sourceText = Array.isArray(sourceUrls) ? sourceUrls.join('\n').trim() : String(sourceUrls || '').trim();
+    if (!sourceText && !process.env.JOB_BOARD_OFFICIAL_SOURCES) {
+      return res.status(400).json({ error: '请先提供企业官网招聘页或官方 ATS 链接，再刷新职位看板。', code: 'NO_OFFICIAL_SOURCE' });
+    }
+    const data = await refreshJobBoard({
+      keywords,
+      city: String(body.city || '').trim(),
+      sourceUrls,
+      limit: body.limit,
+      resumeText: String(body.resumeText || ''),
+    });
     return res.json(data);
   } catch (err) {
     return handleCrawlerError(res, err);
