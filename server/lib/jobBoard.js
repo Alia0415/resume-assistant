@@ -24,7 +24,9 @@ const SKILL_TERMS = [
   'Excel', 'SQL', 'Python', 'R', 'Tableau', 'Power BI', 'SPSS', 'SAS', 'Pandas', 'NumPy',
   '机器学习', '数据分析', '数据可视化', '数据建模', '数据清洗', '经营分析', '商业分析', '用户研究',
   '财务分析', '审计', '会计', '内控', '税务', '预算', '报表', '凭证', '底稿', '函证',
+  '产品', '产品经理', '产品策划', '产品规划', '产品设计', '产品需求', '用户体验', '用户反馈',
   '产品运营', '内容运营', '用户运营', '活动运营', '增长', 'A/B测试', '竞品分析', '需求分析',
+  '数据监控', '指标分析', '实验设计', '行业洞察', '市场需求', '商业价值',
   '项目管理', '沟通协调', '跨部门', '文档撰写', '英语', 'PPT', 'Word',
   'JavaScript', 'TypeScript', 'Java', 'C++', 'Go', 'Node.js', 'React', 'Vue', 'Spring',
   'Linux', 'Git', 'Docker', 'Kubernetes', 'MySQL', 'PostgreSQL', 'Redis',
@@ -136,7 +138,10 @@ function buildApiSearchTerms(options) {
   const terms = [];
   if (raw) terms.push(raw);
   KEYWORD_TRANSLATIONS.forEach(([cn, en]) => {
-    if (raw.indexOf(cn) >= 0) terms.push(en);
+    if (raw.indexOf(cn) >= 0) {
+      terms.push(cn);
+      terms.push(en);
+    }
   });
   if (!terms.length) terms.push('intern');
   return uniqueBy(terms, item => item.toLowerCase()).slice(0, 4);
@@ -166,6 +171,13 @@ function matchesSearchIntent(options, fields) {
   const asciiParts = rawParts.filter(part => /^[a-z0-9+#.]+$/i.test(part));
   if (asciiParts.length >= 2) return asciiParts.every(part => termMatchesText(part, text));
   return rawParts.some(part => part.length >= 2 && termMatchesText(part, text));
+}
+
+function matchesRoleIntent(options, job) {
+  const raw = cleanText(options && options.keywords);
+  if (!raw) return true;
+  if (!/(产品|运营|财务|会计|审计|证券|投行|券商|人力|招聘|设计|法务|前端|后端|软件|算法|测试|销售)/.test(raw)) return true;
+  return matchesSearchIntent(options, [job && job.role, job && job.direction]);
 }
 
 function parseBooleanLike(value) {
@@ -231,9 +243,125 @@ function hasEntryLevelSignal(job) {
   return /经验不限|不限经验|无经验|无需经验|接受应届|应届优先|应届生优先/i.test(text);
 }
 
-function detectHardRequirement(job) {
+const MAJOR_CATEGORY_RULES = [
+  { key: 'finance', label: '财务/金融/会计', re: /会计|财务|金融|经济|审计|税务|财政|投资|证券|保险|精算/ },
+  { key: 'cs', label: '计算机/软件/数据', re: /计算机|软件|信息安全|网络工程|人工智能|电子|通信|自动化|机器学习|大数据|数据科学|信息管理|物联网/ },
+  { key: 'math', label: '数学/统计', re: /数学|统计|应用统计|概率|运筹/ },
+  { key: 'design', label: '设计/视觉/交互', re: /设计|视觉|交互|工业设计|动画|美术|用户体验/ },
+  { key: 'law', label: '法学/法律', re: /法学|法律|知识产权/ },
+  { key: 'medicine', label: '医学/生物/药学', re: /医学|临床|药学|生物|护理|医疗器械/ },
+  { key: 'language', label: '语言/翻译', re: /英语|翻译|外语|小语种|商务英语/ },
+  { key: 'marketing', label: '市场/传媒', re: /市场营销|广告|传播|新闻|传媒|公共关系/ },
+];
+
+const CERT_REQUIREMENTS = [
+  { key: 'cet6', label: '英语六级', re: /英语六级|六级|CET-?6/i },
+  { key: 'cpa', label: 'CPA', re: /CPA|注册会计师/i },
+  { key: 'cfa', label: 'CFA', re: /\bCFA\b|特许金融分析师/i },
+  { key: 'acca', label: 'ACCA', re: /\bACCA\b/i },
+  { key: 'frm', label: 'FRM', re: /\bFRM\b|金融风险管理师/i },
+  { key: 'legal', label: '法律职业资格', re: /法律职业资格|司法考试|法考|律师资格/ },
+  { key: 'securities', label: '证券从业资格', re: /证券从业|证券从业资格/ },
+  { key: 'fund', label: '基金从业资格', re: /基金从业|基金从业资格/ },
+  { key: 'banking', label: '银行从业资格', re: /银行从业|银行从业资格/ },
+];
+
+function detectMajorCategories(text) {
+  const cleaned = cleanText(text);
+  return MAJOR_CATEGORY_RULES
+    .filter(rule => rule.re.test(cleaned))
+    .map(rule => rule.key);
+}
+
+function labelMajorCategories(keys) {
+  return keys
+    .map(key => (MAJOR_CATEGORY_RULES.find(rule => rule.key === key) || {}).label)
+    .filter(Boolean)
+    .join('、');
+}
+
+function detectCerts(text) {
+  const cleaned = cleanText(text);
+  const out = new Set();
+  CERT_REQUIREMENTS.forEach(rule => {
+    if (rule.re.test(cleaned)) out.add(rule.key);
+  });
+  return out;
+}
+
+function extractGraduationYears(text) {
+  const cleaned = cleanText(text);
+  const out = [];
+  let match;
+  const pattern = /(^|[^0-9])(?:20([2-4][0-9])|([2-4][0-9]))\s*(?:届|年毕业|毕业生)/g;
+  while ((match = pattern.exec(cleaned))) {
+    const year = match[2] ? '20' + match[2] : (match[3] ? '20' + match[3] : '');
+    if (year) out.push(year);
+  }
+  return uniqueBy(out, item => item);
+}
+
+function inferDegreeRank(text) {
+  const cleaned = cleanText(text);
+  if (/博士|博士研究生|PhD/i.test(cleaned)) return 4;
+  if (/硕士|研究生|Master/i.test(cleaned)) return 3;
+  if (/本科|学士|Bachelor|大学本科/i.test(cleaned)) return 2;
+  if (/大专|专科|Associate/i.test(cleaned)) return 1;
+  return 0;
+}
+
+function requiredDegreeRank(text) {
+  const cleaned = cleanText(text);
+  if (/学历不限|不限学历/.test(cleaned)) return 0;
+  if (/(博士|博士研究生).{0,8}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,8}(博士|博士研究生)/.test(cleaned)) return 4;
+  if (/(硕士|研究生).{0,8}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,8}(硕士|研究生)/.test(cleaned)) return 3;
+  if (/(本科|学士).{0,8}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,8}(本科|学士)/.test(cleaned)) return 2;
+  if (/(大专|专科).{0,8}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,8}(大专|专科)/.test(cleaned)) return 1;
+  return 0;
+}
+
+function inferCandidateProfile(options = {}) {
+  const text = cleanText(options.resumeText || '');
+  const workYears = [];
+  const cnNum = '([0-9]+|[一二两三四五六七八九十]+)';
+  recordRequiredYears(text, new RegExp(cnNum + '\\s*年.{0,12}(?:全职|工作经验|从业经验|正式工作|任职)', 'g'), workYears);
+  return {
+    text,
+    degreeRank: inferDegreeRank(text),
+    graduationYears: extractGraduationYears(text),
+    majorCategories: detectMajorCategories(text),
+    certs: detectCerts(text),
+    workYears: workYears.length ? Math.max(...workYears) : 0,
+  };
+}
+
+function extractRequiredMajorCategories(text) {
+  const cleaned = cleanText(text);
+  if (/专业不限|不限专业/.test(cleaned)) return [];
+  const snippets = cleaned
+    .split(/[\n。；;]/)
+    .map(part => part.trim())
+    .filter(part => /(专业要求|专业背景|专业方向|所学专业|相关专业|相关学科|相关方向|以下专业|专业为|专业是|专业：|专业:)/.test(part))
+    .filter(part => !/(相关专业|专业背景|专业方向|所学专业|相关学科|相关方向).{0,24}(优先|加分|更佳|优先考虑)/.test(part));
+  if (!snippets.length) return [];
+  return detectMajorCategories(snippets.join(' '));
+}
+
+function hardRequiredCerts(text) {
+  const cleaned = cleanText(text);
+  return CERT_REQUIREMENTS.filter(rule => {
+    if (!rule.re.test(cleaned)) return false;
+    const certSource = rule.re.source;
+    return new RegExp('(?:必须|需|需要|要求|通过|持有|具备|取得|拥有|获得|完成|至少).{0,18}(?:' + certSource + ')', 'i').test(cleaned) ||
+      new RegExp('(?:' + certSource + ').{0,18}(?:必备|必须|需|需要|要求|通过|持有|具备|取得|拥有|获得|及以上|以上)', 'i').test(cleaned);
+  });
+}
+
+function detectHardRequirement(job, options = {}) {
   const roleLine = cleanText([job && job.role, job && job.direction].filter(Boolean).join(' '));
   const text = cleanText([job && job.role, job && job.direction, job && job.jd].filter(Boolean).join('\n'));
+  const profile = inferCandidateProfile(options);
+  const internshipIntent = hasInternshipIntent(options);
   const years = [];
   const cnNum = '([0-9]+|[一二两三四五六七八九十]+)';
   recordRequiredYears(text, new RegExp(cnNum + '\\s*年\\s*(?:及以上|以上|\\+)', 'g'), years);
@@ -245,20 +373,44 @@ function detectHardRequirement(job) {
   const reasons = [];
   if (years.length) {
     const minYears = Math.min(...years);
-    reasons.push('要求 ' + minYears + ' 年以上相关经验');
+    if (internshipIntent || wantsNoExperienceFilter(options) || profile.workYears < minYears) {
+      reasons.push('要求 ' + minYears + ' 年以上相关经验');
+    }
   }
-  if (!hasInternshipSignal(job) && /(高级|资深|专家|负责人|主管|架构师|总监)|\b(senior|principal|staff|lead|leader|architect)\b/i.test(roleLine)) {
+  if ((internshipIntent || !profile.workYears) && !hasInternshipSignal(job) && /(高级|资深|专家|负责人|主管|架构师|总监)|\b(senior|principal|staff|lead|leader|architect)\b/i.test(roleLine)) {
     reasons.push('岗位层级偏资深');
   }
+
+  const degreeRank = requiredDegreeRank(text);
+  if (degreeRank && profile.degreeRank && profile.degreeRank < degreeRank) {
+    reasons.push('学历要求不匹配');
+  }
+
+  const requiredGradYears = extractGraduationYears(text);
+  if (requiredGradYears.length && profile.graduationYears.length && !requiredGradYears.some(year => profile.graduationYears.includes(year))) {
+    reasons.push('届别要求不匹配');
+  }
+
+  const requiredMajors = extractRequiredMajorCategories(text);
+  if (requiredMajors.length && profile.majorCategories.length && !requiredMajors.some(key => profile.majorCategories.includes(key))) {
+    reasons.push('专业方向不匹配：要求 ' + labelMajorCategories(requiredMajors));
+  }
+
+  if (profile.text) {
+    hardRequiredCerts(text).forEach(rule => {
+      if (!profile.certs.has(rule.key)) reasons.push('缺少硬性证书：' + rule.label);
+    });
+  }
+
   return {
     blocked: reasons.length > 0,
-    reasons,
+    reasons: uniqueBy(reasons, item => item),
   };
 }
 
 function matchesEligibilityIntent(options, job) {
-  const hard = detectHardRequirement(job);
-  if (wantsNoExperienceFilter(options) && hard.blocked) return false;
+  const hard = detectHardRequirement(job, options);
+  if (hard.blocked) return false;
   if (hasInternshipIntent(options) && !hasInternshipSignal(job) && !hasEntryLevelSignal(job)) return false;
   return true;
 }
@@ -1041,6 +1193,7 @@ async function discoverJobs(options = {}) {
   const jobs = await fetchOfficialJobs(options);
   const filtered = jobs.filter(job =>
     matchesSearchIntent(options, [job.company, job.role, job.direction, job.city, job.jd]) &&
+    matchesRoleIntent(options, job) &&
     matchesCityIntent(options, job) &&
     matchesEligibilityIntent(options, job)
   );
@@ -1066,10 +1219,13 @@ function extractSkillTerms(text) {
   SKILL_TERMS.forEach(term => {
     if (containsTerm(text, term)) out.push(term);
   });
+  const knownTerms = new Set(SKILL_TERMS.map(term => term.toLowerCase()));
   const english = String(text || '').match(/\b[A-Za-z][A-Za-z+#.]{1,18}\b/g) || [];
   english.forEach(term => {
     if (/^(and|or|the|with|for|to|of|in|on|a|an)$/i.test(term)) return;
     if (term.length < 2) return;
+    if (/^[A-Z]{2,6}$/.test(term) && !knownTerms.has(term.toLowerCase())) return;
+    if (!knownTerms.has(term.toLowerCase()) && !/[+#.0-9]/.test(term)) return;
     out.push(term);
   });
   return uniqueBy(out, item => item.toLowerCase()).slice(0, 30);
@@ -1089,7 +1245,7 @@ function scoreOneJob(resumeText, job) {
   const warnings = [];
   if (!terms.length) warnings.push('JD 信息较少，匹配度可信度偏低。');
   if (score < 55) warnings.push('简历中暂未明显体现多项岗位关键词。');
-  const hard = detectHardRequirement(job);
+  const hard = detectHardRequirement(job, { resumeText });
   if (hard.blocked && hard.reasons.length) warnings.push('岗位硬性门槛：' + hard.reasons[0]);
   return {
     matchScore: score,
@@ -1119,7 +1275,7 @@ async function refreshJobBoard(options = {}) {
       limit: Math.max(1, Math.min(MAX_LIMIT, Number(options.limit) || DEFAULT_LIMIT)),
       sourceCount: configuredOfficialUrls(options.sourceUrls).length,
       jobType: cleanText(options.jobType || ''),
-      noWorkExperience: wantsNoExperienceFilter(options),
+      eligibility: 'hard_requirements_filtered',
     },
     provider: SEARCH_PROVIDER,
   };

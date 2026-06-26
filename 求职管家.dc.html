@@ -304,7 +304,7 @@
       <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
       <section data-screen-label="职位看板">
         <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:18px 20px;margin-bottom:16px;">
-          <div style="display:grid;grid-template-columns:1.2fr .75fr .45fr .45fr;gap:12px;align-items:end;">
+          <div style="display:grid;grid-template-columns:1.2fr .75fr .45fr .45fr auto;gap:12px;align-items:end;">
             <div>
               <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">职位关键词</label>
               <input value="{{ boardKeywords }}" onInput="{{ setBoardKeywords }}" placeholder="如：数据分析实习 / 财务分析 / AI 运营" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;">
@@ -321,20 +321,6 @@
               <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">最低分</label>
               <input value="{{ boardMinScore }}" onInput="{{ setBoardMinScore }}" type="number" min="0" max="95" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;">
             </div>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap;">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span style="font-size:12px;color:#6b7a96;">求职类型</span>
-              <button onClick="{{ setBoardInternshipMode }}" style="{{ boardInternshipStyle }}">实习/校招</button>
-              <button onClick="{{ setBoardAnyJobMode }}" style="{{ boardAnyJobStyle }}">不限</button>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span style="font-size:12px;color:#6b7a96;">经验门槛</span>
-              <button onClick="{{ setBoardNoExpMode }}" style="{{ boardNoExpStyle }}">无工作经验</button>
-              <button onClick="{{ setBoardAnyExpMode }}" style="{{ boardAnyExpStyle }}">不限</button>
-            </div>
-          </div>
-          <div style="display:flex;justify-content:flex-end;margin-top:14px;">
             <button onClick="{{ refreshJobBoard }}" style="height:42px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:0 20px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;">{{ boardRefreshLabel }}</button>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap;">
@@ -1077,7 +1063,7 @@ class Component extends DCLogic {
     page: 'dashboard', modalType: null, form: {}, editId: null,
     toast: null, aiLoading: false, crawlLoading: false, boardLoading: false, boardError: null, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
-    jobSearch: '', boardKeywords: '', boardCity: '', boardJobType: '', boardNoWorkExp: null, boardLimit: '12', boardMinScore: null, appSearch: '', appStatus: '全部', syncErr: false,
+    jobSearch: '', boardKeywords: '', boardCity: '', boardLimit: '12', boardMinScore: null, appSearch: '', appStatus: '全部', syncErr: false,
     sidebarCollapsed: false, rewriteEditorWidth: 58
   };
 
@@ -1907,10 +1893,7 @@ class Component extends DCLogic {
       sourceUrls: '',
       limit: this.clamp(parseInt(this.state.boardLimit || saved.limit || 12, 10) || 12, 3, 24),
       minScore,
-      jobType: (this.state.boardJobType || saved.jobType || 'internship'),
-      noWorkExperience: (typeof this.state.boardNoWorkExp === 'boolean')
-        ? this.state.boardNoWorkExp
-        : (typeof saved.noWorkExperience === 'boolean' ? saved.noWorkExperience : true)
+      jobType: 'internship'
     };
   }
   setBoardMinScore(value) {
@@ -1918,16 +1901,6 @@ class Component extends DCLogic {
     if (!raw) return this.setState({ boardMinScore: '' });
     const n = this.clamp(parseInt(raw, 10) || 0, 0, 95);
     this.setState({ boardMinScore: String(n) });
-  }
-  setBoardJobType(type) {
-    this.setState({
-      boardJobType: type,
-      boardNoWorkExp: type === 'internship' ? true : this.state.boardNoWorkExp,
-      boardError: null
-    });
-  }
-  setBoardExperienceMode(noWorkExperience) {
-    this.setState({ boardNoWorkExp: !!noWorkExperience, boardError: null });
   }
   async refreshJobBoard() {
     const resumeText = this.getResumeText();
@@ -1942,7 +1915,7 @@ class Component extends DCLogic {
         sourceUrls: filters.sourceUrls,
         limit: filters.limit,
         jobType: filters.jobType,
-        noWorkExperience: filters.noWorkExperience,
+        strictEligibility: true,
         resumeText
       }, '无法连接后端服务，请先启动 Node 服务。');
       const items = Array.isArray(data && data.jobs) ? data.jobs : [];
@@ -2915,12 +2888,7 @@ class Component extends DCLogic {
     // job board
     const board = db.jobBoard || { filters: {}, items: [] };
     const boardFilters = this.currentBoardFilters();
-    const boardJobType = boardFilters.jobType || 'internship';
-    const boardNoWorkExp = boardFilters.noWorkExperience !== false;
-    const boardFilterBtnBase = 'border:1px solid #e2e8f0;border-radius:8px;padding:6px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;';
-    const boardFilterBtnOn = 'background:#eef4ff;color:var(--ac);border-color:#d9e6ff;';
-    const boardFilterBtnOff = 'background:#fff;color:#6b7a96;';
-    const boardEligibilityText = (boardJobType === 'internship' ? '实习/校招' : '岗位不限') + ' · ' + (boardNoWorkExp ? '过滤经验硬门槛' : '经验不限');
+    const boardEligibilityText = '已过滤硬性门槛';
     const boardItemsRaw = Array.isArray(board.items) ? board.items : [];
     const boardRows = boardItemsRaw.map(item => {
       const match = item.boardMatch || {};
@@ -3176,14 +3144,6 @@ class Component extends DCLogic {
       boardLimit: String(boardFilters.limit), setBoardLimit: e => this.setState({ boardLimit: e.target.value }),
       boardMinScore: (typeof S.boardMinScore === 'string') ? S.boardMinScore : String(boardFilters.minScore),
       setBoardMinScore: e => this.setBoardMinScore(e.target.value),
-      setBoardInternshipMode: () => this.setBoardJobType('internship'),
-      setBoardAnyJobMode: () => this.setBoardJobType('all'),
-      setBoardNoExpMode: () => this.setBoardExperienceMode(true),
-      setBoardAnyExpMode: () => this.setBoardExperienceMode(false),
-      boardInternshipStyle: boardFilterBtnBase + (boardJobType === 'internship' ? boardFilterBtnOn : boardFilterBtnOff),
-      boardAnyJobStyle: boardFilterBtnBase + (boardJobType !== 'internship' ? boardFilterBtnOn : boardFilterBtnOff),
-      boardNoExpStyle: boardFilterBtnBase + (boardNoWorkExp ? boardFilterBtnOn : boardFilterBtnOff),
-      boardAnyExpStyle: boardFilterBtnBase + (!boardNoWorkExp ? boardFilterBtnOn : boardFilterBtnOff),
       refreshJobBoard: () => this.refreshJobBoard(), boardRefreshLabel: S.boardLoading ? '刷新中…' : '刷新职位',
       boardRows, boardEmpty, boardHasItems, boardError: S.boardError || '',
       boardEligibilityText,
