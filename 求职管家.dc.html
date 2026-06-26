@@ -322,6 +322,18 @@
               <input value="{{ boardMinScore }}" onInput="{{ setBoardMinScore }}" type="number" min="0" max="95" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;">
             </div>
           </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-size:12px;color:#6b7a96;">求职类型</span>
+              <button onClick="{{ setBoardInternshipMode }}" style="{{ boardInternshipStyle }}">实习/校招</button>
+              <button onClick="{{ setBoardAnyJobMode }}" style="{{ boardAnyJobStyle }}">不限</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-size:12px;color:#6b7a96;">经验门槛</span>
+              <button onClick="{{ setBoardNoExpMode }}" style="{{ boardNoExpStyle }}">无工作经验</button>
+              <button onClick="{{ setBoardAnyExpMode }}" style="{{ boardAnyExpStyle }}">不限</button>
+            </div>
+          </div>
           <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-top:12px;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">
@@ -338,6 +350,7 @@
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap;">
             <div style="font-size:11.5px;color:#93a0b8;">{{ boardRefreshedText }}</div>
+            <div style="font-size:11.5px;color:#93a0b8;">{{ boardEligibilityText }}</div>
             <div style="font-size:11.5px;color:#93a0b8;">{{ boardCountText }}</div>
           </div>
           <sc-if value="{{ boardError }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#c0392b;background:#fdecec;border:1px solid #f0d0cc;border-radius:9px;padding:8px 10px;margin-top:10px;">{{ boardError }}</div></sc-if>
@@ -1076,7 +1089,7 @@ class Component extends DCLogic {
     page: 'dashboard', modalType: null, form: {}, editId: null,
     toast: null, aiLoading: false, crawlLoading: false, boardLoading: false, boardError: null, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
-    jobSearch: '', boardKeywords: '', boardCity: '', boardSources: '', boardSourcesDirty: false, boardLimit: '12', boardMinScore: '0', appSearch: '', appStatus: '全部', syncErr: false,
+    jobSearch: '', boardKeywords: '', boardCity: '', boardSources: '', boardSourcesDirty: false, boardJobType: '', boardNoWorkExp: null, boardLimit: '12', boardMinScore: '0', appSearch: '', appStatus: '全部', syncErr: false,
     sidebarCollapsed: false, rewriteEditorWidth: 58
   };
 
@@ -1925,8 +1938,22 @@ class Component extends DCLogic {
       city: (this.state.boardCity || saved.city || '').trim(),
       sourceUrls: (this.state.boardSourcesDirty ? this.state.boardSources : (this.state.boardSources || saved.sourceUrls || '')).trim(),
       limit: this.clamp(parseInt(this.state.boardLimit || saved.limit || 12, 10) || 12, 3, 24),
-      minScore: this.clamp(parseInt(this.state.boardMinScore || saved.minScore || 0, 10) || 0, 0, 95)
+      minScore: this.clamp(parseInt(this.state.boardMinScore || saved.minScore || 0, 10) || 0, 0, 95),
+      jobType: (this.state.boardJobType || saved.jobType || 'internship'),
+      noWorkExperience: (typeof this.state.boardNoWorkExp === 'boolean')
+        ? this.state.boardNoWorkExp
+        : (typeof saved.noWorkExperience === 'boolean' ? saved.noWorkExperience : true)
     };
+  }
+  setBoardJobType(type) {
+    this.setState({
+      boardJobType: type,
+      boardNoWorkExp: type === 'internship' ? true : this.state.boardNoWorkExp,
+      boardError: null
+    });
+  }
+  setBoardExperienceMode(noWorkExperience) {
+    this.setState({ boardNoWorkExp: !!noWorkExperience, boardError: null });
   }
   applyBoardSourcePreset(kind) {
     const list = this.BOARD_SOURCE_PRESETS[kind] || [];
@@ -1951,6 +1978,8 @@ class Component extends DCLogic {
         city: filters.city,
         sourceUrls: filters.sourceUrls,
         limit: filters.limit,
+        jobType: filters.jobType,
+        noWorkExperience: filters.noWorkExperience,
         resumeText
       }, '无法连接后端服务，请先启动 Node 服务。');
       const items = Array.isArray(data && data.jobs) ? data.jobs : [];
@@ -2923,6 +2952,12 @@ class Component extends DCLogic {
     // job board
     const board = db.jobBoard || { filters: {}, items: [] };
     const boardFilters = this.currentBoardFilters();
+    const boardJobType = boardFilters.jobType || 'internship';
+    const boardNoWorkExp = boardFilters.noWorkExperience !== false;
+    const boardFilterBtnBase = 'border:1px solid #e2e8f0;border-radius:8px;padding:6px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;';
+    const boardFilterBtnOn = 'background:#eef4ff;color:var(--ac);border-color:#d9e6ff;';
+    const boardFilterBtnOff = 'background:#fff;color:#6b7a96;';
+    const boardEligibilityText = (boardJobType === 'internship' ? '实习/校招' : '岗位不限') + ' · ' + (boardNoWorkExp ? '过滤经验硬门槛' : '经验不限');
     const boardItemsRaw = Array.isArray(board.items) ? board.items : [];
     const boardRows = boardItemsRaw.map(item => {
       const match = item.boardMatch || {};
@@ -3181,8 +3216,17 @@ class Component extends DCLogic {
       clearBoardSources: () => this.clearBoardSources(),
       boardLimit: String(boardFilters.limit), setBoardLimit: e => this.setState({ boardLimit: e.target.value }),
       boardMinScore: String(boardFilters.minScore), setBoardMinScore: e => this.setState({ boardMinScore: e.target.value }),
+      setBoardInternshipMode: () => this.setBoardJobType('internship'),
+      setBoardAnyJobMode: () => this.setBoardJobType('all'),
+      setBoardNoExpMode: () => this.setBoardExperienceMode(true),
+      setBoardAnyExpMode: () => this.setBoardExperienceMode(false),
+      boardInternshipStyle: boardFilterBtnBase + (boardJobType === 'internship' ? boardFilterBtnOn : boardFilterBtnOff),
+      boardAnyJobStyle: boardFilterBtnBase + (boardJobType !== 'internship' ? boardFilterBtnOn : boardFilterBtnOff),
+      boardNoExpStyle: boardFilterBtnBase + (boardNoWorkExp ? boardFilterBtnOn : boardFilterBtnOff),
+      boardAnyExpStyle: boardFilterBtnBase + (!boardNoWorkExp ? boardFilterBtnOn : boardFilterBtnOff),
       refreshJobBoard: () => this.refreshJobBoard(), boardRefreshLabel: S.boardLoading ? '刷新中…' : '刷新职位',
       boardRows, boardEmpty, boardHasItems, boardError: S.boardError || '',
+      boardEligibilityText,
       boardRefreshedText, boardCountText: boardRows.length + ' / ' + boardItemsRaw.length + ' 个职位',
       boardNoResume: !this.getResumeText().trim(),
 

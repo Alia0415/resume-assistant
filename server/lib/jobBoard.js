@@ -156,6 +156,101 @@ function matchesSearchIntent(options, fields) {
   return rawParts.some(part => part.length >= 2 && termMatchesText(part, text));
 }
 
+function parseBooleanLike(value) {
+  if (value === true || value === false) return value;
+  if (value == null) return null;
+  const text = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(text)) return true;
+  if (['0', 'false', 'no', 'off'].includes(text)) return false;
+  return null;
+}
+
+function hasInternshipIntent(options = {}) {
+  const jobType = cleanText(options.jobType).toLowerCase();
+  if (/^(all|any|不限|全部|social|experienced)$/.test(jobType)) return false;
+  if (/intern|internship|实习|校招|校园|应届|campus|graduate/.test(jobType)) return true;
+  const text = cleanText([options.keywords, options.resumeText].filter(Boolean).join(' ')).toLowerCase();
+  return /intern|internship|实习|校招|校园招聘|应届|应届生|在校/.test(text);
+}
+
+function wantsNoExperienceFilter(options = {}) {
+  const explicit = parseBooleanLike(options.noWorkExperience);
+  if (explicit !== null) return explicit;
+  if (hasInternshipIntent(options)) return true;
+  const text = cleanText([options.keywords, options.resumeText].filter(Boolean).join(' '));
+  return /无工作经验|没有工作经验|没有工作经历|暂无工作经验|在校生/.test(text);
+}
+
+function parseChineseNumber(value) {
+  const raw = cleanText(value).replace(/[＋+]/g, '');
+  if (!raw) return NaN;
+  const n = Number(raw);
+  if (Number.isFinite(n)) return n;
+  const digits = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+  if (raw === '十') return 10;
+  const ten = raw.indexOf('十');
+  if (ten >= 0) {
+    const before = raw.slice(0, ten);
+    const after = raw.slice(ten + 1);
+    const tens = before ? digits[before] : 1;
+    const ones = after ? digits[after] : 0;
+    return (Number.isFinite(tens) ? tens : 0) * 10 + (Number.isFinite(ones) ? ones : 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(digits, raw)) return digits[raw];
+  return NaN;
+}
+
+function recordRequiredYears(text, pattern, out) {
+  let match;
+  pattern.lastIndex = 0;
+  while ((match = pattern.exec(text))) {
+    const years = parseChineseNumber(match[1]);
+    if (Number.isFinite(years) && years >= 1 && years <= 20) out.push(years);
+  }
+}
+
+function hasInternshipSignal(job) {
+  const text = cleanText([job && job.role, job && job.direction, job && job.jd].filter(Boolean).join(' '));
+  return /实习|实习生|intern|internship|校园招聘|校招|应届|应届生|毕业生|管培|培训生|在校|可转正|202[0-9]届|2[4-9]届/i.test(text);
+}
+
+function hasEntryLevelSignal(job) {
+  const text = cleanText([job && job.role, job && job.direction, job && job.jd].filter(Boolean).join(' '));
+  return /经验不限|不限经验|无经验|无需经验|接受应届|应届优先|应届生优先/i.test(text);
+}
+
+function detectHardRequirement(job) {
+  const roleLine = cleanText([job && job.role, job && job.direction].filter(Boolean).join(' '));
+  const text = cleanText([job && job.role, job && job.direction, job && job.jd].filter(Boolean).join('\n'));
+  const years = [];
+  const cnNum = '([0-9]+|[一二两三四五六七八九十]+)';
+  recordRequiredYears(text, new RegExp(cnNum + '\\s*年\\s*(?:及以上|以上|\\+)', 'g'), years);
+  recordRequiredYears(text, new RegExp(cnNum + '\\s*年.{0,18}(?:工作经验|相关经验|项目经验|从业经验|经验|经历)', 'g'), years);
+  recordRequiredYears(text, new RegExp('(?:至少|不少于|不低于|超过)\\s*' + cnNum + '\\s*年', 'g'), years);
+  recordRequiredYears(text, new RegExp(cnNum + '\\s*[-~—至到]\\s*(?:[0-9]+|[一二两三四五六七八九十]+)\\s*年.{0,18}(?:工作经验|相关经验|项目经验|从业经验|经验|经历)', 'g'), years);
+  recordRequiredYears(text, /([0-9]+)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:work\s+)?experience/ig, years);
+
+  const reasons = [];
+  if (years.length) {
+    const minYears = Math.min(...years);
+    reasons.push('要求 ' + minYears + ' 年以上相关经验');
+  }
+  if (!hasInternshipSignal(job) && /(高级|资深|专家|负责人|主管|架构师|总监)|\b(senior|principal|staff|lead|leader|architect)\b/i.test(roleLine)) {
+    reasons.push('岗位层级偏资深');
+  }
+  return {
+    blocked: reasons.length > 0,
+    reasons,
+  };
+}
+
+function matchesEligibilityIntent(options, job) {
+  const hard = detectHardRequirement(job);
+  if (wantsNoExperienceFilter(options) && hard.blocked) return false;
+  if (hasInternshipIntent(options) && !hasInternshipSignal(job) && !hasEntryLevelSignal(job)) return false;
+  return true;
+}
+
 async function fetchWithTimeout(url, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs || SEARCH_TIMEOUT_MS);
@@ -822,12 +917,13 @@ async function discoverJobs(options = {}) {
     for (const candidate of searchCandidates.slice(0, limit)) {
       jobs.push(await crawlCandidate(candidate));
     }
-    return uniqueBy(jobs, item => item.link || item.id).slice(0, limit);
+    return uniqueBy(jobs.filter(job => matchesEligibilityIntent(options, job)), item => item.link || item.id).slice(0, limit);
   }
   const jobs = await fetchOfficialJobs(options);
   const filtered = jobs.filter(job =>
     matchesSearchIntent(options, [job.company, job.role, job.direction, job.city, job.jd]) &&
-    matchesCityIntent(options, job)
+    matchesCityIntent(options, job) &&
+    matchesEligibilityIntent(options, job)
   );
   return uniqueBy(filtered, item => item.link || item.id).slice(0, limit);
 }
@@ -874,6 +970,8 @@ function scoreOneJob(resumeText, job) {
   const warnings = [];
   if (!terms.length) warnings.push('JD 信息较少，匹配度可信度偏低。');
   if (score < 55) warnings.push('简历中暂未明显体现多项岗位关键词。');
+  const hard = detectHardRequirement(job);
+  if (hard.blocked && hard.reasons.length) warnings.push('岗位硬性门槛：' + hard.reasons[0]);
   return {
     matchScore: score,
     matchedKeywords: matched.slice(0, 10),
@@ -901,6 +999,8 @@ async function refreshJobBoard(options = {}) {
       city: cleanText(options.city || ''),
       limit: Math.max(1, Math.min(MAX_LIMIT, Number(options.limit) || DEFAULT_LIMIT)),
       sourceCount: configuredOfficialUrls(options.sourceUrls).length,
+      jobType: cleanText(options.jobType || ''),
+      noWorkExperience: wantsNoExperienceFilter(options),
     },
     provider: SEARCH_PROVIDER,
   };
@@ -911,5 +1011,6 @@ module.exports = {
   discoverJobs,
   scoreJobs,
   scoreOneJob,
+  detectHardRequirement,
   parseRssItems,
 };

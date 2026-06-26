@@ -349,6 +349,8 @@ app.post('/api/jobs/board-refresh', crawlLimiter, async (req, res) => {
       sourceUrls,
       limit: body.limit,
       resumeText: String(body.resumeText || ''),
+      jobType: String(body.jobType || '').trim(),
+      noWorkExperience: body.noWorkExperience,
     });
     return res.json(data);
   } catch (err) {
