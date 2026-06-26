@@ -5,6 +5,7 @@ const { crawlJobUrl, htmlToText, assertPublicUrl } = require('./jobCrawler');
 const SEARCH_TIMEOUT_MS = Math.max(3000, Number(process.env.JOB_BOARD_SEARCH_TIMEOUT_MS) || 10000);
 const DEFAULT_LIMIT = Math.max(3, Math.min(30, Number(process.env.JOB_BOARD_DEFAULT_LIMIT) || 12));
 const MAX_LIMIT = Math.max(5, Math.min(50, Number(process.env.JOB_BOARD_MAX_LIMIT) || 24));
+const MAX_SOURCE_URLS = Math.max(20, Math.min(100, Number(process.env.JOB_BOARD_MAX_SOURCES) || 80));
 const CRAWL_DETAIL_LIMIT = Math.max(0, Math.min(12, Number(process.env.JOB_BOARD_CRAWL_DETAIL_LIMIT) || 6));
 const GENERIC_PAGE_TIMEOUT_MS = Math.max(2000, Math.min(SEARCH_TIMEOUT_MS, Number(process.env.JOB_BOARD_PAGE_TIMEOUT_MS) || 5000));
 const SEARCH_PROVIDER = (process.env.JOB_BOARD_SEARCH_PROVIDER || 'official-sources').trim();
@@ -77,14 +78,14 @@ function safeUrl(value) {
 
 function normalizeSourceUrls(value) {
   const raw = Array.isArray(value) ? value : String(value || '').split(/\r?\n|,/);
-  return raw.map(safeUrl).filter(Boolean).slice(0, 12);
+  return raw.map(safeUrl).filter(Boolean).slice(0, MAX_SOURCE_URLS);
 }
 
 function configuredOfficialUrls(value) {
   return uniqueBy(
     normalizeSourceUrls(DEFAULT_OFFICIAL_SOURCES).concat(normalizeSourceUrls(value)),
     item => item
-  ).slice(0, 20);
+  ).slice(0, MAX_SOURCE_URLS);
 }
 
 function uniqueBy(items, keyFn) {
@@ -249,6 +250,12 @@ function matchesEligibilityIntent(options, job) {
   if (wantsNoExperienceFilter(options) && hard.blocked) return false;
   if (hasInternshipIntent(options) && !hasInternshipSignal(job) && !hasEntryLevelSignal(job)) return false;
   return true;
+}
+
+function officialSearchKeyword(options = {}) {
+  const raw = cleanText(options.keywords || '');
+  if (raw) return raw;
+  return hasInternshipIntent(options) ? '实习' : '';
 }
 
 async function fetchWithTimeout(url, options = {}) {
@@ -422,7 +429,7 @@ function tencentPostLink(post) {
 async function fetchTencentJobs(source, options = {}) {
   const limit = Math.max(3, Math.min(MAX_LIMIT, Number(options.limit) || DEFAULT_LIMIT));
   const pageSize = Math.max(limit, Math.min(30, limit * 2));
-  const keyword = cleanText(options.keywords || '');
+  const keyword = officialSearchKeyword(options);
   const url = 'https://careers.tencent.com/tencentcareer/api/post/Query?timestamp=' + Date.now() +
     '&countryId=&cityId=&bgIds=&productId=&categoryId=&parentCategoryId=&attrId=' +
     '&keyword=' + encodeURIComponent(keyword) +
@@ -477,7 +484,7 @@ function parseWindowInitialData(html, varName) {
 
 async function fetchBaiduJobs(source, options = {}) {
   const limit = Math.max(3, Math.min(MAX_LIMIT, Number(options.limit) || DEFAULT_LIMIT));
-  const keyword = cleanText(options.keywords || '');
+  const keyword = officialSearchKeyword(options);
   const url = 'https://talent.baidu.com/jobs/social-list' + (keyword ? '?search=' + encodeURIComponent(keyword) : '');
   const html = await fetchWithTimeout(url, {
     timeoutMs: SEARCH_TIMEOUT_MS,
@@ -510,7 +517,7 @@ async function fetchJdJobs(source, options = {}) {
     workCityJson: '[]',
     jobTypeJson: '[]',
     depTypeJson: '[]',
-    jobSearch: cleanText(options.keywords || ''),
+    jobSearch: officialSearchKeyword(options),
   });
   const data = await fetchJson('https://zhaopin.jd.com/web/job/job_list', {
     method: 'POST',
@@ -542,7 +549,7 @@ async function fetchMeituanJobs(source, options = {}) {
   const limit = Math.max(3, Math.min(MAX_LIMIT, Number(options.limit) || DEFAULT_LIMIT));
   const payload = {
     page: { pageNo: 1, pageSize: Math.max(limit, 20) },
-    keywords: cleanText(options.keywords || ''),
+    keywords: officialSearchKeyword(options),
   };
   const data = await fetchJson('https://zhaopin.meituan.com/api/official/job/getJobList', {
     method: 'POST',
