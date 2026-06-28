@@ -328,6 +328,11 @@
             <div style="font-size:11.5px;color:#93a0b8;">{{ boardEligibilityText }}</div>
             <div style="font-size:11.5px;color:#93a0b8;">{{ boardCountText }}</div>
           </div>
+          <div style="font-size:11.5px;color:#93a0b8;margin-top:8px;line-height:1.6;">{{ boardSourceText }}</div>
+          <details style="margin-top:10px;">
+            <summary style="font-size:12px;color:#5b6b85;cursor:pointer;">官网来源（可选，每行一个；不填使用内置来源）</summary>
+            <textarea value="{{ boardSourceUrls }}" onInput="{{ setBoardSourceUrls }}" rows="3" placeholder="例如：https://join.qq.com/post.html?query=p_104" style="margin-top:8px;width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px 11px;font-size:12.5px;line-height:1.5;outline:none;resize:vertical;background:#fff;"></textarea>
+          </details>
           <sc-if value="{{ boardError }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#c0392b;background:#fdecec;border:1px solid #f0d0cc;border-radius:9px;padding:8px 10px;margin-top:10px;">{{ boardError }}</div></sc-if>
           <sc-if value="{{ boardNoResume }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#9a6411;background:#fff8ee;border:1px solid #f5e3c3;border-radius:9px;padding:8px 10px;margin-top:10px;">请先上传一份可解析的简历，再刷新职位看板。</div></sc-if>
         </div>
@@ -362,6 +367,22 @@
                   <div style="font-size:11.5px;color:#9a6411;line-height:1.5;margin-top:9px;">缺口：{{ b.missingText }}</div>
                 </sc-if>
                 <sc-if value="{{ b.hasWarning }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#9a6411;line-height:1.5;margin-top:8px;">{{ b.warningText }}</div></sc-if>
+                <details style="margin-top:10px;border-top:1px solid #eef2f7;padding-top:9px;">
+                  <summary style="font-size:11.8px;color:#5b6b85;cursor:pointer;">筛选和评分依据</summary>
+                  <div style="font-size:11.5px;color:#5b6b85;line-height:1.6;margin-top:8px;">入选：{{ b.selectionText }}</div>
+                  <div style="font-size:11.5px;color:#5b6b85;line-height:1.6;margin-top:4px;">硬性门槛：{{ b.hardGateText }}</div>
+                  <div style="font-size:11.5px;color:#7b89a3;line-height:1.6;margin-top:4px;">{{ b.scoreFormula }}</div>
+                  <div style="display:grid;gap:6px;margin-top:8px;">
+                    <sc-for list="{{ b.scoreBreakdown }}" as="d" hint-placeholder-count="0">
+                      <div style="background:#f8fafc;border:1px solid #eef2f7;border-radius:8px;padding:7px 8px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;font-weight:700;color:#24304a;">
+                          <span>{{ d.label }}</span><span>{{ d.scoreLabel }}</span>
+                        </div>
+                        <div style="font-size:11px;color:#6b7a96;line-height:1.5;margin-top:3px;">{{ d.detail }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </details>
                 <div style="display:flex;gap:8px;margin-top:auto;padding-top:14px;align-items:center;">
                   <button onClick="{{ b.save }}" style="background:var(--ac);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;">保存岗位</button>
                   <sc-if value="{{ b.hasLink }}" hint-placeholder-val="{{ false }}"><a href="{{ b.link }}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px;color:#5b6b85;text-decoration:none;border:1px solid #e2e8f0;border-radius:8px;padding:7px 12px;">打开链接</a></sc-if>
@@ -1063,7 +1084,7 @@ class Component extends DCLogic {
     page: 'dashboard', modalType: null, form: {}, editId: null,
     toast: null, aiLoading: false, crawlLoading: false, boardLoading: false, boardError: null, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
-    jobSearch: '', boardKeywords: '', boardCity: '', boardLimit: '12', boardMinScore: null, appSearch: '', appStatus: '全部', syncErr: false,
+    jobSearch: '', boardKeywords: '', boardCity: '', boardSourceUrls: '', boardLimit: '12', boardMinScore: null, appSearch: '', appStatus: '全部', syncErr: false,
     sidebarCollapsed: false, rewriteEditorWidth: 58
   };
 
@@ -1818,6 +1839,13 @@ class Component extends DCLogic {
   setMatchResume(e) { this.setState({ matchResumeId: e.target.value }); }
   setManualResume(e) { this.setForm('manualResume', e.target.value); }
   getResumeText() { const r = this.state.db.resumes.find(x => x.id === this.curResumeId()); return (r && r.text) || this.state.form.manualResume || ''; }
+  getCandidateProfileText() {
+    const p = (this.state.db && this.state.db.profile) || {};
+    return [p.school, p.degree, p.major, p.city].map(x => String(x || '').trim()).filter(Boolean).join('\n');
+  }
+  getBoardResumeText() {
+    return [this.getResumeText(), this.getCandidateProfileText()].map(x => String(x || '').trim()).filter(Boolean).join('\n');
+  }
   normalizeRewriteSuggestion(s) {
     const out = Object.assign({}, s || {});
     const score = this.clamp(Number(out.qualityScore) || 3, 1, 5);
@@ -1890,7 +1918,7 @@ class Component extends DCLogic {
     return {
       keywords: (this.state.boardKeywords || saved.keywords || '').trim(),
       city: (this.state.boardCity || saved.city || '').trim(),
-      sourceUrls: '',
+      sourceUrls: (this.state.boardSourceUrls || saved.sourceUrls || '').trim(),
       limit: this.clamp(parseInt(this.state.boardLimit || saved.limit || 12, 10) || 12, 3, 24),
       minScore,
       jobType: 'internship'
@@ -1903,8 +1931,8 @@ class Component extends DCLogic {
     this.setState({ boardMinScore: String(n) });
   }
   async refreshJobBoard() {
-    const resumeText = this.getResumeText();
-    if (!resumeText.trim()) return this.showToast('请先上传或粘贴一份可解析的简历');
+    const resumeText = this.getBoardResumeText();
+    if (!this.getResumeText().trim()) return this.showToast('请先上传或粘贴一份可解析的简历');
     const filters = this.currentBoardFilters();
     if (this.state.boardLoading) return;
     this.setState({ boardLoading: true, boardError: null });
@@ -1924,7 +1952,8 @@ class Component extends DCLogic {
           filters,
           items,
           refreshedAt: (data && data.fetchedAt) || Date.now(),
-          provider: (data && data.provider) || ''
+          provider: (data && data.provider) || '',
+          query: (data && data.query) || {}
         };
       });
       this.setState({ boardLoading: false });
@@ -2761,7 +2790,7 @@ class Component extends DCLogic {
     if (t === 'todo') return [inp('text', '待办内容', '如：周五前完成某岗位网申'), inp('due', '截止日期', '', 'date')];
     if (t === 'version' && f.exactDocx) return [inp('name', '版本名称', '如：资金管理版'), inp('targetJob', '对应岗位', '如：腾讯音乐 · 资金管理实习生'), inp('focus', '修改重点', '如：突出资金账户、台账、对账经历')];
     if (t === 'version') return [inp('name', '版本名称', '如：资金管理版'), inp('targetJob', '对应岗位', '如：腾讯音乐 · 资金管理实习生'), inp('focus', '修改重点', '如：突出资金账户、台账、对账经历'), area('content', '简历内容', '该版本的简历文字…', true)];
-    if (t === 'profile') return [inp('name', '姓名', ''), inp('school', '学校', ''), inp('major', '专业', ''), inp('phone', '电话', ''), inp('email', '邮箱', ''), inp('city', '期望城市', '')];
+    if (t === 'profile') return [inp('name', '姓名', ''), inp('school', '学校', ''), inp('degree', '学历', '如：本科 / 硕士'), inp('major', '专业', ''), inp('phone', '电话', ''), inp('email', '邮箱', ''), inp('city', '期望城市', '')];
     return [];
   }
 
@@ -2823,9 +2852,10 @@ class Component extends DCLogic {
     const prof = db.profile || {};
     const profileName = prof.name || '未填写姓名';
     const profileInitial = (prof.name && prof.name.trim()) ? prof.name.trim().charAt(0) : '+';
-    const profileSub = [prof.school, prof.major].filter(Boolean).join(' · ') || '点击完善信息';
+    const profileSub = [prof.school, prof.degree, prof.major].filter(Boolean).join(' · ') || '点击完善信息';
     const profileFields = [
       { label: '姓名', value: prof.name || '—' }, { label: '学校', value: prof.school || '—' },
+      { label: '学历', value: prof.degree || '—' },
       { label: '专业', value: prof.major || '—' }, { label: '电话', value: prof.phone || '—' },
       { label: '邮箱', value: prof.email || '—' }, { label: '期望城市', value: prof.city || '—' }
     ];
@@ -2889,12 +2919,31 @@ class Component extends DCLogic {
     const board = db.jobBoard || { filters: {}, items: [] };
     const boardFilters = this.currentBoardFilters();
     const boardEligibilityText = '已过滤硬性门槛';
+    const sourceStats = (board.query && Array.isArray(board.query.sourceStats)) ? board.query.sourceStats : [];
+    const returnedSourceStats = (board.query && Array.isArray(board.query.returnedSourceStats)) ? board.query.returnedSourceStats : [];
+    const sourceStatsText = sourceStats.length
+      ? sourceStats.slice(0, 6).map(s => (s.label || '来源') + ' ' + (Number(s.count) || 0)).join('；')
+      : '使用内置官方来源；可展开下方输入更多企业官网。';
+    const returnedSourceText = returnedSourceStats.length
+      ? '入选来源：' + returnedSourceStats.map(s => (s.label || '来源') + ' ' + (Number(s.count) || 0)).join('；')
+      : '';
+    const boardSourceText = (sourceStats.length ? ('抓取来源：' + sourceStatsText) : sourceStatsText) + (returnedSourceText ? '。' + returnedSourceText : '');
     const boardItemsRaw = Array.isArray(board.items) ? board.items : [];
     const boardRows = boardItemsRaw.map(item => {
       const match = item.boardMatch || {};
       const score = this.clamp(Number(match.matchScore) || 0, 0, 100);
       const matched = Array.isArray(match.matchedKeywords) ? match.matchedKeywords.slice(0, 8) : [];
       const missing = Array.isArray(match.missingKeywords) ? match.missingKeywords.slice(0, 8) : [];
+      const hardGate = match.hardGate || {};
+      const selectionReasons = Array.isArray(match.selectionReasons) ? match.selectionReasons.filter(Boolean).slice(0, 4) : [];
+      const scoreBreakdown = Array.isArray(match.scoreBreakdown) ? match.scoreBreakdown.slice(0, 4).map(d => {
+        const raw = (d && typeof d === 'object') ? d : {};
+        return {
+          label: raw.label || '评分项',
+          scoreLabel: (typeof raw.score === 'number' ? raw.score : (parseInt(raw.score, 10) || 0)) + '/100',
+          detail: raw.detail || '暂无说明'
+        };
+      }) : [];
       const warnings = []
         .concat(Array.isArray(item.boardWarnings) ? item.boardWarnings : [])
         .concat(Array.isArray(match.warnings) ? match.warnings : [])
@@ -2915,6 +2964,12 @@ class Component extends DCLogic {
         hasMissingKeywords: missing.length > 0,
         warningText: warnings[0] || '',
         hasWarning: warnings.length > 0,
+        selectionText: selectionReasons.join('；') || '按关键词、城市和硬性门槛筛选后入选',
+        hardGateText: hardGate.passed === false
+          ? ('未通过：' + ((Array.isArray(hardGate.reasons) && hardGate.reasons.join('；')) || '存在硬性冲突'))
+          : '通过：未发现明确硬性冲突',
+        scoreFormula: match.scoreFormula || '按硬性门槛、关键词覆盖、岗位名称贴合和简历证据量综合评分。',
+        scoreBreakdown,
         hasLink: !!(item.link && item.link.trim()),
         link: item.link || '#',
         save: () => this.saveBoardJob(item)
@@ -3141,12 +3196,13 @@ class Component extends DCLogic {
 
       boardKeywords: boardFilters.keywords, setBoardKeywords: e => this.setState({ boardKeywords: e.target.value }),
       boardCity: boardFilters.city, setBoardCity: e => this.setState({ boardCity: e.target.value }),
+      boardSourceUrls: boardFilters.sourceUrls, setBoardSourceUrls: e => this.setState({ boardSourceUrls: e.target.value }),
       boardLimit: String(boardFilters.limit), setBoardLimit: e => this.setState({ boardLimit: e.target.value }),
       boardMinScore: (typeof S.boardMinScore === 'string') ? S.boardMinScore : String(boardFilters.minScore),
       setBoardMinScore: e => this.setBoardMinScore(e.target.value),
       refreshJobBoard: () => this.refreshJobBoard(), boardRefreshLabel: S.boardLoading ? '刷新中…' : '刷新职位',
       boardRows, boardEmpty, boardHasItems, boardError: S.boardError || '',
-      boardEligibilityText,
+      boardEligibilityText, boardSourceText,
       boardRefreshedText, boardCountText: boardRows.length + ' / ' + boardItemsRaw.length + ' 个职位',
       boardNoResume: !this.getResumeText().trim(),
 

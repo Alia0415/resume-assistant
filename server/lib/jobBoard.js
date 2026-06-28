@@ -113,6 +113,28 @@ function uniqueBy(items, keyFn) {
   return out;
 }
 
+function sourceDisplayName(source) {
+  if (!source) return '未知来源';
+  const map = {
+    'tencent-campus': '腾讯校招官网',
+    tencent: '腾讯招聘官网',
+    baidu: '百度招聘官网',
+    jd: '京东招聘官网',
+    meituan: '美团招聘官网',
+    citics: '中信证券官网',
+    greenhouse: 'Greenhouse 官方ATS',
+    lever: 'Lever 官方ATS',
+    ashby: 'Ashby 官方ATS',
+    'career-page': '企业官网页面',
+  };
+  if (map[source.type]) return map[source.type];
+  try {
+    return new URL(source.url).hostname.replace(/^www\./, '');
+  } catch (e) {
+    return source.type || '未知来源';
+  }
+}
+
 function interleaveLists(lists) {
   const out = [];
   const arrays = (lists || []).filter(list => Array.isArray(list) && list.length);
@@ -313,10 +335,19 @@ function inferDegreeRank(text) {
 function requiredDegreeRank(text) {
   const cleaned = cleanText(text);
   if (/学历不限|不限学历/.test(cleaned)) return 0;
-  if (/(博士|博士研究生).{0,8}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,8}(博士|博士研究生)/.test(cleaned)) return 4;
-  if (/(硕士|研究生).{0,8}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,8}(硕士|研究生)/.test(cleaned)) return 3;
-  if (/(本科|学士).{0,8}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,8}(本科|学士)/.test(cleaned)) return 2;
-  if (/(大专|专科).{0,8}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,8}(大专|专科)/.test(cleaned)) return 1;
+  const snippets = cleaned
+    .split(/[\n。；;]/)
+    .map(part => part.trim())
+    .filter(part => /(学历|学位|博士|硕士|研究生|硕博|本科|学士|大专|专科)/.test(part))
+    .filter(part => !/(优先|加分|更佳|优先考虑)/.test(part));
+  const ranks = [];
+  snippets.forEach(part => {
+    if (/(大专|专科).{0,10}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,10}(大专|专科)/.test(part)) ranks.push(1);
+    if (/(本科|学士).{0,10}(及以上|以上|学历|学位|毕业)|(?:学历|学位).{0,10}(本科|学士)|本科毕业/.test(part)) ranks.push(2);
+    if (/(硕士|研究生|硕博).{0,10}(及以上|以上|学历|学位|毕业|在读)|(?:学历|学位).{0,10}(硕士|研究生)|硕士\s*(?:或|或者|\/|、)\s*博士|博士\s*(?:或|或者|\/|、)\s*硕士|硕博/.test(part)) ranks.push(3);
+    if (!/(硕士|研究生|硕博)/.test(part) && /(博士|博士研究生).{0,10}(及以上|以上|学历|学位|毕业|在读)|(?:学历|学位).{0,10}(博士|博士研究生)/.test(part)) ranks.push(4);
+  });
+  if (ranks.length) return Math.min(...ranks);
   return 0;
 }
 
@@ -341,10 +372,15 @@ function extractRequiredMajorCategories(text) {
   const snippets = cleaned
     .split(/[\n。；;]/)
     .map(part => part.trim())
-    .filter(part => /(专业要求|专业背景|专业方向|所学专业|相关专业|相关学科|相关方向|以下专业|专业为|专业是|专业：|专业:)/.test(part))
+    .filter(part => /(专业要求|专业背景|专业方向|所学专业|相关专业|相关学科|相关方向|相关背景|以下专业|专业为|专业是|专业：|专业:|专业，|专业,|学科背景|技术背景)/.test(part))
     .filter(part => !/(相关专业|专业背景|专业方向|所学专业|相关学科|相关方向).{0,24}(优先|加分|更佳|优先考虑)/.test(part));
   if (!snippets.length) return [];
   return detectMajorCategories(snippets.join(' '));
+}
+
+function isTechnicalRole(job) {
+  const text = cleanText([job && job.role, job && job.direction, job && job.jd].filter(Boolean).join(' '));
+  return /(软件开发|后台开发|后端开发|前端开发|客户端开发|算法|研发|测试开发|运维|安全工程|数据开发|工程师|技术岗|技术研发|机器学习|计算机视觉|自然语言处理|NLP|CV)/i.test(text);
 }
 
 function hardRequiredCerts(text) {
@@ -394,6 +430,9 @@ function detectHardRequirement(job, options = {}) {
   const requiredMajors = extractRequiredMajorCategories(text);
   if (requiredMajors.length && profile.majorCategories.length && !requiredMajors.some(key => profile.majorCategories.includes(key))) {
     reasons.push('专业方向不匹配：要求 ' + labelMajorCategories(requiredMajors));
+  }
+  if (!requiredMajors.length && isTechnicalRole(job) && profile.majorCategories.length && !profile.majorCategories.some(key => ['cs', 'math'].includes(key))) {
+    reasons.push('技术岗位与当前专业背景不匹配');
   }
 
   if (profile.text) {
@@ -994,6 +1033,29 @@ async function fetchOfficialJobs(options) {
   return uniqueBy(interleaveLists(batches), item => item.link || item.id);
 }
 
+async function fetchOfficialJobsWithStats(options) {
+  const urls = configuredOfficialUrls(options && options.sourceUrls);
+  const sources = urls.map(detectAtsSource).filter(Boolean);
+  const batches = await Promise.all(sources.map(async source => {
+    const label = sourceDisplayName(source);
+    try {
+      const jobs = await fetchOfficialSource(source, options);
+      return { source, label, jobs, error: '' };
+    } catch (e) {
+      return { source, label, jobs: [], error: (e && e.message) || '抓取失败' };
+    }
+  }));
+  return {
+    jobs: uniqueBy(interleaveLists(batches.map(batch => batch.jobs)), item => item.link || item.id),
+    sourceStats: batches.map(batch => ({
+      label: batch.label,
+      url: batch.source && batch.source.url,
+      count: batch.jobs.length,
+      error: batch.error,
+    })),
+  };
+}
+
 function parseRssItems(xml) {
   const out = [];
   const re = /<item\b[\s\S]*?<\/item>/gi;
@@ -1180,7 +1242,7 @@ async function crawlCandidate(candidate) {
   }
 }
 
-async function discoverJobs(options = {}) {
+async function discoverJobResult(options = {}) {
   const limit = Math.max(1, Math.min(MAX_LIMIT, Number(options.limit) || DEFAULT_LIMIT));
   if (SEARCH_PROVIDER === 'bing-rss' || SEARCH_PROVIDER === 'hybrid') {
     const searchCandidates = await searchPublicJobs(options);
@@ -1188,16 +1250,30 @@ async function discoverJobs(options = {}) {
     for (const candidate of searchCandidates.slice(0, limit)) {
       jobs.push(await crawlCandidate(candidate));
     }
-    return uniqueBy(jobs.filter(job => matchesEligibilityIntent(options, job)), item => item.link || item.id).slice(0, limit);
+    return {
+      jobs: uniqueBy(jobs.filter(job => matchesEligibilityIntent(options, job)), item => item.link || item.id).slice(0, limit),
+      sourceStats: [{ label: '公开搜索', count: searchCandidates.length, error: '' }],
+    };
   }
-  const jobs = await fetchOfficialJobs(options);
+  const fetched = await fetchOfficialJobsWithStats(options);
+  const jobs = fetched.jobs;
   const filtered = jobs.filter(job =>
     matchesSearchIntent(options, [job.company, job.role, job.direction, job.city, job.jd]) &&
     matchesRoleIntent(options, job) &&
     matchesCityIntent(options, job) &&
     matchesEligibilityIntent(options, job)
   );
-  return uniqueBy(filtered, item => item.link || item.id).slice(0, limit);
+  return {
+    jobs: uniqueBy(filtered, item => item.link || item.id).slice(0, limit),
+    sourceStats: fetched.sourceStats,
+    discoveredCount: jobs.length,
+    eligibleCount: filtered.length,
+  };
+}
+
+async function discoverJobs(options = {}) {
+  const result = await discoverJobResult(options);
+  return result.jobs;
 }
 
 function matchesCityIntent(options, job) {
@@ -1231,7 +1307,27 @@ function extractSkillTerms(text) {
   return uniqueBy(out, item => item.toLowerCase()).slice(0, 30);
 }
 
-function scoreOneJob(resumeText, job) {
+function buildSelectionReasons(options, job, hard) {
+  const reasons = [];
+  if (job && job.source) reasons.push('来源：' + job.source);
+  const keyword = cleanText(options && options.keywords);
+  if (keyword) reasons.push('关键词命中：' + keyword);
+  const city = cleanText(options && options.city);
+  if (city) reasons.push('城市命中：' + city);
+  reasons.push(hard && hard.blocked ? ('硬性门槛未通过：' + hard.reasons[0]) : '硬性门槛：未发现明确冲突');
+  return reasons;
+}
+
+function summarizeJobSources(jobs) {
+  const map = new Map();
+  (jobs || []).forEach(job => {
+    const key = cleanText(job && job.source) || '未知来源';
+    map.set(key, (map.get(key) || 0) + 1);
+  });
+  return Array.from(map.entries()).map(([label, count]) => ({ label, count }));
+}
+
+function scoreOneJob(resumeText, job, options = {}) {
   const resume = cleanText(resumeText);
   const jd = cleanText([job.role, job.direction, job.jd].filter(Boolean).join('\n'));
   const terms = extractSkillTerms(jd);
@@ -1240,13 +1336,37 @@ function scoreOneJob(resumeText, job) {
   const overlap = terms.length ? matched.length / terms.length : 0;
   const roleTerms = extractSkillTerms(job.role || '');
   const roleHit = roleTerms.length ? roleTerms.filter(term => containsTerm(resume, term)).length / roleTerms.length : 0;
-  const evidenceBoost = Math.min(14, Math.floor((resume.length / 450) * 4));
-  const score = Math.max(15, Math.min(96, Math.round(34 + overlap * 46 + roleHit * 10 + evidenceBoost)));
+  const evidenceScore = Math.min(100, Math.round((resume.length / 900) * 100));
+  const evidenceBoost = Math.min(12, Math.floor((resume.length / 450) * 4));
+  const hard = detectHardRequirement(job, Object.assign({}, options, { resumeText }));
+  const rawScore = Math.round(30 + overlap * 48 + roleHit * 10 + evidenceBoost);
+  const score = hard.blocked ? Math.min(39, rawScore) : Math.max(15, Math.min(92, rawScore));
   const warnings = [];
   if (!terms.length) warnings.push('JD 信息较少，匹配度可信度偏低。');
   if (score < 55) warnings.push('简历中暂未明显体现多项岗位关键词。');
-  const hard = detectHardRequirement(job, { resumeText });
   if (hard.blocked && hard.reasons.length) warnings.push('岗位硬性门槛：' + hard.reasons[0]);
+  const scoreBreakdown = [
+    {
+      label: '硬性门槛',
+      score: hard.blocked ? 0 : 100,
+      detail: hard.blocked ? hard.reasons.join('；') : '未发现学历、专业、届别、证书、年限等明确冲突',
+    },
+    {
+      label: '关键词覆盖',
+      score: terms.length ? Math.round(overlap * 100) : 0,
+      detail: matched.length + '/' + terms.length + ' 个 JD 关键词命中' + (matched.length ? '：' + matched.slice(0, 5).join('、') : ''),
+    },
+    {
+      label: '岗位名称贴合',
+      score: roleTerms.length ? Math.round(roleHit * 100) : 0,
+      detail: roleTerms.length ? (roleTerms.filter(term => containsTerm(resume, term)).join('、') || '岗位名关键词未明显出现在简历') : '岗位名未抽取到可评分关键词',
+    },
+    {
+      label: '简历证据量',
+      score: evidenceScore,
+      detail: resume.length ? ('当前可解析简历约 ' + resume.length + ' 字') : '未读取到可解析简历文本',
+    },
+  ];
   return {
     matchScore: score,
     matchedKeywords: matched.slice(0, 10),
@@ -1256,24 +1376,37 @@ function scoreOneJob(resumeText, job) {
       : '暂未在简历中识别到明显匹配关键词。',
     warnings,
     method: 'fast_keyword_overlap',
+    selectionReasons: buildSelectionReasons(options, job, hard),
+    hardGate: {
+      passed: !hard.blocked,
+      reasons: hard.reasons,
+    },
+    scoreBreakdown,
+    scoreFormula: '基础分30 + 关键词覆盖48% + 岗位名称贴合10% + 简历证据最多12分；硬性门槛不通过则最高39分并从看板过滤。',
   };
 }
 
-function scoreJobs(resumeText, jobs) {
-  return (jobs || []).map(job => Object.assign({}, job, { boardMatch: scoreOneJob(resumeText, job) }));
+function scoreJobs(resumeText, jobs, options = {}) {
+  return (jobs || []).map(job => Object.assign({}, job, { boardMatch: scoreOneJob(resumeText, job, options) }));
 }
 
 async function refreshJobBoard(options = {}) {
-  const jobs = await discoverJobs(options);
+  const discovered = await discoverJobResult(options);
+  const jobs = discovered.jobs;
   const resumeText = cleanText(options.resumeText || '');
+  const scoredJobs = resumeText ? scoreJobs(resumeText, jobs, options) : jobs;
   return {
-    jobs: resumeText ? scoreJobs(resumeText, jobs) : jobs,
+    jobs: scoredJobs,
     fetchedAt: Date.now(),
     query: {
       keywords: cleanText(options.keywords || ''),
       city: cleanText(options.city || ''),
       limit: Math.max(1, Math.min(MAX_LIMIT, Number(options.limit) || DEFAULT_LIMIT)),
       sourceCount: configuredOfficialUrls(options.sourceUrls).length,
+      sourceStats: (discovered && discovered.sourceStats) || [],
+      returnedSourceStats: summarizeJobSources(scoredJobs),
+      discoveredCount: (discovered && discovered.discoveredCount) || (jobs || []).length,
+      eligibleCount: (discovered && discovered.eligibleCount) || (jobs || []).length,
       jobType: cleanText(options.jobType || ''),
       eligibility: 'hard_requirements_filtered',
     },
