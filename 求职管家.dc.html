@@ -313,14 +313,30 @@
               <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">城市</label>
               <details style="position:relative;">
                 <summary style="list-style:none;width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ boardCityLabel }}</summary>
-                <div style="position:absolute;z-index:30;top:48px;left:0;width:320px;max-width:calc(100vw - 60px);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 14px 34px rgba(15,23,42,.12);padding:12px;">
-                  <div style="font-size:11.5px;color:#93a0b8;margin-bottom:8px;">可多选城市</div>
-                  <div style="display:flex;flex-wrap:wrap;gap:7px;">
-                    <sc-for list="{{ boardCityOptions }}" as="c" hint-placeholder-count="0">
-                      <button onClick="{{ c.toggle }}" style="{{ c.style }}">{{ c.label }}</button>
-                    </sc-for>
+                <div style="position:absolute;z-index:30;top:48px;right:0;width:620px;max-width:calc(100vw - 60px);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 14px 34px rgba(15,23,42,.12);padding:12px;">
+                  <div style="display:grid;grid-template-columns:145px minmax(0,1fr);min-height:300px;max-height:420px;">
+                    <div style="border-right:1px solid #edf0f5;padding-right:9px;overflow-y:auto;">
+                      <sc-for list="{{ boardProvinceOptions }}" as="p" hint-placeholder-count="0">
+                        <button onClick="{{ p.select }}" style="{{ p.style }}">{{ p.label }}</button>
+                      </sc-for>
+                    </div>
+                    <div style="padding-left:13px;min-width:0;overflow-y:auto;">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+                        <div style="font-size:13px;font-weight:700;color:#263550;">{{ boardProvinceLabel }}</div>
+                        <button onClick="{{ toggleBoardProvinceAll }}" style="{{ boardProvinceAllStyle }}">{{ boardProvinceAllLabel }}</button>
+                      </div>
+                      <div style="display:flex;flex-wrap:wrap;gap:7px;align-content:flex-start;">
+                        <sc-for list="{{ boardCityOptions }}" as="c" hint-placeholder-count="0">
+                          <button onClick="{{ c.toggle }}" style="{{ c.style }}">{{ c.label }}</button>
+                        </sc-for>
+                      </div>
+                    </div>
                   </div>
-                  <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #edf0f5;margin-top:10px;padding-top:10px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <span style="font-size:11.5px;color:#93a0b8;">{{ boardSelectedCityText }}</span>
+                      <button onClick="{{ toggleRemoteCity }}" style="{{ remoteCityStyle }}">远程</button>
+                    </div>
                     <button onClick="{{ clearBoardCities }}" style="background:#fff;color:#6b7a96;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;cursor:pointer;">清空</button>
                   </div>
                 </div>
@@ -1097,14 +1113,49 @@ class Component extends DCLogic {
     page: 'dashboard', modalType: null, form: {}, editId: null,
     toast: null, aiLoading: false, crawlLoading: false, boardLoading: false, boardError: null, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
-    jobSearch: '', boardKeywords: '', boardCity: '', boardSourceUrls: '', boardLimit: '12', boardMinScore: null, appSearch: '', appStatus: '全部', syncErr: false,
+    jobSearch: '', boardKeywords: '', boardCity: '', boardProvince: '广东', boardSourceUrls: '', boardLimit: '12', boardMinScore: null, appSearch: '', appStatus: '全部', syncErr: false,
     sidebarCollapsed: false, rewriteEditorWidth: 58
   };
 
   ACTIVE = ['待投递', '已投递', '笔试', '面试'];
   STATUSES = ['待投递', '已投递', '笔试', '面试', '已拒', '已offer', '暂停'];
   FBTYPES = ['收到笔试', '收到面试', '被拒', '无反馈', '需要补材料'];
-  BOARD_CITY_OPTIONS = ['广州', '深圳', '上海', '北京', '杭州', '成都', '南京', '武汉', '西安', '中国香港', '远程'];
+  BOARD_CITY_GROUPS = [
+    ['北京', '北京'],
+    ['天津', '天津'],
+    ['上海', '上海'],
+    ['重庆', '重庆'],
+    ['河北', '石家庄|唐山|秦皇岛|邯郸|邢台|保定|张家口|承德|沧州|廊坊|衡水'],
+    ['山西', '太原|大同|阳泉|长治|晋城|朔州|晋中|运城|忻州|临汾|吕梁'],
+    ['内蒙古', '呼和浩特|包头|乌海|赤峰|通辽|鄂尔多斯|呼伦贝尔|巴彦淖尔|乌兰察布|兴安盟|锡林郭勒盟|阿拉善盟'],
+    ['辽宁', '沈阳|大连|鞍山|抚顺|本溪|丹东|锦州|营口|阜新|辽阳|盘锦|铁岭|朝阳|葫芦岛'],
+    ['吉林', '长春|吉林|四平|辽源|通化|白山|松原|白城|延边'],
+    ['黑龙江', '哈尔滨|齐齐哈尔|鸡西|鹤岗|双鸭山|大庆|伊春|佳木斯|七台河|牡丹江|黑河|绥化|大兴安岭'],
+    ['江苏', '南京|无锡|徐州|常州|苏州|南通|连云港|淮安|盐城|扬州|镇江|泰州|宿迁'],
+    ['浙江', '杭州|宁波|温州|嘉兴|湖州|绍兴|金华|衢州|舟山|台州|丽水'],
+    ['安徽', '合肥|芜湖|蚌埠|淮南|马鞍山|淮北|铜陵|安庆|黄山|滁州|阜阳|宿州|六安|亳州|池州|宣城'],
+    ['福建', '福州|厦门|莆田|三明|泉州|漳州|南平|龙岩|宁德'],
+    ['江西', '南昌|景德镇|萍乡|九江|新余|鹰潭|赣州|吉安|宜春|抚州|上饶'],
+    ['山东', '济南|青岛|淄博|枣庄|东营|烟台|潍坊|济宁|泰安|威海|日照|临沂|德州|聊城|滨州|菏泽'],
+    ['河南', '郑州|开封|洛阳|平顶山|安阳|鹤壁|新乡|焦作|濮阳|许昌|漯河|三门峡|南阳|商丘|信阳|周口|驻马店|济源'],
+    ['湖北', '武汉|黄石|十堰|宜昌|襄阳|鄂州|荆门|孝感|荆州|黄冈|咸宁|随州|恩施|仙桃|潜江|天门|神农架'],
+    ['湖南', '长沙|株洲|湘潭|衡阳|邵阳|岳阳|常德|张家界|益阳|郴州|永州|怀化|娄底|湘西'],
+    ['广东', '广州|深圳|珠海|汕头|佛山|韶关|湛江|肇庆|江门|茂名|惠州|梅州|汕尾|河源|阳江|清远|东莞|中山|潮州|揭阳|云浮'],
+    ['广西', '南宁|柳州|桂林|梧州|北海|防城港|钦州|贵港|玉林|百色|贺州|河池|来宾|崇左'],
+    ['海南', '海口|三亚|三沙|儋州'],
+    ['四川', '成都|自贡|攀枝花|泸州|德阳|绵阳|广元|遂宁|内江|乐山|南充|眉山|宜宾|广安|达州|雅安|巴中|资阳|阿坝|甘孜|凉山'],
+    ['贵州', '贵阳|六盘水|遵义|安顺|毕节|铜仁|黔西南|黔东南|黔南'],
+    ['云南', '昆明|曲靖|玉溪|保山|昭通|丽江|普洱|临沧|楚雄|红河|文山|西双版纳|大理|德宏|怒江|迪庆'],
+    ['西藏', '拉萨|日喀则|昌都|林芝|山南|那曲|阿里'],
+    ['陕西', '西安|铜川|宝鸡|咸阳|渭南|延安|汉中|榆林|安康|商洛'],
+    ['甘肃', '兰州|嘉峪关|金昌|白银|天水|武威|张掖|平凉|酒泉|庆阳|定西|陇南|临夏|甘南'],
+    ['青海', '西宁|海东|海北|黄南|海南州|果洛|玉树|海西'],
+    ['宁夏', '银川|石嘴山|吴忠|固原|中卫'],
+    ['新疆', '乌鲁木齐|克拉玛依|吐鲁番|哈密|昌吉|博尔塔拉|巴音郭楞|阿克苏|克孜勒苏|喀什|和田|伊犁|塔城|阿勒泰'],
+    ['香港', '中国香港'],
+    ['澳门', '中国澳门'],
+    ['台湾', '台北|新北|桃园|台中|台南|高雄|基隆|新竹|嘉义']
+  ].map(([province, cities]) => ({ province, cities: cities.split('|') }));
   componentDidMount() {
     this.applyAccent();
     if (window.pdfjsLib) { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } catch (e) {} }
@@ -1941,15 +1992,43 @@ class Component extends DCLogic {
     };
   }
   normalizeBoardCities(value) {
-    const raw = Array.isArray(value) ? value.join(' / ') : String(value || '');
-    return this.uniqueOptions(raw.split(/[\s,，/、]+/).map(x => x.trim()).filter(x => x && x !== '不限'));
+    const parts = Array.isArray(value)
+      ? value.flatMap(item => {
+        if (item && typeof item === 'object') return [item.value || item.label || ''];
+        return String(item || '').split(/[\s,，/、]+/);
+      })
+      : String(value || '').split(/[\s,，/、]+/);
+    const seen = new Set();
+    return parts.map(item => String(item || '').trim()).filter(city => {
+      if (!city || city === '不限' || city === '[object' || city === 'Object]' || city === '[object Object]') return false;
+      const key = city.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
   setBoardCities(cities) {
-    this.setState({ boardCity: this.normalizeBoardCities(cities).join(' / '), boardError: null });
+    const normalized = this.normalizeBoardCities(cities);
+    this.setState({ boardCity: normalized.length ? normalized.join(' / ') : '不限', boardError: null });
   }
   toggleBoardCity(city) {
     const cur = this.normalizeBoardCities(this.currentBoardFilters().city);
     const next = cur.includes(city) ? cur.filter(x => x !== city) : cur.concat(city);
+    this.setBoardCities(next);
+  }
+  setBoardProvince(province) {
+    if (this.BOARD_CITY_GROUPS.some(group => group.province === province)) {
+      this.setState({ boardProvince: province });
+    }
+  }
+  toggleBoardProvinceAll(province) {
+    const group = this.BOARD_CITY_GROUPS.find(item => item.province === province);
+    if (!group) return;
+    const cur = this.normalizeBoardCities(this.currentBoardFilters().city);
+    const selectedAll = group.cities.every(city => cur.includes(city));
+    const next = selectedAll
+      ? cur.filter(city => !group.cities.includes(city))
+      : this.normalizeBoardCities(cur.concat(group.cities));
     this.setBoardCities(next);
   }
   clearBoardCities() {
@@ -2950,15 +3029,34 @@ class Component extends DCLogic {
     const board = db.jobBoard || { filters: {}, items: [] };
     const boardFilters = this.currentBoardFilters();
     const boardSelectedCities = Array.isArray(boardFilters.selectedCities) ? boardFilters.selectedCities : this.normalizeBoardCities(boardFilters.city);
-    const boardCityLabel = boardSelectedCities.length ? boardSelectedCities.join(' / ') : '不限城市';
+    const activeBoardProvince = this.BOARD_CITY_GROUPS.some(group => group.province === S.boardProvince) ? S.boardProvince : '广东';
+    const activeBoardCityGroup = this.BOARD_CITY_GROUPS.find(group => group.province === activeBoardProvince) || this.BOARD_CITY_GROUPS[0];
+    const fullySelectedGroups = this.BOARD_CITY_GROUPS.filter(group => group.cities.every(city => boardSelectedCities.includes(city)));
+    const fullySelectedCities = new Set(fullySelectedGroups.flatMap(group => group.cities));
+    const compactCityLabels = fullySelectedGroups.map(group => group.province + '全省')
+      .concat(boardSelectedCities.filter(city => !fullySelectedCities.has(city)));
+    const boardCityLabel = !boardSelectedCities.length
+      ? '不限地区'
+      : (compactCityLabels.length <= 3
+        ? compactCityLabels.join(' / ')
+        : compactCityLabels.slice(0, 3).join(' / ') + ' 等' + boardSelectedCities.length + '个城市');
     const cityBtnBase = 'border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;';
     const cityBtnOn = 'background:#eef4ff;color:var(--ac);border-color:#cfe0ff;';
     const cityBtnOff = 'background:#fff;color:#5b6b85;';
-    const boardCityOptions = this.BOARD_CITY_OPTIONS.map(city => ({
+    const boardCityOptions = activeBoardCityGroup.cities.map(city => ({
       label: city,
       toggle: () => this.toggleBoardCity(city),
       style: cityBtnBase + (boardSelectedCities.includes(city) ? cityBtnOn : cityBtnOff)
     }));
+    const provinceBtnBase = 'display:block;width:100%;border:none;border-radius:7px;padding:7px 9px;margin-bottom:3px;text-align:left;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;';
+    const boardProvinceOptions = this.BOARD_CITY_GROUPS.map(group => ({
+      label: group.province,
+      select: () => this.setBoardProvince(group.province),
+      style: provinceBtnBase + (group.province === activeBoardProvince ? 'background:#eef4ff;color:var(--ac);' : 'background:transparent;color:#5b6b85;')
+    }));
+    const boardProvinceAllSelected = activeBoardCityGroup.cities.every(city => boardSelectedCities.includes(city));
+    const boardProvinceAllStyle = cityBtnBase + (boardProvinceAllSelected ? cityBtnOn : cityBtnOff);
+    const remoteCityStyle = cityBtnBase + (boardSelectedCities.includes('远程') ? cityBtnOn : cityBtnOff);
     const boardEligibilityText = '已过滤硬性门槛';
     const sourceStats = (board.query && Array.isArray(board.query.sourceStats)) ? board.query.sourceStats : [];
     const returnedSourceStats = (board.query && Array.isArray(board.query.returnedSourceStats)) ? board.query.returnedSourceStats : [];
@@ -3240,7 +3338,14 @@ class Component extends DCLogic {
       jobSearch: S.jobSearch, setJobSearch: e => this.setState({ jobSearch: e.target.value }),
 
       boardKeywords: boardFilters.keywords, setBoardKeywords: e => this.setState({ boardKeywords: e.target.value }),
-      boardCityLabel, boardCityOptions, clearBoardCities: () => this.clearBoardCities(),
+      boardCityLabel, boardCityOptions, boardProvinceOptions,
+      boardProvinceLabel: activeBoardProvince + ' · 城市',
+      boardProvinceAllLabel: boardProvinceAllSelected ? '取消全省' : '选择全省',
+      boardProvinceAllStyle,
+      toggleBoardProvinceAll: () => this.toggleBoardProvinceAll(activeBoardProvince),
+      boardSelectedCityText: boardSelectedCities.length ? ('已选 ' + boardSelectedCities.length + ' 个城市') : '不限地区',
+      remoteCityStyle, toggleRemoteCity: () => this.toggleBoardCity('远程'),
+      clearBoardCities: () => this.clearBoardCities(),
       boardSourceUrls: boardFilters.sourceUrls, setBoardSourceUrls: e => this.setState({ boardSourceUrls: e.target.value }),
       boardLimit: String(boardFilters.limit), setBoardLimit: e => this.setState({ boardLimit: e.target.value }),
       boardMinScore: (typeof S.boardMinScore === 'string') ? S.boardMinScore : String(boardFilters.minScore),
