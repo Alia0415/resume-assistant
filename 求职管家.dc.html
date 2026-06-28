@@ -228,14 +228,24 @@
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
             <div>
               <div style="font-size:14px;font-weight:700;">经历库</div>
-              <div style="font-size:12px;color:#93a0b8;margin-top:2px;">把没有写进当前简历的实习、项目、校园、课程、比赛等真实经历放在这里，匹配分析会提示哪些可用。</div>
+              <div style="font-size:12px;color:#93a0b8;margin-top:2px;">把没有写进当前简历的实习、项目、校园、课程、比赛等真实经历放在这里。每条经历单独一段；同一项目有多个职责或阶段时，也可以拆成多段并保留相同项目名。</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <button onClick="{{ triggerExperienceUpload }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">上传经历文本</button>
               <button onClick="{{ clearExperienceLibrary }}" style="background:#fff;color:#c0392b;border:1px solid #f0d9d9;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">清空</button>
             </div>
           </div>
-          <textarea value="{{ experienceLibraryText }}" onInput="{{ setExperienceLibrary }}" placeholder="建议按条写清楚：时间 / 组织或项目 / 你的角色 / 做了什么 / 使用了什么工具或方法 / 可核实结果。示例：2025.03-2025.06 课程项目：负责用户调研与数据清洗，访谈 12 名同学，整理 300 条反馈，输出产品改进建议。" style="width:100%;height:150px;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;font-size:12.8px;line-height:1.7;color:#3a485f;outline:none;background:#fbfcfe;"></textarea>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+            <sc-for list="{{ experienceLibraryBoxes }}" as="box" hint-placeholder-count="0">
+              <div style="border:1px solid #e2e8f0;border-radius:12px;background:#fbfcfe;padding:12px 13px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+                  <div style="font-size:12.8px;font-weight:700;color:#3a485f;">{{ box.label }}</div>
+                  <div style="font-size:11px;color:#93a0b8;white-space:nowrap;">{{ box.countLabel }}</div>
+                </div>
+                <textarea value="{{ box.value }}" onInput="{{ box.set }}" placeholder="{{ box.placeholder }}" style="width:100%;height:118px;border:none;border-radius:8px;padding:0;font-size:12.6px;line-height:1.7;color:#3a485f;outline:none;background:transparent;"></textarea>
+              </div>
+            </sc-for>
+          </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:9px;">
             <div style="font-size:11.5px;color:#93a0b8;">{{ experienceLibraryMeta }}</div>
             <div style="font-size:11.5px;color:#7e8aa3;">经历库只作为真实素材提示，不会自动写进简历。</div>
@@ -707,28 +717,6 @@
 
               <div id="jm-rewrite-workspace" style="display:flex;align-items:flex-start;gap:0;min-width:0;">
                 <div style="{{ rewriteLeftPaneStyle }}">
-                  <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:14px 16px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
-                      <div style="font-size:13px;font-weight:700;">修改建议</div>
-                      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-                        <span style="font-size:11.5px;color:#176b4f;background:#e8f8ef;border-radius:999px;padding:4px 8px;">已替换 {{ previewAppliedCount }}</span>
-                        <sc-if value="{{ previewUnlocatedCount }}" hint-placeholder-val="{{ false }}"><span style="font-size:11.5px;color:#9a6411;background:#fff3e6;border-radius:999px;padding:4px 8px;">未定位 {{ previewUnlocatedCount }}</span></sc-if>
-                      </div>
-                    </div>
-                    <div style="font-size:11.5px;color:#7e8aa3;line-height:1.6;">黄色表示右侧已定位但尚未采纳；绿色表示已采纳并替换到预览。未定位的建议不会自动写入正文。</div>
-                  </div>
-
-                  <sc-if value="{{ hasRewriteOverallNotes }}" hint-placeholder-val="{{ false }}">
-                    <div style="background:#f7f9fc;border:1px solid #e4eaf3;border-radius:12px;padding:12px 14px;">
-                      <div style="font-size:12.5px;font-weight:700;color:#3a485f;margin-bottom:7px;">整体质检</div>
-                      <div style="display:flex;flex-direction:column;gap:6px;">
-                        <sc-for list="{{ rewriteOverallNotes }}" as="n" hint-placeholder-count="0">
-                          <div style="font-size:12px;color:#6b7a96;line-height:1.55;padding-left:13px;position:relative;"><span style="position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:#93a0b8;"></span>{{ n }}</div>
-                        </sc-for>
-                      </div>
-                    </div>
-                  </sc-if>
-
                   <div style="display:flex;flex-direction:column;gap:13px;max-height:720px;overflow:auto;padding-right:3px;">
                     <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="0">
                       <div style="{{ s.cardStyle }}">
@@ -786,6 +774,28 @@
                       <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
                         <button onClick="{{ polishRewriteUserNotes }}" style="background:#fff;color:#9a6411;border:1px solid #e6d3a8;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ polishNotesBtnLabel }}</button>
                         <span style="font-size:11.5px;color:#9a6411;">只润色你填写的真实内容，不新增经历。</span>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:14px 16px;margin-top:3px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+                      <div style="font-size:13px;font-weight:700;">修改建议</div>
+                      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+                        <span style="font-size:11.5px;color:#176b4f;background:#e8f8ef;border-radius:999px;padding:4px 8px;">已替换 {{ previewAppliedCount }}</span>
+                        <sc-if value="{{ previewUnlocatedCount }}" hint-placeholder-val="{{ false }}"><span style="font-size:11.5px;color:#9a6411;background:#fff3e6;border-radius:999px;padding:4px 8px;">未定位 {{ previewUnlocatedCount }}</span></sc-if>
+                      </div>
+                    </div>
+                    <div style="font-size:11.5px;color:#7e8aa3;line-height:1.6;">黄色表示右侧已定位但尚未采纳；绿色表示已采纳并替换到预览。未定位的建议不会自动写入正文。</div>
+                  </div>
+
+                  <sc-if value="{{ hasRewriteOverallNotes }}" hint-placeholder-val="{{ false }}">
+                    <div style="background:#f7f9fc;border:1px solid #e4eaf3;border-radius:12px;padding:12px 14px;">
+                      <div style="font-size:12.5px;font-weight:700;color:#3a485f;margin-bottom:7px;">整体质检</div>
+                      <div style="display:flex;flex-direction:column;gap:6px;">
+                        <sc-for list="{{ rewriteOverallNotes }}" as="n" hint-placeholder-count="0">
+                          <div style="font-size:12px;color:#6b7a96;line-height:1.55;padding-left:13px;position:relative;"><span style="position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:#93a0b8;"></span>{{ n }}</div>
+                        </sc-for>
                       </div>
                     </div>
                   </sc-if>
@@ -1237,7 +1247,7 @@ class Component extends DCLogic {
       (db.jobBoard && Array.isArray(db.jobBoard.items) && db.jobBoard.items.length) ||
       ((db.applications || []).length) || ((db.feedback || []).length) ||
       ((db.todos || []).length) || (db.profile && Object.keys(db.profile).length) ||
-      (db.experienceLibrary && String(db.experienceLibrary.text || '').trim())));
+      (db.experienceLibrary && this.experienceLibraryTextFrom(db.experienceLibrary))));
   }
   // 本地缓存（即时、加速首屏、离线可用）。localStorage 只是缓存，不再是唯一数据源。
   cacheLocal(db) { try { localStorage.setItem(this.storeKey(), JSON.stringify(db)); } catch (e) {} }
@@ -1727,13 +1737,42 @@ class Component extends DCLogic {
       return this.showToast('经历库导入失败，请换成纯文本或重新上传');
     }
     if (!text) return this.showToast('没有读取到可用文字');
-    this.setDb(db => { db.experienceLibrary = { text, sourceName: file.name, updatedAt: Date.now() }; });
-    this.showToast('已导入经历库');
-  }
-  setExperienceLibrary(v) {
     this.setDb(db => {
       const prev = db.experienceLibrary || {};
-      db.experienceLibrary = Object.assign({}, prev, { text: v, updatedAt: Date.now(), sourceName: prev.sourceName || '手动填写' });
+      const sections = Object.assign({}, prev.sections || {}, { other: text });
+      db.experienceLibrary = { sections, sourceName: file.name, updatedAt: Date.now() };
+    });
+    this.showToast('已导入经历库');
+  }
+  experienceLibraryDefs() {
+    return [
+      { key: 'internship', label: '实习 / 工作', placeholder: '公司或组织 / 岗位或职责 / 你做了什么 / 可核实成果。例如：在 XX 部门整理用户反馈，跟进 3 个需求。' },
+      { key: 'project', label: '项目 / 产品 / 数据', placeholder: '一条经历一段。同一项目可拆成多段：项目名 / 阶段或职责 / 方法工具 / 产出结果。例如：XX 项目-用户调研：访谈 12 人，整理 300 条反馈。' },
+      { key: 'campus', label: '校园 / 社团', placeholder: '活动或组织 / 你的分工 / 协调对象 / 结果。例如：负责宣传排期、物料协调、报名数据统计。' },
+      { key: 'course', label: '课程 / 比赛 / 研究', placeholder: '课程项目、竞赛、调研、论文等：题目 / 方法 / 产出 / 排名或成绩。' },
+      { key: 'other', label: '技能 / 证书 / 其他', placeholder: '技能、证书、语言、工具，或暂时不好分类的经历。上传文本也会先放在这里。' }
+    ];
+  }
+  experienceLibrarySections(lib) {
+    const raw = (lib && lib.sections && typeof lib.sections === 'object' && !Array.isArray(lib.sections)) ? lib.sections : {};
+    const sections = Object.assign({}, raw);
+    const hasSectionText = this.experienceLibraryDefs().some(d => String(sections[d.key] || '').trim());
+    if (!hasSectionText && lib && lib.text) sections.other = String(lib.text || '');
+    return sections;
+  }
+  experienceLibraryTextFrom(lib) {
+    const sections = this.experienceLibrarySections(lib || {});
+    return this.experienceLibraryDefs().map(d => {
+      const text = String(sections[d.key] || '').trim();
+      return text ? '【' + d.label + '】\n' + text : '';
+    }).filter(Boolean).join('\n\n').trim();
+  }
+  setExperienceLibrarySection(key, v) {
+    this.setDb(db => {
+      const prev = db.experienceLibrary || {};
+      const sections = this.experienceLibrarySections(prev);
+      sections[key] = v;
+      db.experienceLibrary = Object.assign({}, prev, { sections, text: '', updatedAt: Date.now(), sourceName: prev.sourceName || '手动填写' });
     });
   }
   clearExperienceLibrary() {
@@ -1744,7 +1783,7 @@ class Component extends DCLogic {
   }
   getExperienceLibraryText() {
     const lib = (this.state.db && this.state.db.experienceLibrary) || {};
-    return String(lib.text || '').trim();
+    return this.experienceLibraryTextFrom(lib);
   }
   triggerImportBackup() { const el = document.getElementById('jm-backup-file'); if (el) el.click(); }
   async onBackupFile(e) { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) await this.importBackup(file); }
@@ -3093,11 +3132,23 @@ class Component extends DCLogic {
 
     // resume
     const experienceLibrary = db.experienceLibrary || {};
-    const experienceLibraryText = String(experienceLibrary.text || '');
+    const experienceLibrarySections = this.experienceLibrarySections(experienceLibrary);
+    const experienceLibraryText = this.experienceLibraryTextFrom(experienceLibrary);
     const experienceLibraryCount = experienceLibraryText.trim().length;
     const experienceLibraryMeta = experienceLibraryCount
       ? ((experienceLibrary.sourceName ? ('来源：' + experienceLibrary.sourceName + ' · ') : '') + experienceLibraryCount + ' 字' + (experienceLibrary.updatedAt ? ' · 更新于 ' + this.fmt(experienceLibrary.updatedAt) : ''))
       : '还没有经历库素材';
+    const experienceLibraryBoxes = this.experienceLibraryDefs().map(def => {
+      const value = String(experienceLibrarySections[def.key] || '');
+      return {
+        key: def.key,
+        label: def.label,
+        placeholder: def.placeholder,
+        value,
+        countLabel: value.trim() ? (value.trim().length + ' 字') : '未填写',
+        set: e => this.setExperienceLibrarySection(def.key, e.target.value)
+      };
+    });
     const resumeFiles = db.resumes.map(r => ({
       fileName: r.fileName,
       meta: (r.fileType || '').toUpperCase() + ' · ' + (r.size ? Math.max(1, Math.round(r.size / 1024)) + ' KB' : '') + ' · ' + this.fmt(r.uploadedAt),
@@ -3437,7 +3488,7 @@ class Component extends DCLogic {
       goSettings: () => this.go('settings'), goTodos: () => this.go('todos'), goApps: () => this.go('apps'),
       triggerUpload: () => this.triggerUpload(), onFile: e => this.onFile(e), onDragOver: e => this.onDragOver(e), onDrop: e => this.onDrop(e),
       triggerExperienceUpload: () => this.triggerExperienceUpload(), onExperienceFile: e => this.onExperienceFile(e),
-      experienceLibraryText, experienceLibraryMeta, setExperienceLibrary: e => this.setExperienceLibrary(e.target.value), clearExperienceLibrary: () => this.clearExperienceLibrary(),
+      experienceLibraryBoxes, experienceLibraryMeta, clearExperienceLibrary: () => this.clearExperienceLibrary(),
       openJobModal: () => this.openModal('job'), openAppModal: () => this.openModal('application'),
       openFeedbackModal: () => this.openModal('feedback'), openTodoModal: () => this.openModal('todo'),
       openVersionModal: () => this.openModal('version'), openProfileModal: () => this.openModal('profile', db.profile),
