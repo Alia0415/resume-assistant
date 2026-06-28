@@ -35,6 +35,11 @@
   .jm-resize-handle:hover{background:#eaf1ff!important;border-color:#cfe0ff!important;color:var(--ac)!important;}
   .jm-docx-preview-wrap .docx-wrapper{background:transparent!important;padding:0!important;}
   .jm-docx-preview-wrap section.docx{margin:0!important;}
+  .jm-board-city-panel{position:absolute;z-index:30;top:92px;right:20px;width:min(520px,calc(100% - 40px));background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 14px 34px rgba(15,23,42,.12);padding:12px;overflow:hidden;}
+  .jm-board-city-grid{display:grid;grid-template-columns:126px minmax(0,1fr);height:260px;max-height:calc(100vh - 250px);min-height:190px;overflow:hidden;}
+  .jm-board-province-list{border-right:1px solid #edf0f5;padding-right:9px;overflow-y:auto;overscroll-behavior:contain;}
+  .jm-board-city-list{padding-left:13px;min-width:0;overflow-y:auto;overscroll-behavior:contain;}
+  @media(max-height:620px){.jm-board-city-grid{height:220px;}}
 </style>
 </helmet>
 <div style="display:flex;height:100vh;overflow:hidden;background:#f5f7fb;font-family:'Noto Sans SC',system-ui,sans-serif;color:#18223a;">
@@ -303,7 +308,7 @@
       <!-- ============ 职位看板 ============ -->
       <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
       <section data-screen-label="职位看板">
-        <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:18px 20px;margin-bottom:16px;">
+        <div style="position:relative;background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:18px 20px;margin-bottom:16px;">
           <div style="display:grid;grid-template-columns:1.2fr .75fr .45fr .45fr auto;gap:12px;align-items:end;">
             <div>
               <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">职位关键词</label>
@@ -311,16 +316,16 @@
             </div>
             <div>
               <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">城市</label>
-              <details style="position:relative;">
+              <details style="position:static;">
                 <summary style="list-style:none;width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ boardCityLabel }}</summary>
-                <div style="position:absolute;z-index:30;top:48px;right:0;width:620px;max-width:calc(100vw - 60px);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 14px 34px rgba(15,23,42,.12);padding:12px;">
-                  <div style="display:grid;grid-template-columns:145px minmax(0,1fr);min-height:300px;max-height:420px;">
-                    <div style="border-right:1px solid #edf0f5;padding-right:9px;overflow-y:auto;">
+                <div class="jm-board-city-panel">
+                  <div class="jm-board-city-grid">
+                    <div class="jm-board-province-list">
                       <sc-for list="{{ boardProvinceOptions }}" as="p" hint-placeholder-count="0">
                         <button onClick="{{ p.select }}" style="{{ p.style }}">{{ p.label }}</button>
                       </sc-for>
                     </div>
-                    <div style="padding-left:13px;min-width:0;overflow-y:auto;">
+                    <div class="jm-board-city-list">
                       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
                         <div style="font-size:13px;font-weight:700;color:#263550;">{{ boardProvinceLabel }}</div>
                         <button onClick="{{ toggleBoardProvinceAll }}" style="{{ boardProvinceAllStyle }}">{{ boardProvinceAllLabel }}</button>
