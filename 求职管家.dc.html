@@ -311,7 +311,20 @@
             </div>
             <div>
               <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">城市</label>
-              <input value="{{ boardCity }}" onInput="{{ setBoardCity }}" placeholder="如：上海 / 深圳 / 远程" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;">
+              <details style="position:relative;">
+                <summary style="list-style:none;width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;background:#fff;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ boardCityLabel }}</summary>
+                <div style="position:absolute;z-index:30;top:48px;left:0;width:320px;max-width:calc(100vw - 60px);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 14px 34px rgba(15,23,42,.12);padding:12px;">
+                  <div style="font-size:11.5px;color:#93a0b8;margin-bottom:8px;">可多选城市</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                    <sc-for list="{{ boardCityOptions }}" as="c" hint-placeholder-count="0">
+                      <button onClick="{{ c.toggle }}" style="{{ c.style }}">{{ c.label }}</button>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+                    <button onClick="{{ clearBoardCities }}" style="background:#fff;color:#6b7a96;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;cursor:pointer;">清空</button>
+                  </div>
+                </div>
+              </details>
             </div>
             <div>
               <label style="font-size:12px;color:#6b7a96;display:block;margin-bottom:6px;">数量</label>
@@ -340,7 +353,7 @@
         <sc-if value="{{ boardEmpty }}" hint-placeholder-val="{{ true }}">
           <div style="background:#fff;border:1px solid #ebeef4;border-radius:16px;padding:48px 28px;text-align:center;">
             <div style="font-size:16px;font-weight:700;">还没有职位</div>
-            <div style="font-size:13px;color:#6b7a96;margin-top:7px;line-height:1.7;">输入关键词和城市后刷新，职位会按当前简历自动显示匹配度。</div>
+            <div style="font-size:13px;color:#6b7a96;margin-top:7px;line-height:1.7;">输入关键词并选择城市后刷新，职位会按当前简历自动显示匹配度。</div>
             <button onClick="{{ refreshJobBoard }}" style="margin-top:20px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;">{{ boardRefreshLabel }}</button>
           </div>
         </sc-if>
@@ -1091,6 +1104,7 @@ class Component extends DCLogic {
   ACTIVE = ['待投递', '已投递', '笔试', '面试'];
   STATUSES = ['待投递', '已投递', '笔试', '面试', '已拒', '已offer', '暂停'];
   FBTYPES = ['收到笔试', '收到面试', '被拒', '无反馈', '需要补材料'];
+  BOARD_CITY_OPTIONS = ['广州', '深圳', '上海', '北京', '杭州', '成都', '南京', '武汉', '西安', '中国香港', '远程'];
   componentDidMount() {
     this.applyAccent();
     if (window.pdfjsLib) { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; } catch (e) {} }
@@ -1910,6 +1924,7 @@ class Component extends DCLogic {
   currentBoardFilters() {
     const board = (this.state.db && this.state.db.jobBoard) || {};
     const saved = board.filters || {};
+    const selectedCities = this.normalizeBoardCities(this.state.boardCity || saved.city || '');
     const minScoreInput = this.state.boardMinScore;
     const savedMinScore = saved.minScore == null ? 0 : saved.minScore;
     const minScore = (typeof minScoreInput === 'string')
@@ -1917,12 +1932,28 @@ class Component extends DCLogic {
       : this.clamp(parseInt(savedMinScore, 10) || 0, 0, 95);
     return {
       keywords: (this.state.boardKeywords || saved.keywords || '').trim(),
-      city: (this.state.boardCity || saved.city || '').trim(),
+      city: selectedCities.join(' / '),
+      selectedCities,
       sourceUrls: (this.state.boardSourceUrls || saved.sourceUrls || '').trim(),
       limit: this.clamp(parseInt(this.state.boardLimit || saved.limit || 12, 10) || 12, 3, 24),
       minScore,
       jobType: 'internship'
     };
+  }
+  normalizeBoardCities(value) {
+    const raw = Array.isArray(value) ? value.join(' / ') : String(value || '');
+    return this.uniqueOptions(raw.split(/[\s,，/、]+/).map(x => x.trim()).filter(x => x && x !== '不限'));
+  }
+  setBoardCities(cities) {
+    this.setState({ boardCity: this.normalizeBoardCities(cities).join(' / '), boardError: null });
+  }
+  toggleBoardCity(city) {
+    const cur = this.normalizeBoardCities(this.currentBoardFilters().city);
+    const next = cur.includes(city) ? cur.filter(x => x !== city) : cur.concat(city);
+    this.setBoardCities(next);
+  }
+  clearBoardCities() {
+    this.setState({ boardCity: '不限', boardError: null });
   }
   setBoardMinScore(value) {
     const raw = String(value == null ? '' : value).replace(/[^\d]/g, '').slice(0, 3);
@@ -2918,6 +2949,16 @@ class Component extends DCLogic {
     // job board
     const board = db.jobBoard || { filters: {}, items: [] };
     const boardFilters = this.currentBoardFilters();
+    const boardSelectedCities = Array.isArray(boardFilters.selectedCities) ? boardFilters.selectedCities : this.normalizeBoardCities(boardFilters.city);
+    const boardCityLabel = boardSelectedCities.length ? boardSelectedCities.join(' / ') : '不限城市';
+    const cityBtnBase = 'border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;';
+    const cityBtnOn = 'background:#eef4ff;color:var(--ac);border-color:#cfe0ff;';
+    const cityBtnOff = 'background:#fff;color:#5b6b85;';
+    const boardCityOptions = this.BOARD_CITY_OPTIONS.map(city => ({
+      label: city,
+      toggle: () => this.toggleBoardCity(city),
+      style: cityBtnBase + (boardSelectedCities.includes(city) ? cityBtnOn : cityBtnOff)
+    }));
     const boardEligibilityText = '已过滤硬性门槛';
     const sourceStats = (board.query && Array.isArray(board.query.sourceStats)) ? board.query.sourceStats : [];
     const returnedSourceStats = (board.query && Array.isArray(board.query.returnedSourceStats)) ? board.query.returnedSourceStats : [];
@@ -3195,7 +3236,7 @@ class Component extends DCLogic {
       jobSearch: S.jobSearch, setJobSearch: e => this.setState({ jobSearch: e.target.value }),
 
       boardKeywords: boardFilters.keywords, setBoardKeywords: e => this.setState({ boardKeywords: e.target.value }),
-      boardCity: boardFilters.city, setBoardCity: e => this.setState({ boardCity: e.target.value }),
+      boardCityLabel, boardCityOptions, clearBoardCities: () => this.clearBoardCities(),
       boardSourceUrls: boardFilters.sourceUrls, setBoardSourceUrls: e => this.setState({ boardSourceUrls: e.target.value }),
       boardLimit: String(boardFilters.limit), setBoardLimit: e => this.setState({ boardLimit: e.target.value }),
       boardMinScore: (typeof S.boardMinScore === 'string') ? S.boardMinScore : String(boardFilters.minScore),
