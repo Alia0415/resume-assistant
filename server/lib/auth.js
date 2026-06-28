@@ -54,7 +54,7 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024; // 单个简历文件上限 10MB
 const ALLOWED_EXT = { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
 // 用户业务数据只允许项目实际使用的顶层字段，避免原样保存任意 JSON。
 const DATA_FIELDS = {
-  profile: 'object', resumes: 'array', versions: 'array', jobs: 'array',
+  profile: 'object', experienceLibrary: 'object', resumes: 'array', versions: 'array', jobs: 'array',
   analyses: 'object', applications: 'array', feedback: 'array', todos: 'array',
 };
 

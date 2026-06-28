@@ -45,6 +45,7 @@
 <div style="display:flex;height:100vh;overflow:hidden;background:#f5f7fb;font-family:'Noto Sans SC',system-ui,sans-serif;color:#18223a;">
 
   <input id="jm-file" type="file" accept=".docx" style="display:none;" onChange="{{ onFile }}">
+  <input id="jm-experience-file" type="file" accept=".txt,.md,.docx" style="display:none;" onChange="{{ onExperienceFile }}">
   <input id="jm-backup-file" type="file" accept=".json,application/json" style="display:none;" onChange="{{ onBackupFile }}">
 
   <sc-if value="{{ sidebarOpen }}" hint-placeholder-val="{{ true }}">
@@ -221,6 +222,24 @@
               <button onClick="{{ r.del }}" style="background:none;color:#c0392b;border:none;padding:6px;cursor:pointer;font-family:inherit;font-size:12.5px;">删除</button>
             </div>
           </sc-for>
+        </div>
+
+        <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:18px 20px;margin-bottom:30px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+            <div>
+              <div style="font-size:14px;font-weight:700;">经历库</div>
+              <div style="font-size:12px;color:#93a0b8;margin-top:2px;">把没有写进当前简历的实习、项目、校园、课程、比赛等真实经历放在这里，匹配分析会提示哪些可用。</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <button onClick="{{ triggerExperienceUpload }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">上传经历文本</button>
+              <button onClick="{{ clearExperienceLibrary }}" style="background:#fff;color:#c0392b;border:1px solid #f0d9d9;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">清空</button>
+            </div>
+          </div>
+          <textarea value="{{ experienceLibraryText }}" onInput="{{ setExperienceLibrary }}" placeholder="建议按条写清楚：时间 / 组织或项目 / 你的角色 / 做了什么 / 使用了什么工具或方法 / 可核实结果。示例：2025.03-2025.06 课程项目：负责用户调研与数据清洗，访谈 12 名同学，整理 300 条反馈，输出产品改进建议。" style="width:100%;height:150px;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;font-size:12.8px;line-height:1.7;color:#3a485f;outline:none;background:#fbfcfe;"></textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:9px;">
+            <div style="font-size:11.5px;color:#93a0b8;">{{ experienceLibraryMeta }}</div>
+            <div style="font-size:11.5px;color:#7e8aa3;">经历库只作为真实素材提示，不会自动写进简历。</div>
+          </div>
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -614,6 +633,29 @@
               </div>
             </div>
 
+            <sc-if value="{{ hasExperienceSuggestions }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #d6e3ff;border-radius:14px;padding:20px 22px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+                <div style="font-size:14px;font-weight:700;color:#2a4a86;">可从经历库补充的素材<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">仅提示真实已有经历，不会自动写入简历</span></div>
+                <div style="font-size:11.5px;color:#7e8aa3;">{{ experienceLibraryStatus }}</div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+                <sc-for list="{{ experienceSuggestionCards }}" as="x" hint-placeholder-count="0">
+                  <div style="border:1px solid #e1eaff;border-radius:12px;padding:14px 15px;background:#fbfcff;">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;">
+                      <div style="font-size:13px;font-weight:700;color:#2a4a86;line-height:1.5;">{{ x.title }}</div>
+                      <span style="font-size:11px;color:var(--ac);background:var(--ac-soft);border-radius:999px;padding:3px 7px;white-space:nowrap;">{{ x.confidenceLabel }}</span>
+                    </div>
+                    <sc-if value="{{ x.source }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#93a0b8;margin-bottom:7px;">来自：{{ x.source }}</div></sc-if>
+                    <div style="font-size:12.3px;color:#3a485f;line-height:1.65;">{{ x.usableInfo }}</div>
+                    <div style="font-size:12px;color:#5b6b85;line-height:1.6;margin-top:9px;background:#f3f7ff;border-radius:8px;padding:8px 10px;">适配原因：{{ x.whyUseful }}</div>
+                    <div style="font-size:12px;color:#2a4a86;line-height:1.6;margin-top:8px;">建议用法：{{ x.suggestedUse }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            </sc-if>
+
             <sc-if value="{{ hasWeak }}" hint-placeholder-val="{{ false }}">
             <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px;">
               <div style="font-size:13.5px;font-weight:700;margin-bottom:12px;color:#9a6411;">表达偏弱、可加强</div>
@@ -757,8 +799,8 @@
                 <div style="position:sticky;top:86px;background:#fff;border:1px solid #ebeef4;border-radius:14px;overflow:hidden;">
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
                     <div>
-                      <div style="font-size:13px;font-weight:700;">导出前 Word 预览</div>
-                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">这里渲染的就是即将导出的 DOCX；拖拽中间分隔条可放大查看</div>
+                      <div style="font-size:13px;font-weight:700;">Word 修改预览</div>
+                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">黄色为待确认原文，绿色为已采纳替换；保存和导出只写入已采纳内容</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                       <button onClick="{{ widenRewriteEditor }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">放大窗口</button>
@@ -772,14 +814,14 @@
                   <div style="background:#f3f5f9;padding:18px;max-height:820px;overflow:auto;">
                     <div style="width:100%;max-width:none;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 24px rgba(31,53,90,.08);">
                       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
-                        <span style="font-size:12.5px;font-weight:700;color:#18223a;">即将导出的 Word</span>
+                        <span style="font-size:12.5px;font-weight:700;color:#18223a;">Word 修改预览</span>
                         <span style="font-size:11.5px;color:#93a0b8;">{{ sourcePreviewLabel }}</span>
                       </div>
                       <div id="jm-source-preview" data-source-key="{{ sourcePreviewKey }}" style="min-height:640px;max-height:780px;overflow:auto;padding:18px 14px 24px;background:#eef2f7;display:flex;flex-direction:column;align-items:center;gap:14px;"></div>
                     </div>
                   </div>
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-top:1px solid #eef1f6;background:#fbfcfe;flex-wrap:wrap;">
-                    <div style="font-size:11.5px;color:#7e8aa3;">预览和下载使用同一个 DOCX 模板文件，所见即所得。</div>
+                    <div style="font-size:11.5px;color:#7e8aa3;">预览基于原 Word 版式标注；黄色待确认不会写入导出文件。</div>
                     <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存为简历版本</button>
                   </div>
                 </div>
@@ -1114,7 +1156,7 @@ class Component extends DCLogic {
         return JSON.parse(raw) || null;
       } catch (e) { return null; }
     })()
-      || { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [], jobBoard: { filters: {}, items: [] } },
+      || { profile: {}, experienceLibrary: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [], jobBoard: { filters: {}, items: [] } },
     page: 'dashboard', modalType: null, form: {}, editId: null,
     toast: null, aiLoading: false, crawlLoading: false, boardLoading: false, boardError: null, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
@@ -1173,11 +1215,12 @@ class Component extends DCLogic {
   applyAccent() { const a = this.props.accentColor; if (a) document.documentElement.style.setProperty('--ac', a); }
 
   storeKey() { return window.JM_STORE_KEY ? window.JM_STORE_KEY() : 'jm_data_v1'; }
-  emptyDb() { return { profile: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [], jobBoard: { filters: {}, items: [] } }; }
+  emptyDb() { return { profile: {}, experienceLibrary: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [], jobBoard: { filters: {}, items: [] } }; }
   normalizeDb(input) {
     const src = (input && typeof input === 'object' && !Array.isArray(input)) ? input : {};
     const out = this.emptyDb();
     out.profile = (src.profile && typeof src.profile === 'object' && !Array.isArray(src.profile)) ? src.profile : {};
+    out.experienceLibrary = (src.experienceLibrary && typeof src.experienceLibrary === 'object' && !Array.isArray(src.experienceLibrary)) ? src.experienceLibrary : {};
     out.analyses = (src.analyses && typeof src.analyses === 'object' && !Array.isArray(src.analyses)) ? src.analyses : {};
     out.jobBoard = (src.jobBoard && typeof src.jobBoard === 'object' && !Array.isArray(src.jobBoard)) ? src.jobBoard : { filters: {}, items: [] };
     if (!Array.isArray(out.jobBoard.items)) out.jobBoard.items = [];
@@ -1193,7 +1236,8 @@ class Component extends DCLogic {
       ((db.jobs || []).length) || (Object.keys(db.analyses || {}).length) ||
       (db.jobBoard && Array.isArray(db.jobBoard.items) && db.jobBoard.items.length) ||
       ((db.applications || []).length) || ((db.feedback || []).length) ||
-      ((db.todos || []).length) || (db.profile && Object.keys(db.profile).length)));
+      ((db.todos || []).length) || (db.profile && Object.keys(db.profile).length) ||
+      (db.experienceLibrary && String(db.experienceLibrary.text || '').trim())));
   }
   // 本地缓存（即时、加速首屏、离线可用）。localStorage 只是缓存，不再是唯一数据源。
   cacheLocal(db) { try { localStorage.setItem(this.storeKey(), JSON.stringify(db)); } catch (e) {} }
@@ -1410,9 +1454,10 @@ class Component extends DCLogic {
     const jobId = this.curJobId && this.curJobId();
     const a = jobId ? (this.state.db.analyses[jobId] || null) : null;
     const sugs = (a && a.rewrite && a.rewrite.rewriteSuggestions) || [];
-    return sugs.filter(s => s && s.confirmed).map(s => [
+    return sugs.map(s => [
       s.originalText || '',
       s.rewrittenText || '',
+      s.confirmed ? '1' : '0',
       s.truthConfirmed ? '1' : '0'
     ].join('=>')).join('|');
   }
@@ -1535,10 +1580,8 @@ class Component extends DCLogic {
     try {
       if (ext === 'pdf') return await this.renderPdfSourcePreview(box, blob);
       if (ext === 'docx') {
-        const replacements = this.currentDocxReplacements();
-        const preview = replacements.length ? await this.buildPatchedDocxFromResume(resume, replacements, blob) : { blob, missing: [] };
-        this._lastDocxPatchMissing = preview.missing || [];
-        return await this.renderDocxSourcePreview(box, preview.blob);
+        this._lastDocxPatchMissing = [];
+        return await this.renderDocxSourcePreview(box, blob);
       }
       if (ext === 'txt') return this.renderTextSourcePreview(box, resume.text || '');
       return this.sourcePreviewMessage(box, '暂不支持预览 .' + (ext || 'doc') + ' 原始版式；请上传 DOCX。');
@@ -1655,6 +1698,7 @@ class Component extends DCLogic {
     holder.querySelectorAll('section,.docx-wrapper,.docx').forEach(el => {
       el.setAttribute('contenteditable', 'false');
     });
+    this.refreshRewritePreviewEditor();
     this.scheduleSourcePreviewFit();
   }
 
@@ -1662,6 +1706,46 @@ class Component extends DCLogic {
   async onFile(e) { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) await this.ingest(file); }
   onDragOver(e) { e.preventDefault(); }
   async onDrop(e) { e.preventDefault(); const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (file) await this.ingest(file); }
+  triggerExperienceUpload() { const el = document.getElementById('jm-experience-file'); if (el) el.click(); }
+  async onExperienceFile(e) { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) await this.ingestExperienceFile(file); }
+  async ingestExperienceFile(file) {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!['txt', 'md', 'docx'].includes(ext)) return this.showToast('经历库支持 .txt / .md / .docx');
+    if (file.size > 6 * 1024 * 1024) return this.showToast('经历库文件超过 6MB 限制');
+    this.showToast('正在导入经历库…');
+    let text = '';
+    try {
+      if (ext === 'docx') {
+        if (!window.mammoth) return this.showToast('Word 解析组件加载失败，请刷新后重试');
+        const ab = await file.arrayBuffer();
+        const r = await window.mammoth.extractRawText({ arrayBuffer: ab });
+        text = (r.value || '').trim();
+      } else {
+        text = (await file.text()).trim();
+      }
+    } catch (err) {
+      return this.showToast('经历库导入失败，请换成纯文本或重新上传');
+    }
+    if (!text) return this.showToast('没有读取到可用文字');
+    this.setDb(db => { db.experienceLibrary = { text, sourceName: file.name, updatedAt: Date.now() }; });
+    this.showToast('已导入经历库');
+  }
+  setExperienceLibrary(v) {
+    this.setDb(db => {
+      const prev = db.experienceLibrary || {};
+      db.experienceLibrary = Object.assign({}, prev, { text: v, updatedAt: Date.now(), sourceName: prev.sourceName || '手动填写' });
+    });
+  }
+  clearExperienceLibrary() {
+    if (!this.getExperienceLibraryText()) return;
+    if (!confirm('清空经历库？')) return;
+    this.setDb(db => { db.experienceLibrary = {}; });
+    this.showToast('已清空经历库');
+  }
+  getExperienceLibraryText() {
+    const lib = (this.state.db && this.state.db.experienceLibrary) || {};
+    return String(lib.text || '').trim();
+  }
   triggerImportBackup() { const el = document.getElementById('jm-backup-file'); if (el) el.click(); }
   async onBackupFile(e) { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) await this.importBackup(file); }
   async importBackup(file) {
@@ -2157,7 +2241,7 @@ class Component extends DCLogic {
     if (!resumeText.trim()) return this.setState({ aiError: '没有可分析的简历文字，请上传可解析的简历或在上方粘贴简历内容。' });
     this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在分析匹配度…', matchTab: 'match' });
     try {
-      const d = await this.aiCall('/api/ai/match-resume', { resumeText, jdText: job.jd });
+      const d = await this.aiCall('/api/ai/match-resume', { resumeText, jdText: job.jd, experienceLibraryText: this.getExperienceLibraryText() });
       this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.match = d; a.matchedAt = Date.now(); a.matchAdoptCount = (a.rewrite && Array.isArray(a.rewrite.rewriteSuggestions)) ? a.rewrite.rewriteSuggestions.filter(s => s.confirmed).length : 0; });
       this.setState({ aiLoading: false }); this.showToast('匹配分析完成');
     } catch (e) { this.setState({ aiLoading: false, aiError: e.message }); }
@@ -2504,7 +2588,7 @@ class Component extends DCLogic {
     span.setAttribute('data-jm-suggestion-mark', '1');
     span.setAttribute('data-jm-suggestion-index', String(index));
     span.setAttribute('data-jm-original', before || '');
-    span.setAttribute('contenteditable', 'true');
+    span.setAttribute('contenteditable', root && root.getAttribute('data-jm-docx-root') === '1' ? 'false' : 'true');
     span.setAttribute('title', kind === 'accepted' ? '已采纳：来自修改建议' : '待确认：点击左侧采纳后替换');
     span.style.cssText = this.sourceSuggestionStyle(kind);
     span.textContent = after || before || '';
@@ -2523,7 +2607,6 @@ class Component extends DCLogic {
     this._rewritePreviewTimer = setTimeout(() => {
       const root = this.sourceEditRoot();
       if (!root) return;
-      if (root.getAttribute('data-jm-docx-root') === '1') return;
       this.resetSourceSuggestionMarks(root);
       const jobId = this.curJobId();
       const a = this.state.db.analyses[jobId];
@@ -2535,6 +2618,7 @@ class Component extends DCLogic {
         const after = s.confirmed ? ((s.rewrittenText || before).trim() || before) : before;
         return this.replaceInSourceEditor(root, before, after, s.confirmed ? 'accepted' : 'pending', i);
       });
+      this.scheduleSourcePreviewFit();
     }, 0);
   }
   rewritePreviewEditorText() {
@@ -3008,6 +3092,12 @@ class Component extends DCLogic {
     const dashHasData = db.resumes.length || db.versions.length || db.jobs.length || (((db.jobBoard || {}).items || []).length) || db.applications.length || db.todos.length || db.feedback.length;
 
     // resume
+    const experienceLibrary = db.experienceLibrary || {};
+    const experienceLibraryText = String(experienceLibrary.text || '');
+    const experienceLibraryCount = experienceLibraryText.trim().length;
+    const experienceLibraryMeta = experienceLibraryCount
+      ? ((experienceLibrary.sourceName ? ('来源：' + experienceLibrary.sourceName + ' · ') : '') + experienceLibraryCount + ' 字' + (experienceLibrary.updatedAt ? ' · 更新于 ' + this.fmt(experienceLibrary.updatedAt) : ''))
+      : '还没有经历库素材';
     const resumeFiles = db.resumes.map(r => ({
       fileName: r.fileName,
       meta: (r.fileType || '').toUpperCase() + ' · ' + (r.size ? Math.max(1, Math.round(r.size / 1024)) + ' KB' : '') + ' · ' + this.fmt(r.uploadedAt),
@@ -3244,6 +3334,19 @@ class Component extends DCLogic {
     const suggestedFocus = mat ? arr(mat.suggestedResumeFocus) : [];
     const riskWarnings = mat ? arr(mat.riskWarnings) : [];
     const questionsForUser = mat ? arr(mat.questionsForUser) : [];
+    const experienceSuggestionCards = mat ? arr(mat.experienceSuggestions).map((raw, i) => {
+      const x = (raw && typeof raw === 'object') ? raw : { usableInfo: String(raw || '') };
+      const confidence = this.clamp(Number(x.confidence) || 0, 0, 1);
+      return {
+        title: String(x.title || x.section || ('可用经历 ' + (i + 1))).slice(0, 60),
+        source: String(x.source || x.experienceSource || '').slice(0, 80),
+        usableInfo: String(x.usableInfo || x.info || x.evidence || '').slice(0, 260),
+        whyUseful: String(x.whyUseful || x.reason || '与岗位要求有关，可作为补充素材。').slice(0, 220),
+        suggestedUse: String(x.suggestedUse || x.suggestion || '据实补充到相关经历或作为面试案例准备。').slice(0, 220),
+        confidenceLabel: confidence ? ('可信度 ' + Math.round(confidence * 100) + '%') : '待核实'
+      };
+    }).filter(x => x.usableInfo).slice(0, 6) : [];
+    const experienceLibraryStatus = experienceLibraryCount ? ('经历库 ' + experienceLibraryCount + ' 字') : '未添加经历库';
     // 补充确认问题：结构化成可点选的控件（兼容旧的纯字符串）
     const qAns = (rew && rew.qAnswers) || {};
     const chipBase = 'border:none;border-radius:7px;padding:6px 18px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;';
@@ -3333,6 +3436,8 @@ class Component extends DCLogic {
       retryCloudSave: () => { this.setState({ syncErr: false }); this.flushSave(); },
       goSettings: () => this.go('settings'), goTodos: () => this.go('todos'), goApps: () => this.go('apps'),
       triggerUpload: () => this.triggerUpload(), onFile: e => this.onFile(e), onDragOver: e => this.onDragOver(e), onDrop: e => this.onDrop(e),
+      triggerExperienceUpload: () => this.triggerExperienceUpload(), onExperienceFile: e => this.onExperienceFile(e),
+      experienceLibraryText, experienceLibraryMeta, setExperienceLibrary: e => this.setExperienceLibrary(e.target.value), clearExperienceLibrary: () => this.clearExperienceLibrary(),
       openJobModal: () => this.openModal('job'), openAppModal: () => this.openModal('application'),
       openFeedbackModal: () => this.openModal('feedback'), openTodoModal: () => this.openModal('todo'),
       openVersionModal: () => this.openModal('version'), openProfileModal: () => this.openModal('profile', db.profile),
@@ -3391,6 +3496,7 @@ class Component extends DCLogic {
       hasJdKeywords: jdKeywords.length > 0, jdKeywords,
       matchedPoints, matchedEmpty: hasMatch && matchedPoints.length === 0,
       missingPoints, missingEmpty: hasMatch && missingPoints.length === 0,
+      hasExperienceSuggestions: experienceSuggestionCards.length > 0, experienceSuggestionCards, experienceLibraryStatus,
       hasWeak: weakExpressions.length > 0, weakExpressions,
       hasFocus: suggestedFocus.length > 0, suggestedFocus,
       hasRisks: riskWarnings.length > 0, riskWarnings,

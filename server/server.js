@@ -305,6 +305,11 @@ function requireText(value, fieldLabel, res) {
   }
   return true;
 }
+function optionalText(value, maxChars) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return '';
+  return text.slice(0, maxChars || 12000);
+}
 
 const ANTI_FABRICATION =
   '严禁编造、补全或夸大用户未明确提供的任何信息，包括但不限于：学校、专业、实习、项目、技能、证书、工作成果、数字、公司、城市、投递结果或企业反馈。' +
@@ -396,11 +401,13 @@ app.post('/api/ai/analyze-jd', aiLimiter, async (req, res) => {
 app.post('/api/ai/match-resume', aiLimiter, async (req, res) => {
   try {
     const { resumeText, jdText } = req.body || {};
+    const experienceLibraryText = optionalText((req.body || {}).experienceLibraryText, 12000);
     if (!requireText(resumeText, '简历文本（resumeText）', res)) return;
     if (!requireText(jdText, '岗位 JD（jdText）', res)) return;
     const references = findCareerReferences({ resumeText, jdText }, { limit: 6 });
     const referenceContext = buildReferencePrompt(references);
     const sourceIds = references.map(ref => ref.id).join(', ') || '无';
+    const experienceContext = experienceLibraryText || '（未提供）';
 
     const messages = [
       {
@@ -408,6 +415,7 @@ app.post('/api/ai/match-resume', aiLimiter, async (req, res) => {
         content:
           '你是严谨的简历匹配顾问。' + ANTI_FABRICATION +
           '你会收到【外部职业资料】。这些资料只能作为岗位能力基准和市场参照，不能覆盖用户提供的 JD，也不能推断用户未写出的经历。' +
+          '你还可能收到【我的经历库素材】。经历库只用于发现“当前简历之外但用户已提供的真实经历中，可考虑补充使用的部分”；不得把经历库内容计入 matchedPoints，也不得视为当前简历已经满足 JD。' +
           'matchScore 由服务端按 scoreDimensions 加权汇总，你只需给出各维度判断、证据和理由，不要包装成权威分数。' +
           '必须区分“来自简历的内容”和“来自 JD 的要求”。' +
           '当简历信息不足以判断时，把需要用户补充的问题放进 questionsForUser，绝不替用户编造。' +
@@ -419,6 +427,7 @@ app.post('/api/ai/match-resume', aiLimiter, async (req, res) => {
           '请基于【我的简历文本】、【岗位 JD】和【外部职业资料】做匹配分析，并以 JSON 输出，字段固定为：' +
           '{ "matchScore": 0, "matchedPoints": [], "missingPoints": [], "weakExpressions": [], ' +
           '"suggestedResumeFocus": [], "riskWarnings": [], "questionsForUser": [], ' +
+          '"experienceSuggestions": [ { "title": "", "source": "", "usableInfo": "", "whyUseful": "", "suggestedUse": "", "confidence": 0.8 } ], ' +
           '"scoreDimensions": [ { "key": "hardRequirements", "score": 0, "reason": "", "evidence": [] } ], ' +
           '"evidenceItems": [ { "claim": "", "resumeEvidence": "", "jdEvidence": "", "sourceIds": [], "confidence": 0.8 } ] }。' +
           '\nscoreDimensions 必须覆盖这 5 个 key：hardRequirements、coreSkills、experienceDepth、domainFit、communicationReadability。每个 score 为 0-100 整数。' +
@@ -426,13 +435,15 @@ app.post('/api/ai/match-resume', aiLimiter, async (req, res) => {
           'missingPoints 为 JD 要求但简历缺失的点；weakExpressions 为简历中表达偏弱、可加强的句子；' +
           'suggestedResumeFocus 为针对该岗位建议突出的方向；riskWarnings 为可能的风险（如经历不符、跨行等）；' +
           'questionsForUser 为信息不足、需要我补充真实信息的问题。' +
+          '\nexperienceSuggestions 只能来自【我的经历库素材】，用于提示“可以据实补进简历或用于面试案例”的已有经历片段；如果经历库未提供或与 JD 无关，返回空数组。source 写经历库中的项目/组织/时间等来源线索，usableInfo 写可直接复核的事实，whyUseful 写它对应 JD 哪类要求，suggestedUse 写建议放到简历的哪个部分或如何准备。' +
           '\nevidenceItems 用于解释关键判断：claim 写判断，resumeEvidence 必须来自简历原文或写“简历未体现”，jdEvidence 必须来自 JD 原文或写“JD 未明确”，sourceIds 只填外部资料 ID。' +
           '\n\n【外部职业资料】\n' + referenceContext +
           '\n\n【我的简历文本】\n' + resumeText +
+          '\n\n【我的经历库素材】\n' + experienceContext +
           '\n\n【岗位 JD】\n' + jdText,
       },
     ];
-    const data = await callDeepSeekJSON(messages, { temperature: 0.2, maxTokens: 3800 });
+    const data = await callDeepSeekJSON(messages, { temperature: 0.2, maxTokens: 4600 });
     res.json(normalizeMatchResult(data, references));
   } catch (err) {
     handleError(res, err);

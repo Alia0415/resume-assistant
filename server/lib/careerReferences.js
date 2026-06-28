@@ -331,6 +331,30 @@ function normalizeEvidenceItems(items, references) {
   }).filter(item => item.claim).slice(0, 8);
 }
 
+function normalizeExperienceSuggestions(items) {
+  return (Array.isArray(items) ? items : []).map(item => {
+    if (typeof item === 'string') {
+      const text = item.trim();
+      return text ? {
+        title: '可用经历素材',
+        source: '',
+        usableInfo: text.slice(0, 260),
+        whyUseful: '',
+        suggestedUse: '据实补充到相关经历或作为面试案例准备。',
+        confidence: 0,
+      } : null;
+    }
+    return {
+      title: asText(item && (item.title || item.section || item.name)).slice(0, 80),
+      source: asText(item && (item.source || item.experienceSource)).slice(0, 120),
+      usableInfo: asText(item && (item.usableInfo || item.info || item.evidence)).slice(0, 320),
+      whyUseful: asText(item && (item.whyUseful || item.reason)).slice(0, 260),
+      suggestedUse: asText(item && (item.suggestedUse || item.suggestion)).slice(0, 260),
+      confidence: Math.max(0, Math.min(1, Number(item && item.confidence) || 0)),
+    };
+  }).filter(item => item && item.usableInfo).slice(0, 8);
+}
+
 function normalizeMatchResult(data, references) {
   const out = Object.assign({}, data || {});
   out.matchedPoints = stringArray(out.matchedPoints);
@@ -339,6 +363,7 @@ function normalizeMatchResult(data, references) {
   out.suggestedResumeFocus = stringArray(out.suggestedResumeFocus);
   out.riskWarnings = stringArray(out.riskWarnings);
   out.questionsForUser = stringArray(out.questionsForUser);
+  out.experienceSuggestions = normalizeExperienceSuggestions(out.experienceSuggestions);
   out.scoreDimensions = normalizeScoreDimensions(out.scoreDimensions);
   out.matchScore = weightedScore(out.scoreDimensions, out.matchScore);
   out.evidenceItems = normalizeEvidenceItems(out.evidenceItems, references);

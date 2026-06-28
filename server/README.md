@@ -63,14 +63,16 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 ### `POST /api/ai/match-resume`
 简历 × JD 匹配分析（matchScore 由服务端按维度权重汇总，仍仅供参考）。
 ```json
-请求: { "resumeText": "...", "jdText": "..." }
+请求: { "resumeText": "...", "jdText": "...", "experienceLibraryText": "可选，用户全部经历素材" }
 响应: { "matchScore":0,"matchedPoints":[],"missingPoints":[],"weakExpressions":[],
         "suggestedResumeFocus":[],"riskWarnings":[],"questionsForUser":[],
+        "experienceSuggestions":[],
         "scoreDimensions":[],"evidenceItems":[],"authoritativeReferences":[],
         "referenceCoverage":{},"scoreBasis":{} }
 ```
 
 匹配前后端会自动从 `server/lib/careerReferences.js` 的职业资料库中检索相关来源，并把命中的资料片段作为外部参照传给模型。模型负责给出维度判断和证据，服务端再按固定权重汇总 `matchScore`。
+如果传入 `experienceLibraryText`，模型只会把它用于发现“当前简历之外可补充使用的真实经历素材”，结果放在 `experienceSuggestions`，不会计入当前简历已匹配项。
 
 ### `GET /api/reference/search?q=...`
 检索本地职业资料库，主要用于调试和后续前端预览。
