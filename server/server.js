@@ -542,7 +542,8 @@ app.post('/api/ai/polish-confirmation-notes', aiLimiter, async (req, res) => {
           '你是严谨的求职材料润色助手。' + ANTI_FABRICATION +
           '你的任务只是润色用户写出的这段补充说明本身，让它表达更清晰、专业、通顺，适合后续写进简历或投递材料。' +
           '只能调整措辞、语序、标点和分点排版，必须完整保留用户提供的每一条事实信息，不得增加、删除或改写任何经历、技能、证书、公司、数据、结果或时间，也不得引入用户这段文字之外的任何内容。' +
-          '如果用户补充说明里信息不足或需要核实，请保留谨慎表达，必要时用 [请补充/核实...] 占位。只输出一个 JSON 对象。',
+          '如果用户补充说明里信息不足或需要核实，请保留谨慎表达，必要时用 [请补充/核实...] 占位。' +
+          '如果文本里出现“仅用于约束、不直接写入简历、未补充前不要写入简历、不要写入简历”等意思，不能把这些约束改写成可写入简历的事实句，只能保留为约束/提醒，或放入 questionsForUser。只输出一个 JSON 对象。',
       },
       {
         role: 'user',
@@ -550,6 +551,7 @@ app.post('/api/ai/polish-confirmation-notes', aiLimiter, async (req, res) => {
           '请只润色下面这段【用户补充说明】的文字表达，并以 JSON 输出，字段固定为：' +
           '{ "polishedText": "", "truthCheckWarnings": [], "questionsForUser": [] }。' +
           '\npolishedText 是润色后的补充说明，必须与原文表达同样的事实、不增不减，可以分点；truthCheckWarnings 写这段说明里需要用户核实的风险；questionsForUser 写还需要用户补充的问题。' +
+          '不要把“是/否选择、待补充、不要写入简历”的约束内容改写成简历经历。' +
           '\n\n【AI 提出的问题（仅供理解上下文，不要写进 polishedText）】\n' + (questionText || '（无）') +
           '\n\n【用户补充说明】\n' + userNotes,
       },

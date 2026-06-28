@@ -783,7 +783,7 @@
                   <sc-if value="{{ hasRewriteQuestions }}" hint-placeholder-val="{{ false }}">
                     <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:12px;padding:14px 16px;">
                       <div style="font-size:12.5px;font-weight:700;color:#9a6411;margin-bottom:6px;">需要你补充确认</div>
-                      <div style="font-size:11.5px;color:#9a6411;margin-bottom:11px;line-height:1.6;">每题选「是 / 否」，或选「其他」自己补充说明；点下方按钮即可据此生成补充说明。</div>
+                      <div style="font-size:11.5px;color:#9a6411;margin-bottom:11px;line-height:1.6;">选「是」后请补具体项目、动作和结果；选「否」会作为不写入约束；选「其他」可自己说明。</div>
                       <div style="display:flex;flex-direction:column;gap:10px;">
                         <sc-for list="{{ rewriteQuestionItems }}" as="q" hint-placeholder-count="0">
                           <div style="background:#fff;border:1px solid #f0e2c2;border-radius:10px;padding:11px 13px;">
@@ -802,7 +802,7 @@
                       <button onClick="{{ applyAnswersToNotes }}" style="margin-top:11px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">用我的选择填写补充说明 ↓</button>
                       <textarea value="{{ rewriteUserNotes }}" onInput="{{ setRewriteUserNotes }}" placeholder="把你的真实补充写在这里，例如相关项目、课程作业、学习经历、可核实的数据等…" style="width:100%;height:104px;margin-top:12px;border:1px solid #e6d3a8;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;color:#5f420c;outline:none;background:#fff;"></textarea>
                       <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
-                        <button onClick="{{ polishRewriteUserNotes }}" style="background:#fff;color:#9a6411;border:1px solid #e6d3a8;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">{{ polishNotesBtnLabel }}</button>
+                        <button onClick="{{ polishRewriteUserNotes }}" style="{{ polishNotesBtnStyle }}">{{ polishNotesBtnLabel }}</button>
                         <span style="font-size:11.5px;color:#9a6411;">只润色你填写的真实内容，不新增经历。</span>
                       </div>
                     </div>
@@ -1163,7 +1163,7 @@ class Component extends DCLogic {
     })()
       || { profile: {}, experienceLibrary: {}, resumes: [], versions: [], jobs: [], analyses: {}, applications: [], feedback: [], todos: [], jobBoard: { filters: {}, items: [] } },
     page: 'dashboard', modalType: null, form: {}, editId: null,
-    toast: null, aiLoading: false, crawlLoading: false, boardLoading: false, boardError: null, aiError: null,
+    toast: null, aiLoading: false, polishNotesLoading: false, crawlLoading: false, boardLoading: false, boardError: null, aiError: null,
     matchJobId: null, matchResumeId: null, targetSection: '全部', loadingMsg: '', matchTab: null,
     jobSearch: '', boardKeywords: '', boardCity: '', boardProvince: '广东', boardSourceUrls: '', boardLimit: '12', boardMinScore: null, appSearch: '', appStatus: '全部', syncErr: false,
     sidebarCollapsed: false, rewriteEditorWidth: 58
@@ -1524,6 +1524,7 @@ class Component extends DCLogic {
     const doc = parser.parseFromString(xml, 'application/xml');
     if (doc.getElementsByTagName('parsererror').length) throw new Error('Word XML 解析失败');
     const paragraphs = Array.from(doc.getElementsByTagName('w:p'));
+    const allTextNodes = () => Array.from(doc.getElementsByTagName('w:t'));
     const applied = [];
     replacements.forEach(rep => {
       for (const p of paragraphs) {
@@ -1536,6 +1537,13 @@ class Component extends DCLogic {
           applied.push(rep.index);
           break;
         }
+      }
+      if (applied.includes(rep.index)) return;
+      const nodes = allTextNodes();
+      const fullText = nodes.map(n => n.textContent || '').join('');
+      const range = this.findDocxTextRange(fullText, rep.before);
+      if (range && this.replaceDocxTextNodes(nodes, range.start, range.end, rep.after)) {
+        applied.push(rep.index);
       }
     });
     return { xml: new XMLSerializer().serializeToString(doc), applied };
@@ -2423,22 +2431,37 @@ class Component extends DCLogic {
     if (!rew) return this.showToast('请先生成修改建议');
     const qs = Array.isArray(rew.questionsForUser) ? rew.questionsForUser : [];
     const ans = rew.qAnswers || {};
-    const lines = [];
+    const factLines = [];
+    const guardLines = [];
     qs.forEach((raw, i) => {
       const q = (typeof raw === 'string') ? { question: raw } : (raw || {});
       const an = ans[i] || {};
       const detail = (an.detail || '').trim();
-      // 三选项：是 / 否 / 其他。仅「其他」会带上自定义补充文字。
-      if (an.choice === '其他') {
-        lines.push('· ' + (q.question || '') + ' —— ' + (detail || '其他'));
-      } else if (an.choice === '是' || an.choice === '否') {
-        lines.push('· ' + (q.question || '') + ' —— ' + an.choice);
+      const question = (q.question || '').trim();
+      if (!an.choice) return;
+      if (an.choice === '是') {
+        if (detail) {
+          factLines.push('· 关于“' + question + '”：' + detail);
+        } else {
+          guardLines.push('· 关于“' + question + '”：你选择了“是”，但还需要补充具体项目名称、你的角色、做了什么、使用的方法工具和可核实结果；未补充前不要写入简历。');
+        }
+      } else if (an.choice === '否') {
+        guardLines.push('· 关于“' + question + '”：你选择了“否”，不要把这一点写入简历。');
+      } else if (an.choice === '其他') {
+        if (detail) {
+          factLines.push('· 关于“' + question + '”：' + detail);
+        } else {
+          guardLines.push('· 关于“' + question + '”：你选择了“其他”，但还没有填写具体说明；未补充前不要写入简历。');
+        }
       }
     });
-    if (!lines.length) return this.showToast('请先在上方选择或填写');
+    if (!factLines.length && !guardLines.length) return this.showToast('请先在上方选择或填写');
     // 不覆盖用户手写/润色过的内容：保留 MARK 之前的自由文本，只替换由选择整理出的托管段落（可重复点击且幂等）
     const MARK = '【根据选择整理】';
-    const composed = MARK + '\n' + lines.join('\n');
+    const blocks = [];
+    if (factLines.length) blocks.push('【用户补充的真实素材】\n' + factLines.join('\n'));
+    if (guardLines.length) blocks.push('【仅用于约束，不直接写入简历】\n' + guardLines.join('\n'));
+    const composed = MARK + '\n' + blocks.join('\n\n');
     this.setDb(db => {
       const x = db.analyses[jobId];
       if (x && x.rewrite) {
@@ -2448,7 +2471,7 @@ class Component extends DCLogic {
         x.rewrite.userNotes = manual ? (manual + '\n\n' + composed) : composed;
       }
     });
-    this.showToast('已把你的选择整理进补充说明（不会覆盖你手写的内容）');
+    this.showToast(factLines.length ? '已把具体补充整理进说明（不会覆盖你手写的内容）' : '已记录选择，但需要补充具体细节后才能写入简历');
   }
   async polishRewriteUserNotes() {
     const jobId = this.curJobId();
@@ -2457,7 +2480,8 @@ class Component extends DCLogic {
     const userNotes = ((rew && rew.userNotes) || '').trim();
     if (!rew) return this.showToast('请先生成修改建议');
     if (!userNotes) return this.showToast('请先填写补充说明');
-    this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在润色补充说明…' });
+    if (this.state.polishNotesLoading) return;
+    this.setState({ polishNotesLoading: true, aiError: null });
     try {
       const data = await this.aiCall('/api/ai/polish-confirmation-notes', {
         userNotes,
@@ -2472,10 +2496,11 @@ class Component extends DCLogic {
           x.rewrite.userNoteQuestions = (data && data.questionsForUser) || [];
         }
       });
-      this.setState({ aiLoading: false });
       this.showToast('已润色补充说明');
     } catch (e) {
-      this.setState({ aiLoading: false, aiError: e.message });
+      this.showToast((e && e.message) || '润色失败，请稍后再试');
+    } finally {
+      this.setState({ polishNotesLoading: false });
     }
   }
   setNoteField(field, v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.note) a.note[field] = v; }); }
@@ -3468,11 +3493,14 @@ class Component extends DCLogic {
       const ans = qAns[i] || {};
       const choice = ans.choice || '';
       const off = 'background:#f0e9d8;color:#8a6a2a;';
+      const needsDetail = choice === '是' || choice === '其他';
       return {
         text: q.question || '',
-        showOther: choice === '其他', // 选「其他」才展开补充输入框
+        showOther: needsDetail,
         detail: ans.detail == null ? '' : ans.detail,
-        detailHint: q.detailHint || '补充说明，例如相关链接、一句话经历…',
+        detailHint: choice === '是'
+          ? (q.detailHint || '请补充具体项目、你的角色、做法、工具、结果；不填则不会写入简历。')
+          : (q.detailHint || '补充说明，例如相关链接、一句话经历…'),
         yesStyle: chipBase + (choice === '是' ? 'background:var(--ac2);color:#fff;' : off),
         noStyle: chipBase + (choice === '否' ? 'background:#d9694e;color:#fff;' : off),
         otherStyle: chipBase + (choice === '其他' ? 'background:var(--ac);color:#fff;' : off),
@@ -3484,6 +3512,8 @@ class Component extends DCLogic {
     });
     const hasRewriteQuestions = rewriteQuestionItems.length > 0;
     const rewriteUserNotes = (rew && rew.userNotes) || '';
+    const polishNotesLoading = !!S.polishNotesLoading;
+    const polishNotesBtnStyle = 'background:#fff;color:#9a6411;border:1px solid #e6d3a8;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:' + (polishNotesLoading ? 'wait;opacity:.72;' : 'pointer;');
     const rewriteOverallNotes = rew ? arr(rew.overallNotes) : [];
     const hasRewriteOverallNotes = rewriteOverallNotes.length > 0;
     const noteObj = note || {};
@@ -3620,7 +3650,7 @@ class Component extends DCLogic {
       sourcePreviewKey, sourcePreviewLabel,
       hasRewriteQuestions, rewriteQuestionItems, applyAnswersToNotes: () => this.applyAnswersToNotes(), rewriteUserNotes, setRewriteUserNotes: e => this.setRewriteUserNotes(e.target.value),
       rewriteOverallNotes, hasRewriteOverallNotes,
-      polishRewriteUserNotes: () => this.polishRewriteUserNotes(), polishNotesBtnLabel: aiBusy ? '润色中…' : 'AI 自动润色',
+      polishRewriteUserNotes: () => this.polishRewriteUserNotes(), polishNotesBtnLabel: polishNotesLoading ? '润色中…' : 'AI 自动润色', polishNotesBtnStyle,
       saveVersionFromRewrite: () => this.saveVersionFromRewrite(),
       noteSummary: noteObj.applicationSummary || '', noteSubject: noteObj.emailSubject || '', noteBody: noteObj.emailBody || '',
       setNoteSubject: e => this.setNoteField('emailSubject', e.target.value), setNoteBody: e => this.setNoteField('emailBody', e.target.value),
