@@ -15,6 +15,9 @@ const BUILTIN_OFFICIAL_SOURCES = [
   'https://careers.tencent.com/',
   'https://zhaopin.meituan.com/web/campus',
   'https://zhaopin.meituan.com/web/social',
+  'https://talent.alibaba.com/?lang=zh',
+  'https://careers.shein.cn/',
+  'https://join.tencentmusic.com/login',
   'https://zhaopin.jd.com/web/job/job_list',
   'https://talent.baidu.com/jobs/social-list',
   'https://careers.citics.com/',
@@ -121,6 +124,9 @@ function sourceDisplayName(source) {
     baidu: '百度招聘官网',
     jd: '京东招聘官网',
     meituan: '美团招聘官网',
+    alibaba: '阿里招聘官网',
+    shein: 'SHEIN 招聘官网',
+    tme: '腾讯音乐招聘官网',
     citics: '中信证券官网',
     greenhouse: 'Greenhouse 官方ATS',
     lever: 'Lever 官方ATS',
@@ -519,6 +525,15 @@ function detectAtsSource(inputUrl) {
   if (host === 'zhaopin.meituan.com') {
     return { type: 'meituan', url: href };
   }
+  if (host === 'talent.alibaba.com' || host === 'campus-talent.alibaba.com') {
+    return { type: 'alibaba', url: href };
+  }
+  if (host === 'careers.shein.cn') {
+    return { type: 'shein', url: href };
+  }
+  if (host === 'join.tencentmusic.com') {
+    return { type: 'tme', url: href };
+  }
   if (host === 'careers.citics.com' || host === 'global-kong.citics.com') {
     return { type: 'citics', url: href };
   }
@@ -879,6 +894,57 @@ async function fetchMeituanJobs(source, options = {}) {
   }));
 }
 
+async function fetchTencentMusicJobs(source, options = {}) {
+  const limit = Math.max(3, Math.min(MAX_LIMIT, Number(options.limit) || DEFAULT_LIMIT));
+  const endpoints = [
+    { url: 'https://join.tencentmusic.com/api/uc-job/list', label: '校园招聘', detail: 'https://join.tencentmusic.com/api/uc-job/info', path: '/campus/post-details?id=' },
+    { url: 'https://join.tencentmusic.com/api/job/list', label: '社会招聘', detail: 'https://join.tencentmusic.com/api/job/info', path: '/jobs/details?id=' },
+  ];
+  const jobs = [];
+  for (const endpoint of endpoints) {
+    let data;
+    try {
+      data = await fetchJson(endpoint.url, {
+        headers: {
+          'Accept': 'application/json, text/plain, */*',
+          'User-Agent': 'Mozilla/5.0 ResumeAssistantBot/1.0',
+          'Referer': source && source.url ? source.url : 'https://join.tencentmusic.com/',
+        },
+      });
+    } catch (e) {
+      continue;
+    }
+    const list = data && data.code === '200' && data.data && Array.isArray(data.data.items) ? data.data.items : [];
+    for (const item of list.slice(0, Math.max(limit, 20))) {
+      const city = Array.isArray(item.work_city)
+        ? item.work_city.map(x => cleanText((x && (x.label || x.name || x.value)) || '')).filter(Boolean).join('、')
+        : cleanText(item.work_city || '');
+      const link = item.id ? 'https://join.tencentmusic.com' + endpoint.path + encodeURIComponent(item.id) : 'https://join.tencentmusic.com/';
+      jobs.push(officialJob({
+        id: apiJobId('tme', endpoint.label + '|' + (item.id || item.name)),
+        company: '腾讯音乐',
+        role: cleanText(item.name || ''),
+        city,
+        direction: cleanText([endpoint.label, item.position_nbr_descr, item.jobf_descr, item.company_set, item.work_nature_descr || item.job_type_descr].filter(Boolean).join(' / ')),
+        link,
+        jd: cleanText([item.duty, item.requirement, item.job_requirement, item.positionDesc].filter(Boolean).join('\n\n')),
+        source: '腾讯音乐招聘官网',
+        datePosted: cleanText(item.date || ''),
+        boardWarnings: ['来自腾讯音乐招聘官网公开岗位接口；请打开原链接核对最新状态。'],
+      }));
+    }
+  }
+  return uniqueBy(jobs, job => job.link || job.id);
+}
+
+async function fetchAlibabaJobs() {
+  throw new Error('阿里招聘接口返回 403，疑似需要官网 CSRF/风控参数，暂未接入稳定抓取。');
+}
+
+async function fetchSheinJobs() {
+  throw new Error('SHEIN 官网岗位列表接口已定位，但分页参数仍需适配，暂未接入稳定抓取。');
+}
+
 async function fetchCiticsPositionList(payload) {
   const body = new URLSearchParams(Object.assign({ sysNo: 'CSE001' }, payload || {}));
   return fetchJson('https://global-kong.citics.com/api/v1/recruit/getPositionList', {
@@ -1012,6 +1078,9 @@ async function fetchOfficialSource(source, options = {}) {
   if (source.type === 'baidu') return fetchBaiduJobs(source, options);
   if (source.type === 'jd') return fetchJdJobs(source, options);
   if (source.type === 'meituan') return fetchMeituanJobs(source, options);
+  if (source.type === 'tme') return fetchTencentMusicJobs(source, options);
+  if (source.type === 'alibaba') return fetchAlibabaJobs(source, options);
+  if (source.type === 'shein') return fetchSheinJobs(source, options);
   if (source.type === 'citics') return fetchCiticsJobs(source, options);
   if (source.type === 'greenhouse') return fetchGreenhouseJobs(source);
   if (source.type === 'lever') return fetchLeverJobs(source);
@@ -1340,9 +1409,11 @@ function scoreOneJob(resumeText, job, options = {}) {
   const evidenceBoost = Math.min(12, Math.floor((resume.length / 450) * 4));
   const hard = detectHardRequirement(job, Object.assign({}, options, { resumeText }));
   const rawScore = Math.round(30 + overlap * 48 + roleHit * 10 + evidenceBoost);
-  const score = hard.blocked ? Math.min(39, rawScore) : Math.max(15, Math.min(92, rawScore));
+  const lowInfoCap = (terms.length < 3 || jd.length < 120) ? 55 : 92;
+  const score = hard.blocked ? Math.min(39, rawScore) : Math.max(15, Math.min(lowInfoCap, rawScore));
   const warnings = [];
   if (!terms.length) warnings.push('JD 信息较少，匹配度可信度偏低。');
+  else if (terms.length < 3 || jd.length < 120) warnings.push('JD 信息不足，已限制最高匹配分。');
   if (score < 55) warnings.push('简历中暂未明显体现多项岗位关键词。');
   if (hard.blocked && hard.reasons.length) warnings.push('岗位硬性门槛：' + hard.reasons[0]);
   const scoreBreakdown = [
@@ -1382,7 +1453,7 @@ function scoreOneJob(resumeText, job, options = {}) {
       reasons: hard.reasons,
     },
     scoreBreakdown,
-    scoreFormula: '基础分30 + 关键词覆盖48% + 岗位名称贴合10% + 简历证据最多12分；硬性门槛不通过则最高39分并从看板过滤。',
+    scoreFormula: '基础分30 + 关键词覆盖48% + 岗位名称贴合10% + 简历证据最多12分；硬性门槛不通过最高39分，JD 信息不足最高55分。',
   };
 }
 

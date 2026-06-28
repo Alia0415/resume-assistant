@@ -2963,7 +2963,11 @@ class Component extends DCLogic {
     const sourceStats = (board.query && Array.isArray(board.query.sourceStats)) ? board.query.sourceStats : [];
     const returnedSourceStats = (board.query && Array.isArray(board.query.returnedSourceStats)) ? board.query.returnedSourceStats : [];
     const sourceStatsText = sourceStats.length
-      ? sourceStats.slice(0, 6).map(s => (s.label || '来源') + ' ' + (Number(s.count) || 0)).join('；')
+      ? sourceStats.slice(0, 12).map(s => {
+        const count = Number(s.count) || 0;
+        const err = s.error ? ('（' + String(s.error).slice(0, 34) + '）') : '';
+        return (s.label || '来源') + ' ' + count + err;
+      }).join('；')
       : '使用内置官方来源；可展开下方输入更多企业官网。';
     const returnedSourceText = returnedSourceStats.length
       ? '入选来源：' + returnedSourceStats.map(s => (s.label || '来源') + ' ' + (Number(s.count) || 0)).join('；')
