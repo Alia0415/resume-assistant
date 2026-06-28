@@ -708,16 +708,46 @@
           <sc-if value="{{ showRewrite }}" hint-placeholder-val="{{ false }}">
             <div style="margin-bottom:16px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
-                <div style="font-size:14px;font-weight:700;">简历修改工作台<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">左侧确认建议，右侧直接预览和编辑最终简历</span></div>
+                <div style="font-size:14px;font-weight:700;">简历修改工作台<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">上方预览简历，下方确认修改建议</span></div>
                 <div style="display:flex;align-items:center;gap:12px;">
                   <span style="font-size:12.5px;color:var(--ac2);font-weight:600;">已采纳 {{ sugAcceptedCount }} / {{ sugTotal }}</span>
                   <button onClick="{{ rewriteResume }}" style="background:var(--ac2-soft);color:var(--ac2);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">重新生成</button>
                 </div>
               </div>
 
-              <div id="jm-rewrite-workspace" style="display:flex;align-items:flex-start;gap:0;min-width:0;">
+              <div id="jm-rewrite-workspace" style="display:flex;flex-direction:column;gap:16px;min-width:0;">
+                <div style="{{ rewriteEditorPaneStyle }}">
+                <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;overflow:hidden;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
+                    <div>
+                      <div style="font-size:13px;font-weight:700;">Word 修改预览</div>
+                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">黄色为待确认原文，绿色为已采纳替换；保存和导出只写入已采纳内容</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存为版本</button>
+                    </div>
+                  </div>
+                  <sc-if value="{{ previewHasUnlocated }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin:12px 16px 0;background:#fff8ee;border:1px solid #f5e3c3;border-radius:10px;padding:9px 11px;font-size:11.8px;color:#9a6411;line-height:1.6;">有 {{ previewUnlocatedCount }} 条建议未在原文件中定位，未自动写入。请直接在右侧文件编辑区手动修改，或调整建议原文后再采纳。</div>
+                  </sc-if>
+                  <div style="background:#f3f5f9;padding:18px;max-height:780px;overflow:auto;">
+                    <div style="width:100%;max-width:none;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 24px rgba(31,53,90,.08);">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
+                        <span style="font-size:12.5px;font-weight:700;color:#18223a;">Word 修改预览</span>
+                        <span style="font-size:11.5px;color:#93a0b8;">{{ sourcePreviewLabel }}</span>
+                      </div>
+                      <div id="jm-source-preview" data-source-key="{{ sourcePreviewKey }}" style="min-height:640px;max-height:720px;overflow:auto;padding:18px 14px 24px;background:#eef2f7;display:flex;flex-direction:column;align-items:center;gap:14px;"></div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-top:1px solid #eef1f6;background:#fbfcfe;flex-wrap:wrap;">
+                    <div style="font-size:11.5px;color:#7e8aa3;">预览基于原 Word 版式标注；黄色待确认不会写入导出文件。</div>
+                    <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存为简历版本</button>
+                  </div>
+                </div>
+                </div>
+
                 <div style="{{ rewriteLeftPaneStyle }}">
-                  <div style="display:flex;flex-direction:column;gap:13px;max-height:720px;overflow:auto;padding-right:3px;">
+                  <div style="display:flex;flex-direction:column;gap:13px;">
                     <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="0">
                       <div style="{{ s.cardStyle }}">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -801,41 +831,6 @@
                   </sc-if>
                 </div>
 
-                <button class="jm-resize-handle" onMouseDown="{{ startRewriteResize }}" onTouchStart="{{ startRewriteResize }}" title="拖拽调整原文件窗口宽度" style="{{ rewriteResizeHandleStyle }}">
-                  <span style="width:4px;height:46px;border-radius:999px;background:currentColor;opacity:.42;"></span>
-                </button>
-
-                <div style="{{ rewriteEditorPaneStyle }}">
-                <div style="position:sticky;top:86px;background:#fff;border:1px solid #ebeef4;border-radius:14px;overflow:hidden;">
-                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
-                    <div>
-                      <div style="font-size:13px;font-weight:700;">Word 修改预览</div>
-                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">黄色为待确认原文，绿色为已采纳替换；保存和导出只写入已采纳内容</div>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                      <button onClick="{{ widenRewriteEditor }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">放大窗口</button>
-                      <button onClick="{{ resetRewriteEditor }}" style="background:#fff;color:#5b6b85;border:1px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">还原</button>
-                      <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存为版本</button>
-                    </div>
-                  </div>
-                  <sc-if value="{{ previewHasUnlocated }}" hint-placeholder-val="{{ false }}">
-                    <div style="margin:12px 16px 0;background:#fff8ee;border:1px solid #f5e3c3;border-radius:10px;padding:9px 11px;font-size:11.8px;color:#9a6411;line-height:1.6;">有 {{ previewUnlocatedCount }} 条建议未在原文件中定位，未自动写入。请直接在右侧文件编辑区手动修改，或调整建议原文后再采纳。</div>
-                  </sc-if>
-                  <div style="background:#f3f5f9;padding:18px;max-height:820px;overflow:auto;">
-                    <div style="width:100%;max-width:none;margin:0 auto;background:#fff;border:1px solid #dfe5ee;box-shadow:0 10px 24px rgba(31,53,90,.08);">
-                      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
-                        <span style="font-size:12.5px;font-weight:700;color:#18223a;">Word 修改预览</span>
-                        <span style="font-size:11.5px;color:#93a0b8;">{{ sourcePreviewLabel }}</span>
-                      </div>
-                      <div id="jm-source-preview" data-source-key="{{ sourcePreviewKey }}" style="min-height:640px;max-height:780px;overflow:auto;padding:18px 14px 24px;background:#eef2f7;display:flex;flex-direction:column;align-items:center;gap:14px;"></div>
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-top:1px solid #eef1f6;background:#fbfcfe;flex-wrap:wrap;">
-                    <div style="font-size:11.5px;color:#7e8aa3;">预览基于原 Word 版式标注；黄色待确认不会写入导出文件。</div>
-                    <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存为简历版本</button>
-                  </div>
-                </div>
-                </div>
               </div>
             </div>
           </sc-if>
@@ -1739,10 +1734,10 @@ class Component extends DCLogic {
     if (!text) return this.showToast('没有读取到可用文字');
     this.setDb(db => {
       const prev = db.experienceLibrary || {};
-      const sections = Object.assign({}, prev.sections || {}, { other: text });
+      const sections = this.mergeExperienceSections(this.experienceLibrarySections(prev), this.classifyExperienceLibraryText(text));
       db.experienceLibrary = { sections, sourceName: file.name, updatedAt: Date.now() };
     });
-    this.showToast('已导入经历库');
+    this.showToast('已导入并自动归类经历库');
   }
   experienceLibraryDefs() {
     return [
@@ -1752,6 +1747,75 @@ class Component extends DCLogic {
       { key: 'course', label: '课程 / 比赛 / 研究', placeholder: '课程项目、竞赛、调研、论文等：题目 / 方法 / 产出 / 排名或成绩。' },
       { key: 'other', label: '技能 / 证书 / 其他', placeholder: '技能、证书、语言、工具，或暂时不好分类的经历。上传文本也会先放在这里。' }
     ];
+  }
+  mergeExperienceSections(base, incoming) {
+    const out = Object.assign({}, base || {});
+    Object.keys(incoming || {}).forEach(key => {
+      const add = String(incoming[key] || '').trim();
+      if (!add) return;
+      const prev = String(out[key] || '').trim();
+      out[key] = prev ? (prev + '\n\n' + add) : add;
+    });
+    return out;
+  }
+  experienceSectionKeyFromTitle(title) {
+    const t = String(title || '').trim();
+    if (!t) return '';
+    if (/^(实习|工作|工作经历|实习经历|任职经历|职业经历|校外实践|社会实践)$/.test(t)) return 'internship';
+    if (/^(项目|项目经历|产品项目|数据项目|产品\/数据|产品与数据|作品项目|调研项目)$/.test(t)) return 'project';
+    if (/^(校园|校园经历|社团|社团经历|学生工作|学生组织|志愿服务|活动经历)$/.test(t)) return 'campus';
+    if (/^(课程|课程项目|比赛|竞赛|研究|科研|科研经历|论文|学术经历)$/.test(t)) return 'course';
+    if (/^(技能|技能证书|证书|语言|工具|荣誉|奖项|其他|其他经历)$/.test(t)) return 'other';
+    return '';
+  }
+  experienceLooksLikeSectionTitle(line) {
+    const t = String(line || '').trim().replace(/[：:]+$/, '');
+    return t.length <= 16 && this.experienceSectionKeyFromTitle(t) && !/[|｜\-—]/.test(t);
+  }
+  experienceSectionKeyForText(text, fallbackKey) {
+    if (fallbackKey) return fallbackKey;
+    const t = String(text || '').toLowerCase();
+    const score = { internship: 0, project: 0, campus: 0, course: 0, other: 0 };
+    const add = (key, re, weight) => { const m = t.match(re); if (m) score[key] += m.length * (weight || 1); };
+    add('internship', /实习|工作|任职|岗位|部门|公司|企业|助理|运营|审计|财务|人力|hr|intern/g, 2);
+    add('project', /项目|产品|数据|用户|调研|需求|竞品|原型|脚本|拍摄|剪辑|分析|模型|看板|dashboard|excel|sql|python/g, 2);
+    add('campus', /校园|社团|学生会|协会|宣传|体育部|活动|志愿|组织|协调|社群|报名/g, 2);
+    add('course', /课程|比赛|竞赛|科研|研究|论文|课题|实验|获奖|奖项|排名|成绩/g, 2);
+    add('other', /技能|证书|语言|工具|office|ppt|word|英语|雅思|托福|普通话|pr|ps|剪映/g, 1);
+    const keys = ['internship', 'project', 'campus', 'course', 'other'];
+    const best = keys.reduce((a, b) => score[b] > score[a] ? b : a, 'other');
+    return score[best] ? best : 'other';
+  }
+  classifyExperienceLibraryText(text) {
+    const sections = {};
+    const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+    let currentKey = '', bucket = [];
+    const push = () => {
+      const chunk = bucket.join('\n').trim();
+      if (!chunk) return;
+      const chunks = currentKey ? [chunk] : this.experienceParagraphChunks(chunk);
+      chunks.forEach(part => {
+        const key = this.experienceSectionKeyForText(part, currentKey);
+        sections[key] = sections[key] ? (sections[key] + '\n\n' + part) : part;
+      });
+      bucket = [];
+    };
+    lines.forEach(line => {
+      const clean = String(line || '').trim().replace(/[：:]+$/, '');
+      if (this.experienceLooksLikeSectionTitle(clean)) {
+        push();
+        currentKey = this.experienceSectionKeyFromTitle(clean);
+        return;
+      }
+      bucket.push(line);
+    });
+    push();
+    return sections;
+  }
+  experienceParagraphChunks(text) {
+    const blocks = String(text || '').split(/\n\s*\n+/).map(x => x.trim()).filter(Boolean);
+    if (blocks.length > 1) return blocks;
+    return String(text || '').trim() ? [String(text || '').trim()] : [];
   }
   experienceLibrarySections(lib) {
     const raw = (lib && lib.sections && typeof lib.sections === 'object' && !Array.isArray(lib.sections)) ? lib.sections : {};
@@ -3087,11 +3151,9 @@ class Component extends DCLogic {
     const tt = titles[page] || ['', ''];
     const sidebarOpen = !S.sidebarCollapsed;
     const contentShellStyle = 'padding:24px 32px 60px;max-width:' + ((page === 'match' || page === 'board') ? '1480px' : '1180px') + ';margin:0 auto;';
-    const editorWidth = this.clamp(Number(S.rewriteEditorWidth) || 58, 44, 82);
-    const leftWidth = 100 - editorWidth;
-    const rewriteLeftPaneStyle = 'flex:0 0 calc(' + leftWidth + '% - 8px);min-width:260px;display:flex;flex-direction:column;gap:13px;padding-right:16px;min-height:1px;';
-    const rewriteEditorPaneStyle = 'flex:1 1 ' + editorWidth + '%;min-width:420px;min-height:1px;';
-    const rewriteResizeHandleStyle = 'align-self:stretch;position:sticky;top:86px;width:16px;min-height:720px;margin-right:16px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#93a0b8;display:flex;align-items:center;justify-content:center;cursor:col-resize;padding:0;flex-shrink:0;';
+    const rewriteLeftPaneStyle = 'width:100%;display:flex;flex-direction:column;gap:13px;min-height:1px;';
+    const rewriteEditorPaneStyle = 'width:100%;min-width:0;min-height:1px;';
+    const rewriteResizeHandleStyle = 'display:none;';
 
     const prof = db.profile || {};
     const profileName = prof.name || '未填写姓名';
