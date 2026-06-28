@@ -132,6 +132,32 @@ async function fetchText(url, options = {}) {
   throw makeError('TOO_MANY_REDIRECTS', '岗位链接跳转次数过多，已停止抓取。', 400);
 }
 
+async function fetchJson(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs || FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      method: options.method || 'GET',
+      signal: controller.signal,
+      headers: Object.assign({
+        'User-Agent': 'Mozilla/5.0 ResumeAssistantBot/1.0',
+        'Accept': 'application/json, text/plain, */*',
+      }, options.headers || {}),
+      body: options.body,
+    });
+    if (!response.ok) {
+      throw makeError('HTTP_ERROR', '岗位接口返回 HTTP ' + response.status + '，暂时无法抓取。', response.status);
+    }
+    return await response.json();
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw makeError('TIMEOUT', '抓取超时，请稍后重试或换一个岗位链接。', 504);
+    if (e && e.code) throw e;
+    throw makeError('FETCH_FAILED', '无法访问岗位接口：' + ((e && e.message) || '网络错误'), 502);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function stripComment(line) {
   const i = line.indexOf('#');
   return (i >= 0 ? line.slice(0, i) : line).trim();
@@ -304,6 +330,137 @@ function firstString(value) {
   return cleanText(value || '');
 }
 
+function tencentCampusHeaders(sourceUrl) {
+  return {
+    'Content-Type': 'application/json;charset=UTF-8',
+    'Origin': 'https://join.qq.com',
+    'Referer': sourceUrl || 'https://join.qq.com/post.html?query=p_104',
+  };
+}
+
+function tencentCampusPostId(url) {
+  const params = url.searchParams;
+  return cleanText(params.get('postid') || params.get('postId') || params.get('post_id') || '');
+}
+
+function tencentCampusProjectId(url, hints = {}) {
+  const query = cleanText(url.searchParams.get('query') || url.searchParams.get('project') || '');
+  const match = query.match(/p_(\d+)/i) || query.match(/^(\d+)$/);
+  if (match) return Number(match[1]);
+  const hint = cleanText([hints.role, hints.direction].filter(Boolean).join(' '));
+  return /实习|校招|应届/.test(hint) ? 104 : null;
+}
+
+function tencentCampusKeyword(hints = {}) {
+  return cleanText([
+    hints.role,
+    hints.direction,
+  ].filter(Boolean).join(' '))
+    .replace(/岗位详情|腾讯校招|腾讯|校招|校园招聘|实习生?|应届生?|岗位|招聘/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 30);
+}
+
+function tencentCampusCityHint(hints = {}) {
+  return cleanText(hints.city || '').replace(/不限|地区|城市/g, '').trim();
+}
+
+function tencentCampusScore(item, keyword, cityHint) {
+  const title = cleanText(item && (item.positionTitle || item.title));
+  const cities = cleanText(item && (item.workCities || (Array.isArray(item.workCityList) ? item.workCityList.join(' ') : '')));
+  const bgs = cleanText(item && item.bgs);
+  let score = 0;
+  const terms = cleanText(keyword).split(/[\s/|,，、]+/).filter(Boolean);
+  terms.forEach(term => {
+    if (title.indexOf(term) >= 0) score += 8;
+    else if (bgs.indexOf(term) >= 0) score += 2;
+  });
+  if (cityHint && cities.indexOf(cityHint) >= 0) score += 4;
+  if (/实习|应届/.test(cleanText(item && ((item.projectName || '') + ' ' + (item.recruitLabelName || ''))))) score += 2;
+  return score;
+}
+
+async function fetchTencentCampusDetail(postId, sourceUrl) {
+  const data = await fetchJson('https://join.qq.com/api/v1/jobDetails/getJobDetailsByPostId?postId=' + encodeURIComponent(postId), {
+    headers: tencentCampusHeaders(sourceUrl),
+  });
+  return data && data.status === 0 ? data.data : null;
+}
+
+async function searchTencentCampusPosition(url, hints = {}) {
+  const keyword = tencentCampusKeyword(hints);
+  if (!keyword) {
+    throw makeError('AMBIGUOUS_JOB_LIST', '这是腾讯校招岗位列表页，不是单个岗位详情；请先填写具体岗位名称，或打开某个岗位详情页后再抓取。', 400);
+  }
+  const payload = {
+    keyword,
+    bgList: [],
+    workCityList: [],
+    recruitCityList: [],
+    positionFidList: [],
+    pageIndex: 1,
+    pageSize: 12,
+  };
+  const projectId = tencentCampusProjectId(url, hints);
+  if (projectId) payload.projectId = projectId;
+  const data = await fetchJson('https://join.qq.com/api/v1/position/searchPosition', {
+    method: 'POST',
+    headers: tencentCampusHeaders(url.href),
+    body: JSON.stringify(payload),
+  });
+  const list = data && data.status === 0 && data.data && Array.isArray(data.data.positionList)
+    ? data.data.positionList
+    : [];
+  if (!list.length) throw makeError('NO_JOB_FOUND', '腾讯校招没有搜到这个岗位，请换一个更具体的岗位名称或直接粘贴岗位详情页链接。', 404);
+  const cityHint = tencentCampusCityHint(hints);
+  return list
+    .slice()
+    .sort((a, b) => tencentCampusScore(b, keyword, cityHint) - tencentCampusScore(a, keyword, cityHint))[0];
+}
+
+async function crawlTencentCampusJobUrl(url, hints = {}) {
+  if (url.hostname.toLowerCase() !== 'join.qq.com') return null;
+  let postId = tencentCampusPostId(url);
+  let fromList = false;
+  if (!postId) {
+    const found = await searchTencentCampusPosition(url, hints);
+    postId = cleanText(found && found.postId);
+    fromList = true;
+  }
+  const detail = await fetchTencentCampusDetail(postId, url.href);
+  if (!detail) throw makeError('NO_JOB_FOUND', '没有从腾讯校招接口拿到岗位详情，请打开具体岗位详情页后再试。', 404);
+  const departments = [];
+  (detail.intentionBGDList || []).slice(0, 4).forEach(bg => {
+    const bgName = cleanText((bg && (bg.showTitle || bg.title)) || '');
+    (bg && Array.isArray(bg.departmentList) ? bg.departmentList : []).slice(0, 3).forEach(dep => {
+      const depName = cleanText(dep && dep.name);
+      if (depName) departments.push(bgName ? bgName + '-' + depName : depName);
+    });
+  });
+  const jdText = cleanText([
+    detail.desc ? '岗位职责：\n' + detail.desc : '',
+    detail.request ? '岗位要求：\n' + detail.request : '',
+    departments.length ? '可选团队：' + departments.slice(0, 10).join('；') : '',
+  ].filter(Boolean).join('\n\n'));
+  return {
+    role: cleanText(detail.title || detail.positionTitle || ''),
+    company: '腾讯',
+    city: cleanText((detail.workCityList || []).join('、') || detail.workCities || ''),
+    direction: cleanText([detail.projectName, detail.recruitLabelName, detail.tidName, detail.bgs].filter(Boolean).join(' / ')),
+    jdText,
+    sourceName: '腾讯校招官网',
+    link: postId ? 'https://join.qq.com/post_detail.html?postid=' + encodeURIComponent(postId) : url.href,
+    pageTitle: cleanText(detail.title || '腾讯校招岗位详情'),
+    warnings: [fromList ? '已通过腾讯校招公开接口按岗位名称匹配到详情，请核对是否为你要投的岗位。' : '来自腾讯校招公开岗位详情接口，请打开原链接核对最新状态。'],
+  };
+}
+
+async function crawlKnownJobProvider(url, hints = {}) {
+  if (url.hostname.toLowerCase() === 'join.qq.com') return crawlTencentCampusJobUrl(url, hints);
+  return null;
+}
+
 function parseLocation(value) {
   const items = Array.isArray(value) ? value : [value];
   const parts = [];
@@ -408,9 +565,39 @@ function cacheGet(key) {
   return Object.assign({}, hit.value, { fromCache: true });
 }
 
-async function crawlJobUrl(inputUrl) {
+function crawlResultFromParsed(parsed, finalUrl, contentLength, fromCache = false) {
+  return {
+    ok: true,
+    fetchedAt: Date.now(),
+    fromCache,
+    robotsAllowed: true,
+    finalUrl,
+    job: {
+      company: parsed.company || '',
+      role: parsed.role || '',
+      city: parsed.city || '',
+      direction: parsed.direction || '',
+      link: parsed.link || finalUrl,
+      jd: parsed.jdText || '',
+      source: parsed.sourceName ? ('网页抓取 · ' + parsed.sourceName) : '网页抓取',
+      crawledAt: Date.now(),
+      datePosted: parsed.datePosted || '',
+      validThrough: parsed.validThrough || '',
+      crawlerWarnings: parsed.warnings || [],
+    },
+    meta: {
+      pageTitle: parsed.pageTitle || '',
+      sourceName: parsed.sourceName || '',
+      contentLength,
+      warnings: parsed.warnings || [],
+    },
+  };
+}
+
+async function crawlJobUrl(inputUrl, hints = {}) {
   const safeUrl = await assertPublicUrl(inputUrl);
-  const cacheKey = safeUrl.href;
+  const hintKey = cleanText([hints.role, hints.city, hints.direction].filter(Boolean).join('|')).slice(0, 160);
+  const cacheKey = safeUrl.href + '::' + hintKey;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
 
@@ -426,38 +613,20 @@ async function crawlJobUrl(inputUrl) {
   }
 
   hostLastFetch.set(host, Date.now());
+  const providerParsed = await crawlKnownJobProvider(safeUrl, hints);
+  if (providerParsed) {
+    const providerResult = crawlResultFromParsed(providerParsed, providerParsed.link || safeUrl.href, 0, false);
+    cacheSet(cacheKey, providerResult);
+    return providerResult;
+  }
+
   const fetched = await fetchText(safeUrl.href);
   const contentType = fetched.contentType || '';
   if (contentType && !/text\/html|application\/xhtml\+xml|application\/xml|text\/plain/.test(contentType)) {
     throw makeError('BAD_CONTENT_TYPE', '这个链接不是可解析的网页内容。', 415);
   }
   const parsed = parseJobHtml(fetched.text, fetched.finalUrl);
-  const result = {
-    ok: true,
-    fetchedAt: Date.now(),
-    fromCache: false,
-    robotsAllowed: true,
-    finalUrl: fetched.finalUrl,
-    job: {
-      company: parsed.company || '',
-      role: parsed.role || '',
-      city: parsed.city || '',
-      direction: parsed.direction || '',
-      link: parsed.link || fetched.finalUrl,
-      jd: parsed.jdText || '',
-      source: parsed.sourceName ? ('网页抓取 · ' + parsed.sourceName) : '网页抓取',
-      crawledAt: Date.now(),
-      datePosted: parsed.datePosted || '',
-      validThrough: parsed.validThrough || '',
-      crawlerWarnings: parsed.warnings || [],
-    },
-    meta: {
-      pageTitle: parsed.pageTitle || '',
-      sourceName: parsed.sourceName || '',
-      contentLength: fetched.text.length,
-      warnings: parsed.warnings || [],
-    },
-  };
+  const result = crawlResultFromParsed(parsed, fetched.finalUrl, fetched.text.length, false);
   cacheSet(cacheKey, result);
   return result;
 }

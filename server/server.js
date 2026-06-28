@@ -325,7 +325,7 @@ app.post('/api/jobs/fetch-url', crawlLimiter, async (req, res) => {
     if (typeof url !== 'string' || !url.trim()) {
       return res.status(400).json({ error: '请先填写岗位链接。', code: 'BAD_URL' });
     }
-    const data = await crawlJobUrl(url);
+    const data = await crawlJobUrl(url, req.body || {});
     return res.json(data);
   } catch (err) {
     return handleCrawlerError(res, err);

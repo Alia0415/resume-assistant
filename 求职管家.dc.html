@@ -1957,7 +1957,13 @@ class Component extends DCLogic {
     if (this.state.crawlLoading) return;
     this.setState({ crawlLoading: true });
     try {
-      const data = await this.postJson('/api/jobs/fetch-url', { url }, '无法连接后端服务，请先启动 Node 服务。');
+      const data = await this.postJson('/api/jobs/fetch-url', {
+        url,
+        company: this.state.form.company || '',
+        role: this.state.form.role || '',
+        city: this.state.form.city || '',
+        direction: this.state.form.direction || ''
+      }, '无法连接后端服务，请先启动 Node 服务。');
       const job = (data && data.job) || {};
       const warnings = Array.isArray(job.crawlerWarnings) ? job.crawlerWarnings : [];
       this.setState(s => ({ crawlLoading: false, form: Object.assign({}, s.form, {
