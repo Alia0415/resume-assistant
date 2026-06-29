@@ -102,10 +102,11 @@ npm start                   # 启动后访问 http://localhost:3000/求职管家
 如果没有在请求里传 `sourceUrls`，也没有配置 `JOB_BOARD_OFFICIAL_SOURCES`，接口会拒绝刷新，避免用泛搜索结果冒充企业官网职位。
 
 ### `POST /api/ai/rewrite-resume`
-逐条改写建议（原文 / 改后 / 理由 / 是否需核实）。
+逐条改写建议（原文 / 改后 / 理由 / 是否需核实），也可返回可定位的新增段落建议。
 ```json
 请求: { "resumeText":"...", "jdText":"...", "targetSection":"实习经历" }
 响应: { "rewriteSuggestions":[{ "section","originalText","rewrittenText","reason","truthCheckRequired" }],
+        "insertSuggestions":[{ "section","insertAfterText","insertedText","reason","truthCheckRequired" }],
         "overallNotes":[],"questionsForUser":[] }
 ```
 

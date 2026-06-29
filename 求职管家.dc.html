@@ -714,7 +714,7 @@
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;">
                     <div>
                       <div style="font-size:13px;font-weight:700;">Word 修改预览</div>
-                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">黄色为待确认原文，绿色为已采纳替换；保存和导出只写入已采纳内容</div>
+                      <div style="font-size:11.5px;color:#93a0b8;margin-top:3px;">黄色为待确认替换/新增，绿色为已采纳内容；保存和导出只写入已采纳内容</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                       <button onClick="{{ saveVersionFromRewrite }}" style="display:flex;align-items:center;gap:7px;background:var(--ac);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;">保存为版本</button>
@@ -733,7 +733,7 @@
                     </div>
                   </div>
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-top:1px solid #eef1f6;background:#fbfcfe;flex-wrap:wrap;">
-                    <div style="font-size:11.5px;color:#7e8aa3;">预览基于原 Word 版式标注；黄色待确认不会写入导出文件。</div>
+                    <div style="font-size:11.5px;color:#7e8aa3;">预览基于原 Word 版式标注；黄色待确认不会写入导出文件，绿色采纳后才会保存。</div>
                     <button onClick="{{ saveVersionFromRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;">保存为简历版本</button>
                   </div>
                 </div>
@@ -773,6 +773,44 @@
                     </sc-for>
                   </div>
 
+                  <sc-if value="{{ hasInsertSuggestions }}" hint-placeholder-val="{{ false }}">
+                    <div style="background:#fff;border:1px solid #d6e3ff;border-radius:14px;padding:16px 18px;">
+                      <div style="font-size:13px;font-weight:700;color:#2a4a86;margin-bottom:10px;">新增段落建议<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">采纳后会插入 Word 的定位段落后方</span></div>
+                      <div style="display:flex;flex-direction:column;gap:13px;">
+                        <sc-for list="{{ insertSuggestions }}" as="s" hint-placeholder-count="0">
+                          <div style="{{ s.cardStyle }}">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                              <span style="font-size:13px;font-weight:700;">{{ s.section }}</span>
+                              <span style="{{ s.locStyle }}">{{ s.locLabel }}</span>
+                              <span style="{{ s.qualityStyle }}">{{ s.qualityLabel }}</span>
+                              <span style="{{ s.confidenceStyle }}">{{ s.confidenceLabel }}</span>
+                              <sc-if value="{{ s.needConfirm }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#c2710c;background:#fff3e6;border-radius:6px;padding:2px 8px;">需你核实真实性</span></sc-if>
+                              <sc-if value="{{ s.truthConfirmed }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#176b4f;background:#e8f8ef;border-radius:6px;padding:2px 8px;">已核实</span></sc-if>
+                              <button onClick="{{ s.toggle }}" style="{{ s.btnStyle }}">{{ s.btnLabel }}</button>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:10px;">
+                              <div style="border:1px solid #d6e3ff;background:#f8fbff;border-radius:10px;padding:10px 12px;">
+                                <div style="font-size:10.5px;font-weight:600;color:#2a4a86;margin-bottom:6px;">插入到这段之后</div>
+                                <div style="font-size:12.3px;color:#5b6b85;line-height:1.65;">{{ s.anchor }}</div>
+                              </div>
+                              <div style="border:1px solid #cfe9da;background:#f3fbf6;border-radius:10px;padding:10px 12px;">
+                                <div style="font-size:10.5px;font-weight:600;color:var(--ac2);margin-bottom:6px;">新增内容（可编辑）</div>
+                                <textarea value="{{ s.insertedText }}" onInput="{{ s.editInserted }}" style="width:100%;height:92px;border:1px solid #cfe9da;border-radius:7px;padding:7px 9px;font-size:12.5px;line-height:1.7;color:#1f6b4a;outline:none;background:#fff;"></textarea>
+                              </div>
+                            </div>
+                            <div style="display:flex;align-items:flex-start;gap:7px;font-size:12px;color:#6b7a96;margin-top:11px;background:#f7f9fc;border-radius:8px;padding:9px 11px;line-height:1.6;">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93a0b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 16v-4M12 8h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"></path></svg>
+                              {{ s.reason }}
+                            </div>
+                            <sc-if value="{{ s.impact }}" hint-placeholder-val="{{ false }}">
+                              <div style="font-size:12px;color:#2a4a86;margin-top:9px;background:#eef4ff;border:1px solid #d6e3ff;border-radius:8px;padding:8px 10px;line-height:1.6;">岗位提升：{{ s.impact }}</div>
+                            </sc-if>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+
                   <sc-if value="{{ hasRewriteExperienceLibrary }}" hint-placeholder-val="{{ false }}">
                     <div style="background:#fff;border:1px solid #d6e3ff;border-radius:14px;padding:16px 18px;">
                       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
@@ -794,7 +832,7 @@
                               <div style="font-size:12px;color:#2a4a86;line-height:1.6;margin-top:8px;">建议用法：{{ x.suggestedUse }}</div>
                               <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:11px;">
                                 <button onClick="{{ x.addToRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">加入补充说明</button>
-                                <button onClick="{{ x.addAndRewrite }}" style="background:var(--ac);color:#fff;border:none;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">加入并重新生成</button>
+                                <button onClick="{{ x.addAndRewrite }}" style="background:var(--ac);color:#fff;border:none;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">用它生成建议</button>
                               </div>
                             </div>
                           </sc-for>
@@ -841,7 +879,7 @@
                       <textarea value="{{ rewriteUserNotes }}" onInput="{{ setRewriteUserNotes }}" placeholder="把你的真实补充写在这里，例如相关项目、课程作业、学习经历、可核实的数据等…" style="width:100%;height:104px;margin-top:12px;border:1px solid #e6d3a8;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.7;color:#5f420c;outline:none;background:#fff;"></textarea>
                       <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
                         <button onClick="{{ polishRewriteUserNotes }}" style="{{ polishNotesBtnStyle }}">{{ polishNotesBtnLabel }}</button>
-                        <span style="font-size:11.5px;color:#9a6411;">只润色你填写的真实内容，不新增经历。</span>
+                        <span style="font-size:11.5px;color:#9a6411;">补充说明不会直接写入 Word，只用于生成上方替换/新增建议。</span>
                       </div>
                     </div>
                   </sc-if>
@@ -1497,25 +1535,44 @@ class Component extends DCLogic {
     const jobId = this.curJobId && this.curJobId();
     const a = jobId ? (this.state.db.analyses[jobId] || null) : null;
     const sugs = (a && a.rewrite && a.rewrite.rewriteSuggestions) || [];
+    const inserts = (a && a.rewrite && a.rewrite.insertSuggestions) || [];
     return sugs.map(s => [
       s.originalText || '',
       s.rewrittenText || '',
+      s.confirmed ? '1' : '0',
+      s.truthConfirmed ? '1' : '0'
+    ].join('=>')).join('|') + '||insert||' + inserts.map(s => [
+      s.insertAfterText || '',
+      s.insertedText || '',
       s.confirmed ? '1' : '0',
       s.truthConfirmed ? '1' : '0'
     ].join('=>')).join('|');
   }
   docxReplacementsFromSuggestions(suggestions) {
     return (suggestions || []).map((s, i) => ({
-      index: i,
+      type: 'replace',
+      index: 'r' + i,
       before: String((s && s.originalText) || '').trim(),
       after: String((s && s.rewrittenText) || (s && s.originalText) || '').trim()
     })).filter(r => r.before && r.after);
   }
+  docxInsertionsFromSuggestions(suggestions) {
+    return (suggestions || []).map((s, i) => ({
+      type: 'insert',
+      index: 'i' + i,
+      anchor: String((s && s.insertAfterText) || '').trim(),
+      text: String((s && s.insertedText) || '').trim()
+    })).filter(r => r.anchor && r.text);
+  }
+  docxOperationsFromRewrite(rewrite) {
+    const rew = rewrite || {};
+    return this.docxInsertionsFromSuggestions((rew.insertSuggestions || []).filter(s => s && s.confirmed))
+      .concat(this.docxReplacementsFromSuggestions((rew.rewriteSuggestions || []).filter(s => s && s.confirmed)));
+  }
   currentDocxReplacements() {
     const jobId = this.curJobId();
     const a = this.state.db.analyses[jobId];
-    const sugs = (a && a.rewrite && a.rewrite.rewriteSuggestions) || [];
-    return this.docxReplacementsFromSuggestions(sugs.filter(s => s && s.confirmed));
+    return this.docxOperationsFromRewrite(a && a.rewrite);
   }
   compactDocxText(s) {
     const out = { text: '', map: [] };
@@ -1557,14 +1614,53 @@ class Component extends DCLogic {
     });
     return inserted;
   }
-  patchDocxXmlString(xml, replacements) {
+  setDocxParagraphText(paragraph, text) {
+    const nodes = Array.from(paragraph.getElementsByTagName('w:t'));
+    if (!nodes.length) return false;
+    nodes.forEach((node, i) => {
+      node.textContent = i === 0 ? text : '';
+      if (i === 0) node.setAttribute('xml:space', 'preserve');
+    });
+    return true;
+  }
+  insertDocxParagraphsAfter(paragraph, text) {
+    const parent = paragraph && paragraph.parentNode;
+    if (!parent) return null;
+    const lines = String(text || '').split(/\n+/).map(x => x.trim()).filter(Boolean);
+    if (!lines.length) return null;
+    let ref = paragraph;
+    lines.forEach(line => {
+      const clone = paragraph.cloneNode(true);
+      this.setDocxParagraphText(clone, line);
+      parent.insertBefore(clone, ref.nextSibling);
+      ref = clone;
+    });
+    return ref;
+  }
+  patchDocxXmlString(xml, operations) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xml, 'application/xml');
     if (doc.getElementsByTagName('parsererror').length) throw new Error('Word XML 解析失败');
     const paragraphs = Array.from(doc.getElementsByTagName('w:p'));
     const allTextNodes = () => Array.from(doc.getElementsByTagName('w:t'));
     const applied = [];
-    replacements.forEach(rep => {
+    const insertRefs = new WeakMap();
+    (operations || []).forEach(rep => {
+      if (rep.type === 'insert') {
+        for (const p of paragraphs) {
+          const nodes = Array.from(p.getElementsByTagName('w:t'));
+          if (!nodes.length) continue;
+          const fullText = nodes.map(n => n.textContent || '').join('');
+          if (!this.findDocxTextRange(fullText, rep.anchor)) continue;
+          const last = this.insertDocxParagraphsAfter(insertRefs.get(p) || p, rep.text);
+          if (last) {
+            insertRefs.set(p, last);
+            applied.push(rep.index);
+          }
+          break;
+        }
+        return;
+      }
       for (const p of paragraphs) {
         const nodes = Array.from(p.getElementsByTagName('w:t'));
         if (!nodes.length) continue;
@@ -2365,6 +2461,25 @@ class Component extends DCLogic {
     out.truthConfirmed = false;
     return out;
   }
+  normalizeInsertSuggestion(s) {
+    const out = Object.assign({}, s || {});
+    out.insertAfterText = String(out.insertAfterText || out.anchorText || out.afterText || '').trim();
+    out.insertedText = String(out.insertedText || out.newText || out.text || '').trim();
+    const score = this.clamp(Number(out.qualityScore) || 3, 1, 5);
+    const confidence = this.clamp(Number(out.confidence) || 0, 0, 1);
+    const checks = (out.qualityChecks && typeof out.qualityChecks === 'object') ? out.qualityChecks : {};
+    out.qualityScore = Math.round(score * 10) / 10;
+    out.confidence = Math.round(confidence * 100) / 100;
+    out.qualityChecks = {
+      jdFit: Math.round(this.clamp(Number(checks.jdFit) || score, 1, 5) * 10) / 10,
+      specificity: Math.round(this.clamp(Number(checks.specificity) || score, 1, 5) * 10) / 10,
+      truthSafety: Math.round(this.clamp(Number(checks.truthSafety) || (out.truthCheckRequired ? 3 : score), 1, 5) * 10) / 10,
+      readability: Math.round(this.clamp(Number(checks.readability) || score, 1, 5) * 10) / 10
+    };
+    out.confirmed = false;
+    out.truthConfirmed = false;
+    return out;
+  }
 
   async postJson(path, body, connectMessage) {
     const base = (this.props.apiBase || '').replace(/\/+$/, '');
@@ -2613,6 +2728,7 @@ class Component extends DCLogic {
     try {
       const d = await this.aiCall('/api/ai/rewrite-resume', { resumeText, jdText: job.jd, targetSection: this.state.targetSection || '全部', userNotes });
       d.rewriteSuggestions = (d.rewriteSuggestions || []).map(s => this.normalizeRewriteSuggestion(s));
+      d.insertSuggestions = (d.insertSuggestions || []).map(s => this.normalizeInsertSuggestion(s)).filter(s => s.insertAfterText && s.insertedText);
       this.setDb(db => { const a = this.ensureAnalysis(db, jobId); a.rewrite = d; if (userNotes) a.rewrite.userNotes = userNotes; a.rewrite.qAnswers = {}; a.rewroteAt = Date.now(); });
       this.setState({ aiLoading: false }); this.showToast(userNotes ? '已结合你的补充重新生成修改建议' : '已生成修改建议');
     } catch (e) { this.setState({ aiLoading: false, aiError: e.message }); }
@@ -2664,9 +2780,40 @@ class Component extends DCLogic {
     });
     this.scheduleSourcePreviewRender();
   }
+  toggleInsertSug(jobId, i) {
+    const cur = (((this.state.db.analyses[jobId] || {}).rewrite || {}).insertSuggestions || [])[i];
+    const willConfirm = cur && !cur.confirmed;
+    let markTruthConfirmed = false;
+    if (willConfirm && cur.truthCheckRequired && !cur.truthConfirmed) {
+      const ok = confirm('这条新增段落会写入 Word。请确认新增内容都来自你的真实经历和补充说明。');
+      if (!ok) return;
+      markTruthConfirmed = true;
+    }
+    this.setDb(db => {
+      const a = db.analyses[jobId];
+      if (a && a.rewrite && a.rewrite.insertSuggestions && a.rewrite.insertSuggestions[i]) {
+        const x = a.rewrite.insertSuggestions[i];
+        if (markTruthConfirmed) x.truthConfirmed = true;
+        x.confirmed = !x.confirmed;
+      }
+    });
+    this.scheduleSourcePreviewRender();
+  }
+  editInsertSug(jobId, i, v) {
+    this.setDb(db => {
+      const a = db.analyses[jobId];
+      if (a && a.rewrite && a.rewrite.insertSuggestions && a.rewrite.insertSuggestions[i]) {
+        const x = a.rewrite.insertSuggestions[i];
+        if (x.insertedText !== v && x.truthCheckRequired) x.truthConfirmed = false;
+        x.insertedText = v;
+      }
+    });
+    this.scheduleSourcePreviewRender();
+  }
   ensureRewriteDraft(db, jobId) {
     const a = this.ensureAnalysis(db, jobId);
-    if (!a.rewrite) a.rewrite = { rewriteSuggestions: [], overallNotes: [], questionsForUser: [], qAnswers: {}, userNotes: '' };
+    if (!a.rewrite) a.rewrite = { rewriteSuggestions: [], insertSuggestions: [], overallNotes: [], questionsForUser: [], qAnswers: {}, userNotes: '' };
+    if (!Array.isArray(a.rewrite.insertSuggestions)) a.rewrite.insertSuggestions = [];
     if (!a.rewrite.qAnswers) a.rewrite.qAnswers = {};
     return a.rewrite;
   }
@@ -2857,10 +3004,39 @@ class Component extends DCLogic {
     if (pos < 0) return null;
     return { start: s.map[pos], end: s.map[pos + t.length - 1] + 1 };
   }
-  buildRewritePreview(resumeText, suggestions) {
+  buildRewritePreview(resumeText, suggestions, insertions) {
     const pieces = [{ text: resumeText || '', kind: 'plain' }];
     const hits = (suggestions || []).map(() => false);
+    const insertHits = (insertions || []).map(() => false);
     const unlocated = [];
+    const insertUnlocated = [];
+    (insertions || []).forEach((s, index) => {
+      const anchor = (s && s.insertAfterText) || '';
+      const text = (s && s.insertedText) || '';
+      if (!anchor || !text) { insertUnlocated.push(index); return; }
+      const kind = s.confirmed ? 'insertAccepted' : 'insertPending';
+      let found = false;
+      for (let i = 0; i < pieces.length; i++) {
+        const p = pieces[i];
+        if (!p || p.virtual) continue;
+        const match = this.findPreviewMatch(p.text, anchor);
+        if (!match) continue;
+        const next = [];
+        if (match.end > 0) next.push(Object.assign({}, p, { text: p.text.slice(0, match.end) }));
+        next.push({
+          text: '\n' + text,
+          kind,
+          virtual: !s.confirmed,
+          title: s.confirmed ? '已采纳：新增到 Word' : '待确认：采纳后新增到 Word'
+        });
+        if (match.end < p.text.length) next.push(Object.assign({}, p, { text: p.text.slice(match.end) }));
+        pieces.splice(i, 1, ...next);
+        insertHits[index] = true;
+        found = true;
+        break;
+      }
+      if (!found) insertUnlocated.push(index);
+    });
     (suggestions || []).forEach((s, index) => {
       const before = (s && s.originalText) || '';
       if (!before) { unlocated.push(index); return; }
@@ -2887,10 +3063,13 @@ class Component extends DCLogic {
     });
     return {
       lines: this.previewLinesFromPieces(pieces),
-      text: pieces.map(p => p.text).join('').trim(),
+      text: pieces.filter(p => !p.virtual).map(p => p.text).join('').trim(),
       hits,
+      insertHits,
       unlocated,
-      appliedCount: (suggestions || []).filter((s, i) => s.confirmed && hits[i]).length
+      insertUnlocated,
+      appliedCount: (suggestions || []).filter((s, i) => s.confirmed && hits[i]).length +
+        (insertions || []).filter((s, i) => s.confirmed && insertHits[i]).length
     };
   }
   previewLinesFromPieces(pieces) {
@@ -2918,7 +3097,9 @@ class Component extends DCLogic {
     const base = 'border-radius:4px;padding:1px 2px;';
     const styleMap = {
       pending: base + 'background:#fff3c4;box-shadow:inset 0 -1px 0 #d8a72b;',
-      accepted: base + 'background:#e8f8ef;color:#176b4f;font-weight:600;box-shadow:inset 0 -1px 0 #63c18d;'
+      accepted: base + 'background:#e8f8ef;color:#176b4f;font-weight:600;box-shadow:inset 0 -1px 0 #63c18d;',
+      insertPending: base + 'background:#fff3c4;color:#7a5410;border:1px dashed #d8a72b;',
+      insertAccepted: base + 'background:#e8f8ef;color:#176b4f;font-weight:600;border:1px dashed #63c18d;'
     };
     return { text: seg.text || '', style: styleMap[seg.kind] || '', title: seg.title || '' };
   }
@@ -2986,6 +3167,8 @@ class Component extends DCLogic {
   }
   sourceSuggestionStyle(kind) {
     const base = 'border-radius:4px;padding:1px 2px;white-space:pre-wrap;outline:1px solid transparent;';
+    if (kind === 'insertAccepted') return base + 'background:#e8f8ef;color:#176b4f;font-weight:600;border:1px dashed #63c18d;';
+    if (kind === 'insertPending') return base + 'background:#fff3c4;color:#7a5410;border:1px dashed #d8a72b;';
     if (kind === 'accepted') return base + 'background:#e8f8ef;color:#176b4f;font-weight:600;box-shadow:inset 0 -1px 0 #63c18d;';
     return base + 'background:#fff3c4;box-shadow:inset 0 -1px 0 #d8a72b;';
   }
@@ -3007,11 +3190,28 @@ class Component extends DCLogic {
     range.insertNode(span);
     return true;
   }
+  insertInSourceEditor(root, anchor, text, kind, index) {
+    const match = this.findSourceDomMatch(root, anchor);
+    if (!match) return false;
+    const range = document.createRange();
+    range.setStart(match.end.node, match.end.offset);
+    range.collapse(true);
+    const span = document.createElement('span');
+    span.setAttribute('data-jm-suggestion-mark', '1');
+    span.setAttribute('data-jm-suggestion-index', 'insert-' + index);
+    span.setAttribute('data-jm-original', '');
+    span.setAttribute('contenteditable', root && root.getAttribute('data-jm-docx-root') === '1' ? 'false' : 'true');
+    span.setAttribute('title', kind === 'insertAccepted' ? '已采纳：新增到 Word' : '待确认：采纳后新增到 Word');
+    span.style.cssText = this.sourceSuggestionStyle(kind);
+    span.textContent = '\n' + (text || '');
+    range.insertNode(span);
+    return true;
+  }
   currentRewritePreview() {
     const jobId = this.curJobId();
     const a = this.state.db.analyses[jobId];
     const rew = a && a.rewrite;
-    return this.buildRewritePreview(this.getResumeText(), (rew && rew.rewriteSuggestions) || []);
+    return this.buildRewritePreview(this.getResumeText(), (rew && rew.rewriteSuggestions) || [], (rew && rew.insertSuggestions) || []);
   }
   refreshRewritePreviewEditor() {
     clearTimeout(this._rewritePreviewTimer);
@@ -3023,6 +3223,13 @@ class Component extends DCLogic {
       const a = this.state.db.analyses[jobId];
       const rew = a && a.rewrite;
       const suggestions = (rew && rew.rewriteSuggestions) || [];
+      const insertions = (rew && rew.insertSuggestions) || [];
+      this._sourceInsertHits = insertions.map((s, i) => {
+        const anchor = (s && s.insertAfterText) || '';
+        const text = (s && s.insertedText) || '';
+        if (!anchor || !text) return false;
+        return this.insertInSourceEditor(root, anchor, text, s.confirmed ? 'insertAccepted' : 'insertPending', i);
+      });
       this._sourceSuggestionHits = suggestions.map((s, i) => {
         const before = (s && s.originalText) || '';
         if (!before) return false;
@@ -3044,12 +3251,13 @@ class Component extends DCLogic {
     const a = this.state.db.analyses[jobId];
     if (!a || !a.rewrite) return;
     const confirmed = (a.rewrite.rewriteSuggestions || []).filter(s => s.confirmed);
-    if (!confirmed.length) return this.showToast('请先勾选「采纳」且确认属实的建议');
-    const unverified = confirmed.filter(s => s.truthCheckRequired && !s.truthConfirmed);
+    const confirmedInserts = (a.rewrite.insertSuggestions || []).filter(s => s.confirmed);
+    if (!confirmed.length && !confirmedInserts.length) return this.showToast('请先勾选「采纳」且确认属实的建议');
+    const unverified = confirmed.concat(confirmedInserts).filter(s => s.truthCheckRequired && !s.truthConfirmed);
     if (unverified.length) return this.showToast('还有 ' + unverified.length + ' 条需核实建议未确认属实');
     const resume = this.currentResumeFile();
     if (!resume || String(resume.fileType || '').toLowerCase() !== 'docx') return this.showToast('请先选择一份 DOCX 原简历');
-    const replacements = this.docxReplacementsFromSuggestions(confirmed);
+    const replacements = this.docxInsertionsFromSuggestions(confirmedInserts).concat(this.docxReplacementsFromSuggestions(confirmed));
     let patched = null;
     try {
       patched = await this.buildPatchedDocxFromResume(resume, replacements);
@@ -3058,9 +3266,10 @@ class Component extends DCLogic {
       return this.showToast('生成 Word 预览失败：' + ((e && e.message) || '请稍后重试'));
     }
     if (patched.missing.length) return this.showToast('有 ' + patched.missing.length + ' 条建议无法写入原 Word，请调整建议原文后再保存');
-    const focus = confirmed.map(s => s.section).join('；');
+    const focus = confirmed.concat(confirmedInserts).map(s => s.section).join('；');
     const allSuggestions = a.rewrite.rewriteSuggestions || [];
-    const preview = this.buildRewritePreview(this.getResumeText(), allSuggestions);
+    const allInsertions = a.rewrite.insertSuggestions || [];
+    const preview = this.buildRewritePreview(this.getResumeText(), allSuggestions, allInsertions);
     this.openModal('version', {
       name: ((job && (job.direction || job.role)) || '定制') + '版',
       targetJob: (job ? job.company + ' · ' + job.role : ''),
@@ -3663,7 +3872,7 @@ class Component extends DCLogic {
     const matchNoResume = !((curResume && curResume.text) || (S.form.manualResume || '').trim());
     const an = curJobId ? (db.analyses[curJobId] || null) : null;
     const mat = an && an.match, rew = an && an.rewrite, note = an && an.note;
-    const hasMatch = !!mat, hasRewrite = !!(rew && rew.rewriteSuggestions), hasNote = !!note;
+    const hasMatch = !!mat, hasRewrite = !!(rew && (rew.rewriteSuggestions || rew.insertSuggestions)), hasNote = !!note;
     const aiBusy = S.aiLoading;
     const arr = v => Array.isArray(v) ? v : [];
     const circ = 2 * Math.PI * 46;
@@ -3725,12 +3934,13 @@ class Component extends DCLogic {
     const coverage = (mat && mat.referenceCoverage) || {};
     const referenceCoverageText = coverage.note || (referenceCards.length ? ('已引用 ' + referenceCards.length + ' 条资料') : '');
     const scoreBasisText = (mat && mat.scoreBasis && mat.scoreBasis.method === 'server_weighted_dimensions') ? '硬性要求 35% · 核心技能 25% · 经历深度 20%' : '';
-    let suggestions = [], sugAcceptedCount = 0, sugTotal = 0;
-    let rewritePreview = { lines: [], text: '', hits: [], unlocated: [], appliedCount: 0 };
+    let suggestions = [], insertSuggestions = [], sugAcceptedCount = 0, sugTotal = 0;
+    let rewritePreview = { lines: [], text: '', hits: [], insertHits: [], unlocated: [], insertUnlocated: [], appliedCount: 0 };
     if (hasRewrite) {
       const sugs = rew.rewriteSuggestions || [];
-      sugTotal = sugs.length;
-      rewritePreview = this.buildRewritePreview(this.getResumeText(), sugs);
+      const inserts = rew.insertSuggestions || [];
+      sugTotal = sugs.length + inserts.length;
+      rewritePreview = this.buildRewritePreview(this.getResumeText(), sugs, inserts);
       suggestions = sugs.map((s, i) => {
         const on = !!s.confirmed; if (on) sugAcceptedCount++;
         const located = !!rewritePreview.hits[i];
@@ -3753,6 +3963,34 @@ class Component extends DCLogic {
           btnStyle: 'margin-left:auto;border:none;border-radius:8px;padding:6px 15px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;' + (on ? 'background:var(--ac2);color:#fff;' : 'background:var(--ac2-soft);color:var(--ac2);'),
           toggle: () => this.toggleSug(curJobId, i),
           editAfter: e => this.editSug(curJobId, i, e.target.value)
+        };
+      });
+      insertSuggestions = inserts.map((s, i) => {
+        const on = !!s.confirmed; if (on) sugAcceptedCount++;
+        const located = !!rewritePreview.insertHits[i];
+        const score = this.clamp(Number(s.qualityScore) || 3, 1, 5);
+        const confidence = this.clamp(Number(s.confidence) || 0, 0, 1);
+        const qualityOk = score >= 4;
+        const confidenceOk = confidence >= .75;
+        return {
+          section: s.section || '新增经历',
+          anchor: s.insertAfterText || '',
+          insertedText: s.insertedText || '',
+          reason: s.reason || '',
+          needConfirm: !!s.truthCheckRequired,
+          truthConfirmed: !!s.truthConfirmed,
+          impact: s.impact || '',
+          qualityLabel: '质量 ' + score + '/5',
+          confidenceLabel: '可信度 ' + Math.round(confidence * 100) + '%',
+          qualityStyle: 'font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;' + (qualityOk ? 'color:#176b4f;background:#e8f8ef;' : 'color:#9a6411;background:#fff3c4;'),
+          confidenceStyle: 'font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;' + (confidenceOk ? 'color:#2a4a86;background:#eef4ff;' : 'color:#9a6411;background:#fff3c4;'),
+          cardStyle: 'background:#fff;border:1px solid ' + (on ? 'var(--ac2)' : '#ebeef4') + ';border-radius:14px;padding:17px 19px;',
+          locLabel: located ? (on ? '已新增到原文件' : '已定位插入位置') : '未定位',
+          locStyle: 'font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;' + (located ? (on ? 'color:#176b4f;background:#e8f8ef;' : 'color:#9a6411;background:#fff3c4;') : 'color:#c0392b;background:#fdecec;'),
+          btnLabel: on ? '✓ 已采纳' : '采纳新增',
+          btnStyle: 'margin-left:auto;border:none;border-radius:8px;padding:6px 15px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;' + (on ? 'background:var(--ac2);color:#fff;' : 'background:var(--ac2-soft);color:var(--ac2);'),
+          toggle: () => this.toggleInsertSug(curJobId, i),
+          editInserted: e => this.editInsertSug(curJobId, i, e.target.value)
         };
       });
     }
@@ -3948,9 +4186,10 @@ class Component extends DCLogic {
       hasFocus: suggestedFocus.length > 0, suggestedFocus,
       hasRisks: riskWarnings.length > 0, riskWarnings,
       hasQuestions: questionsForUser.length > 0, questionsForUser,
-      suggestions, sugAcceptedCount, sugTotal,
+      suggestions, insertSuggestions, hasInsertSuggestions: insertSuggestions.length > 0, sugAcceptedCount, sugTotal,
       rewritePreviewLines: rewritePreview.lines, previewAppliedCount: rewritePreview.appliedCount,
-      previewUnlocatedCount: rewritePreview.unlocated.length, previewHasUnlocated: rewritePreview.unlocated.length > 0,
+      previewUnlocatedCount: rewritePreview.unlocated.length + rewritePreview.insertUnlocated.length,
+      previewHasUnlocated: (rewritePreview.unlocated.length + rewritePreview.insertUnlocated.length) > 0,
       sourcePreviewKey, sourcePreviewLabel,
       hasRewriteQuestions, rewriteQuestionItems, applyAnswersToNotes: () => this.applyAnswersToNotes(), rewriteUserNotes, setRewriteUserNotes: e => this.setRewriteUserNotes(e.target.value),
       rewriteOverallNotes, hasRewriteOverallNotes,
