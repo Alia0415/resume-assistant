@@ -243,7 +243,22 @@
                   <div style="font-size:12.8px;font-weight:700;color:#3a485f;">{{ box.label }}</div>
                   <div style="font-size:11px;color:#93a0b8;white-space:nowrap;">{{ box.countLabel }}</div>
                 </div>
-                <textarea value="{{ box.value }}" onInput="{{ box.set }}" placeholder="{{ box.placeholder }}" style="width:100%;height:118px;border:none;border-radius:8px;padding:0;font-size:12.6px;line-height:1.7;color:#3a485f;outline:none;background:transparent;"></textarea>
+                <sc-if value="{{ box.hasItems }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:8px;max-height:190px;overflow:auto;padding-right:3px;">
+                    <sc-for list="{{ box.items }}" as="item" hint-placeholder-count="0">
+                      <div style="background:#fff;border:1px solid #edf1f7;border-radius:9px;padding:9px 10px;">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px;">
+                          <div style="font-size:12.6px;font-weight:700;color:#2f3b52;line-height:1.45;">{{ item.title }}</div>
+                          <sc-if value="{{ item.timeLabel }}" hint-placeholder-val="{{ false }}"><span style="font-size:10.8px;color:#7e8aa3;background:#f3f6fb;border-radius:999px;padding:2px 7px;white-space:nowrap;">{{ item.timeLabel }}</span></sc-if>
+                        </div>
+                        <div style="font-size:12.1px;color:#5b6b85;line-height:1.65;white-space:pre-wrap;">{{ item.content }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ box.empty }}" hint-placeholder-val="{{ false }}">
+                  <textarea value="{{ box.value }}" onInput="{{ box.set }}" placeholder="{{ box.placeholder }}" style="width:100%;height:118px;border:none;border-radius:8px;padding:0;font-size:12.6px;line-height:1.7;color:#3a485f;outline:none;background:transparent;"></textarea>
+                </sc-if>
               </div>
             </sc-for>
           </div>
@@ -1742,11 +1757,11 @@ class Component extends DCLogic {
     }
     if (!text) return this.showToast('没有读取到可用文字');
     this.setDb(db => {
-      const prev = db.experienceLibrary || {};
-      const sections = this.mergeExperienceSections(this.experienceLibrarySections(prev), this.classifyExperienceLibraryText(text));
-      db.experienceLibrary = { sections, sourceName: file.name, updatedAt: Date.now() };
+      const items = this.experienceItemsFromText(text);
+      const sections = this.experienceSectionsFromItems(items);
+      db.experienceLibrary = { items, sections, sourceName: file.name, updatedAt: Date.now() };
     });
-    this.showToast('已导入并自动归类经历库');
+    this.showToast('已导入并解析为经历条目');
   }
   experienceLibraryDefs() {
     return [
@@ -1767,6 +1782,160 @@ class Component extends DCLogic {
       out[key] = prev ? (prev + '\n\n' + add) : add;
     });
     return out;
+  }
+  normalizeExperienceType(key) {
+    return this.experienceLibraryDefs().some(d => d.key === key) ? key : 'other';
+  }
+  experienceItemsFromText(text) {
+    const sections = this.classifyExperienceLibraryText(text);
+    const items = [];
+    this.experienceLibraryDefs().forEach(def => {
+      this.experienceItemsFromSection(def.key, sections[def.key]).forEach(item => items.push(item));
+    });
+    return this.dedupeExperienceItems(items);
+  }
+  experienceItemsFromSection(type, text) {
+    const blocks = this.experienceEntryBlocks(text, type);
+    return blocks.map(block => this.experienceItemFromBlock(type, block)).filter(Boolean);
+  }
+  experienceEntryBlocks(text, type) {
+    const source = String(text || '').trim();
+    if (!source) return [];
+    const roughBlocks = source.split(/\n\s*\n+/).map(x => x.trim()).filter(Boolean);
+    const blocks = [];
+    roughBlocks.forEach(block => {
+      const lines = block.split('\n').map(x => x.trim()).filter(Boolean).filter(line => !this.experienceShouldIgnoreChunk(line));
+      let current = [];
+      lines.forEach((line, idx) => {
+        const next = lines[idx + 1] || '';
+        if (current.length && this.experienceLooksLikeEntryStart(line, next, type)) {
+          blocks.push(current.join('\n').trim());
+          current = [];
+        }
+        current.push(line);
+      });
+      if (current.length) blocks.push(current.join('\n').trim());
+    });
+    return blocks.filter(Boolean);
+  }
+  experienceLooksLikeEntryStart(line, next, type) {
+    const clean = String(line || '').trim();
+    if (!clean || this.experienceLooksLikeSectionTitle(clean)) return false;
+    if (/^(核心课程|主修课程|专业成绩|GPA|绩点|荣誉|奖项|获奖|教育背景|教育经历)[：:]/i.test(clean)) return true;
+    if (type === 'education' && /^(中山大学|[\u4e00-\u9fa5]{2,}大学|[\u4e00-\u9fa5]{2,}学院)/.test(clean)) return true;
+    const timeInLine = this.extractExperienceTime(clean);
+    const timeInNext = this.extractExperienceTime(next);
+    const cue = /(公司|事务所|企业|部门|项目|产品|数据|科研|课题|实习生|助理|运营|审计|班长|社团|学生会|协会|志愿|比赛|竞赛)/.test(clean);
+    if (timeInLine.label && cue) return true;
+    if (timeInNext.label && cue && clean.length <= 80) return true;
+    return cue && clean.length <= 70 && /[-｜|]/.test(clean);
+  }
+  extractExperienceTime(text) {
+    const raw = String(text || '');
+    const date = '(?:20\\d{2}|19\\d{2})(?:[.\\-/年]\\s?\\d{1,2})?(?:月)?';
+    const re = new RegExp('(' + date + ')\\s*(?:[-—~～至到]+\\s*((?:' + date + ')|至今|现在|present))?', 'i');
+    const m = raw.match(re);
+    if (!m) return { start: '', end: '', label: '', raw: '' };
+    const norm = v => String(v || '').replace(/年\s*/g, '.').replace(/月/g, '').replace(/[/-]/g, '.').replace(/\s+/g, '');
+    const start = norm(m[1]);
+    const end = /^(至今|现在|present)$/i.test(m[2] || '') ? '至今' : norm(m[2] || '');
+    return { start, end, label: end ? (start + ' - ' + end) : start, raw: m[0] };
+  }
+  experienceLineIsOnlyTime(line) {
+    const time = this.extractExperienceTime(line);
+    return !!time.raw && String(line || '').replace(time.raw, '').replace(/[|｜\-—~～至到\s]/g, '').trim() === '';
+  }
+  cleanExperienceTitle(line, time) {
+    return String(line || '')
+      .replace(time && time.raw ? time.raw : '', '')
+      .replace(/^[•·\-\s]+/, '')
+      .replace(/[|｜]\s*$/, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 80);
+  }
+  experienceItemFromBlock(type, block) {
+    const lines = String(block || '').split('\n').map(x => x.trim()).filter(Boolean).filter(line => !this.experienceShouldIgnoreChunk(line));
+    if (!lines.length) return null;
+    const joined = lines.join('\n');
+    const time = this.extractExperienceTime(joined);
+    let title = '';
+    let content = '';
+    let titleIdx = 0;
+    const first = lines[0] || '';
+    const colon = first.match(/^([^：:]{2,14})[：:]\s*(.+)$/);
+    if (colon && /^(核心课程|主修课程|专业成绩|GPA|绩点|荣誉|奖项|获奖|技能|证书|语言|工具)$/i.test(colon[1])) {
+      title = colon[1].trim();
+      content = [colon[2].trim()].concat(lines.slice(1).filter(x => !this.experienceLineIsOnlyTime(x))).join('\n').trim();
+    } else {
+      titleIdx = lines.findIndex(line => !this.experienceLineIsOnlyTime(line) && this.cleanExperienceTitle(line, time));
+      if (titleIdx < 0) titleIdx = 0;
+      title = this.cleanExperienceTitle(lines[titleIdx], time);
+      content = lines.filter((line, idx) => idx !== titleIdx && !this.experienceLineIsOnlyTime(line)).join('\n').trim();
+    }
+    if (!title) {
+      const def = this.experienceLibraryDefs().find(d => d.key === type);
+      title = (def && def.label) || '经历条目';
+    }
+    if (!content) {
+      content = lines.map(line => String(line || '').replace(time.raw || '', '').trim()).filter(Boolean).filter(line => line !== title).join('\n').trim();
+    }
+    if (!content && title && type !== 'education') content = title;
+    return {
+      type: this.normalizeExperienceType(type),
+      title,
+      start: time.start || '',
+      end: time.end || '',
+      timeLabel: time.label || '',
+      content: String(content || '').slice(0, 1000),
+      sourceText: joined.slice(0, 1500)
+    };
+  }
+  dedupeExperienceItems(items) {
+    const seen = {};
+    return (items || []).filter(item => {
+      if (!item || !(item.title || item.content)) return false;
+      const key = [item.type, item.title, item.start, String(item.content || '').slice(0, 80)].join('|').replace(/\s+/g, '');
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  }
+  experienceItemText(item) {
+    const lines = ['名称：' + (item.title || '经历条目')];
+    if (item.timeLabel) lines.push('时间：' + item.timeLabel);
+    if (item.content) lines.push('内容：' + item.content);
+    return lines.join('\n');
+  }
+  experienceSectionsFromItems(items) {
+    const sections = {};
+    this.dedupeExperienceItems(items).forEach(item => {
+      const key = this.normalizeExperienceType(item.type);
+      const text = this.experienceItemText(item);
+      sections[key] = sections[key] ? (sections[key] + '\n\n' + text) : text;
+    });
+    return sections;
+  }
+  experienceLibraryItems(lib) {
+    const rawItems = Array.isArray(lib && lib.items) ? lib.items : [];
+    const items = rawItems.map(item => ({
+      type: this.normalizeExperienceType(item.type),
+      title: String(item.title || '').trim(),
+      start: String(item.start || '').trim(),
+      end: String(item.end || '').trim(),
+      timeLabel: String(item.timeLabel || '').trim(),
+      content: String(item.content || '').trim(),
+      sourceText: String(item.sourceText || '').trim()
+    })).filter(item => item.title || item.content);
+    const raw = (lib && lib.sections && typeof lib.sections === 'object' && !Array.isArray(lib.sections)) ? lib.sections : {};
+    const typesWithItems = {};
+    items.forEach(item => { typesWithItems[item.type] = true; });
+    this.experienceLibraryDefs().forEach(def => {
+      if (!typesWithItems[def.key] && String(raw[def.key] || '').trim()) {
+        this.experienceItemsFromSection(def.key, raw[def.key]).forEach(item => items.push(item));
+      }
+    });
+    return this.dedupeExperienceItems(items);
   }
   experienceSectionKeyFromTitle(title) {
     const t = String(title || '').trim();
@@ -1845,28 +2014,40 @@ class Component extends DCLogic {
   }
   reclassifyExperienceLibrary() {
     const lib = (this.state.db && this.state.db.experienceLibrary) || {};
+    const existingItems = this.experienceLibraryItems(lib);
     const sections = this.experienceLibrarySections(lib);
-    const text = this.experienceLibraryDefs().map(d => String(sections[d.key] || '').trim()).filter(Boolean).join('\n\n');
+    const itemText = existingItems.map(item => [item.title, item.timeLabel, item.content].filter(Boolean).join('\n')).join('\n\n');
+    const text = itemText || this.experienceLibraryDefs().map(d => String(sections[d.key] || '').trim()).filter(Boolean).join('\n\n');
     if (!text.trim()) return this.showToast('还没有可重新归类的经历库内容');
+    const items = this.experienceItemsFromText(text);
     this.setDb(db => {
       const prev = db.experienceLibrary || {};
       db.experienceLibrary = Object.assign({}, prev, {
-        sections: this.classifyExperienceLibraryText(text),
+        items,
+        sections: this.experienceSectionsFromItems(items),
         text: '',
         updatedAt: Date.now(),
         sourceName: prev.sourceName || '重新归类'
       });
     });
-    this.showToast('已按新规则重新归类经历库');
+    this.showToast('已重新解析为经历条目');
   }
   experienceLibrarySections(lib) {
     const raw = (lib && lib.sections && typeof lib.sections === 'object' && !Array.isArray(lib.sections)) ? lib.sections : {};
-    const sections = Object.assign({}, raw);
+    const itemSections = this.experienceSectionsFromItems(this.experienceLibraryItems(lib || {}));
+    const sections = Object.assign({}, raw, itemSections);
     const hasSectionText = this.experienceLibraryDefs().some(d => String(sections[d.key] || '').trim());
     if (!hasSectionText && lib && lib.text) sections.other = String(lib.text || '');
     return sections;
   }
   experienceLibraryTextFrom(lib) {
+    const items = this.experienceLibraryItems(lib || {});
+    if (items.length) {
+      return this.experienceLibraryDefs().map(d => {
+        const list = items.filter(item => item.type === d.key);
+        return list.length ? '【' + d.label + '】\n' + list.map(item => this.experienceItemText(item)).join('\n\n') : '';
+      }).filter(Boolean).join('\n\n').trim();
+    }
     const sections = this.experienceLibrarySections(lib || {});
     return this.experienceLibraryDefs().map(d => {
       const text = String(sections[d.key] || '').trim();
@@ -3253,6 +3434,7 @@ class Component extends DCLogic {
 
     // resume
     const experienceLibrary = db.experienceLibrary || {};
+    const experienceLibraryItems = this.experienceLibraryItems(experienceLibrary);
     const experienceLibrarySections = this.experienceLibrarySections(experienceLibrary);
     const experienceLibraryText = this.experienceLibraryTextFrom(experienceLibrary);
     const experienceLibraryCount = experienceLibraryText.trim().length;
@@ -3261,12 +3443,20 @@ class Component extends DCLogic {
       : '还没有经历库素材';
     const experienceLibraryBoxes = this.experienceLibraryDefs().map(def => {
       const value = String(experienceLibrarySections[def.key] || '');
+      const items = experienceLibraryItems.filter(item => item.type === def.key).map(item => ({
+        title: item.title || '经历条目',
+        timeLabel: item.timeLabel || '',
+        content: item.content || '（未解析出具体内容）'
+      }));
       return {
         key: def.key,
         label: def.label,
         placeholder: def.placeholder,
         value,
-        countLabel: value.trim() ? (value.trim().length + ' 字') : '未填写',
+        items,
+        hasItems: items.length > 0,
+        empty: items.length === 0,
+        countLabel: items.length ? (items.length + ' 条') : (value.trim() ? (value.trim().length + ' 字') : '未填写'),
         set: e => this.setExperienceLibrarySection(def.key, e.target.value)
       };
     });

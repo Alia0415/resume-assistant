@@ -301,6 +301,25 @@ function detectMajorCategories(text) {
     .map(rule => rule.key);
 }
 
+function detectCandidateMajorCategories(text) {
+  const cleaned = cleanText(text);
+  const parts = cleaned
+    .split(/[\n。；;]/)
+    .map(part => part.trim())
+    .filter(Boolean);
+  const strong = parts.filter(part =>
+    /(教育背景|教育经历|学校|学院|专业|本科|学士|硕士|研究生|博士|学历|学位)/.test(part) &&
+    !/(实习|项目|职责|负责|参与|用户|需求|产品|运营|活动|社团|比赛|竞赛|调研)/.test(part)
+  );
+  const strongCategories = detectMajorCategories(strong.join(' '));
+  if (strongCategories.length) return strongCategories;
+
+  const head = parts.slice(0, 12).filter(part =>
+    !/(实习|项目|职责|负责|参与|用户|需求|产品|运营|活动|社团|比赛|竞赛|调研)/.test(part)
+  ).join(' ');
+  return detectMajorCategories(head);
+}
+
 function labelMajorCategories(keys) {
   return keys
     .map(key => (MAJOR_CATEGORY_RULES.find(rule => rule.key === key) || {}).label)
@@ -366,7 +385,7 @@ function inferCandidateProfile(options = {}) {
     text,
     degreeRank: inferDegreeRank(text),
     graduationYears: extractGraduationYears(text),
-    majorCategories: detectMajorCategories(text),
+    majorCategories: detectCandidateMajorCategories(text),
     certs: detectCerts(text),
     workYears: workYears.length ? Math.max(...workYears) : 0,
   };
@@ -378,7 +397,7 @@ function extractRequiredMajorCategories(text) {
   const snippets = cleaned
     .split(/[\n。；;]/)
     .map(part => part.trim())
-    .filter(part => /(专业要求|专业背景|专业方向|所学专业|相关专业|相关学科|相关方向|相关背景|以下专业|专业为|专业是|专业：|专业:|专业，|专业,|学科背景|技术背景)/.test(part))
+    .filter(part => /(专业要求|专业背景|专业方向|所学专业|相关专业|等专业|相关学科|相关方向|相关背景|以下专业|专业为|专业是|专业：|专业:|专业，|专业,|学科背景|技术背景)/.test(part))
     .filter(part => !/(相关专业|专业背景|专业方向|所学专业|相关学科|相关方向).{0,24}(优先|加分|更佳|优先考虑)/.test(part));
   if (!snippets.length) return [];
   return detectMajorCategories(snippets.join(' '));
@@ -434,8 +453,12 @@ function detectHardRequirement(job, options = {}) {
   }
 
   const requiredMajors = extractRequiredMajorCategories(text);
-  if (requiredMajors.length && profile.majorCategories.length && !requiredMajors.some(key => profile.majorCategories.includes(key))) {
-    reasons.push('专业方向不匹配：要求 ' + labelMajorCategories(requiredMajors));
+  if (requiredMajors.length) {
+    if (!profile.majorCategories.length) {
+      reasons.push('未识别到符合要求的专业背景：要求 ' + labelMajorCategories(requiredMajors));
+    } else if (!requiredMajors.some(key => profile.majorCategories.includes(key))) {
+      reasons.push('专业方向不匹配：要求 ' + labelMajorCategories(requiredMajors));
+    }
   }
   if (!requiredMajors.length && isTechnicalRole(job) && profile.majorCategories.length && !profile.majorCategories.some(key => ['cs', 'math'].includes(key))) {
     reasons.push('技术岗位与当前专业背景不匹配');
@@ -1396,6 +1419,13 @@ function summarizeJobSources(jobs) {
   return Array.from(map.entries()).map(([label, count]) => ({ label, count }));
 }
 
+function hardGateScoreCap(hard) {
+  const text = ((hard && hard.reasons) || []).join('；');
+  if (/专业方向不匹配|未识别到符合要求的专业背景|技术岗位/.test(text)) return 32;
+  if (/学历要求|届别要求|缺少硬性证书/.test(text)) return 35;
+  return 39;
+}
+
 function scoreOneJob(resumeText, job, options = {}) {
   const resume = cleanText(resumeText);
   const jd = cleanText([job.role, job.direction, job.jd].filter(Boolean).join('\n'));
@@ -1409,11 +1439,12 @@ function scoreOneJob(resumeText, job, options = {}) {
   const evidenceBoost = Math.min(12, Math.floor((resume.length / 450) * 4));
   const hard = detectHardRequirement(job, Object.assign({}, options, { resumeText }));
   const rawScore = Math.round(30 + overlap * 48 + roleHit * 10 + evidenceBoost);
-  const lowInfoCap = (terms.length < 3 || jd.length < 120) ? 55 : 92;
-  const score = hard.blocked ? Math.min(39, rawScore) : Math.max(15, Math.min(lowInfoCap, rawScore));
+  const lowInfoCap = (terms.length < 4 || jd.length < 160) ? 48 : 92;
+  const hardCap = hard.blocked ? hardGateScoreCap(hard) : 100;
+  const score = hard.blocked ? Math.min(hardCap, rawScore) : Math.max(15, Math.min(lowInfoCap, rawScore));
   const warnings = [];
   if (!terms.length) warnings.push('JD 信息较少，匹配度可信度偏低。');
-  else if (terms.length < 3 || jd.length < 120) warnings.push('JD 信息不足，已限制最高匹配分。');
+  else if (terms.length < 4 || jd.length < 160) warnings.push('JD 信息不足，已限制最高匹配分。');
   if (score < 55) warnings.push('简历中暂未明显体现多项岗位关键词。');
   if (hard.blocked && hard.reasons.length) warnings.push('岗位硬性门槛：' + hard.reasons[0]);
   const scoreBreakdown = [
@@ -1441,8 +1472,10 @@ function scoreOneJob(resumeText, job, options = {}) {
   return {
     matchScore: score,
     matchedKeywords: matched.slice(0, 10),
-    missingKeywords: missing,
-    summary: matched.length
+    missingKeywords: uniqueBy((hard.blocked ? hard.reasons : []).concat(missing), item => item).slice(0, 10),
+    summary: hard.blocked && hard.reasons.length
+      ? '硬性门槛未通过：' + hard.reasons[0]
+      : matched.length
       ? '简历已覆盖 ' + matched.slice(0, 4).join('、') + (matched.length > 4 ? ' 等能力。' : '。')
       : '暂未在简历中识别到明显匹配关键词。',
     warnings,
@@ -1453,7 +1486,7 @@ function scoreOneJob(resumeText, job, options = {}) {
       reasons: hard.reasons,
     },
     scoreBreakdown,
-    scoreFormula: '基础分30 + 关键词覆盖48% + 岗位名称贴合10% + 简历证据最多12分；硬性门槛不通过最高39分，JD 信息不足最高55分。',
+    scoreFormula: '基础分30 + 关键词覆盖48% + 岗位名称贴合10% + 简历证据最多12分；专业/技术等硬性门槛不通过最高32分，其他硬性门槛最高39分，JD 信息不足最高48分。',
   };
 }
 
