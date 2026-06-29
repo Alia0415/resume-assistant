@@ -428,6 +428,7 @@ app.post('/api/ai/match-resume', aiLimiter, async (req, res) => {
           '{ "matchScore": 0, "matchedPoints": [], "missingPoints": [], "weakExpressions": [], ' +
           '"suggestedResumeFocus": [], "riskWarnings": [], "questionsForUser": [], ' +
           '"experienceSuggestions": [ { "title": "", "source": "", "usableInfo": "", "whyUseful": "", "suggestedUse": "", "confidence": 0.8 } ], ' +
+          '"lessUsefulExperiences": [ { "title": "", "source": "", "reason": "", "confidence": 0.8 } ], ' +
           '"scoreDimensions": [ { "key": "hardRequirements", "score": 0, "reason": "", "evidence": [] } ], ' +
           '"evidenceItems": [ { "claim": "", "resumeEvidence": "", "jdEvidence": "", "sourceIds": [], "confidence": 0.8 } ] }。' +
           '\nscoreDimensions 必须覆盖这 5 个 key：hardRequirements、coreSkills、experienceDepth、domainFit、communicationReadability。每个 score 为 0-100 整数。' +
@@ -436,6 +437,7 @@ app.post('/api/ai/match-resume', aiLimiter, async (req, res) => {
           'suggestedResumeFocus 为针对该岗位建议突出的方向；riskWarnings 为可能的风险（如经历不符、跨行等）；' +
           'questionsForUser 为信息不足、需要我补充真实信息的问题。' +
           '\nexperienceSuggestions 只能来自【我的经历库素材】，用于提示“可以据实补进简历或用于面试案例”的已有经历片段；如果经历库未提供或与 JD 无关，返回空数组。source 写经历库中的项目/组织/时间等来源线索，usableInfo 写可直接复核的事实，whyUseful 写它对应 JD 哪类要求，suggestedUse 写建议放到简历的哪个部分或如何准备。' +
+          '\nlessUsefulExperiences 也只能来自【我的经历库素材】，列出当前 JD 用处不大、暂不建议写入这版简历的经历；reason 写清楚它与 JD 核心要求的差距或为什么优先级低。不要输出简历或经历库里没有的经历，不超过 6 条。' +
           '\nevidenceItems 用于解释关键判断：claim 写判断，resumeEvidence 必须来自简历原文或写“简历未体现”，jdEvidence 必须来自 JD 原文或写“JD 未明确”，sourceIds 只填外部资料 ID。' +
           '\n\n【外部职业资料】\n' + referenceContext +
           '\n\n【我的简历文本】\n' + resumeText +
@@ -443,7 +445,7 @@ app.post('/api/ai/match-resume', aiLimiter, async (req, res) => {
           '\n\n【岗位 JD】\n' + jdText,
       },
     ];
-    const data = await callDeepSeekJSON(messages, { temperature: 0.2, maxTokens: 4600 });
+    const data = await callDeepSeekJSON(messages, { temperature: 0.2, maxTokens: 5200 });
     res.json(normalizeMatchResult(data, references));
   } catch (err) {
     handleError(res, err);

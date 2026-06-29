@@ -11,7 +11,11 @@ const GENERIC_PAGE_TIMEOUT_MS = Math.max(2000, Math.min(SEARCH_TIMEOUT_MS, Numbe
 const SEARCH_PROVIDER = (process.env.JOB_BOARD_SEARCH_PROVIDER || 'official-sources').trim();
 const DEFAULT_OFFICIAL_SOURCES = process.env.JOB_BOARD_OFFICIAL_SOURCES || '';
 const BUILTIN_OFFICIAL_SOURCES = [
+  'https://join.qq.com/post.html?query=p_101',
+  'https://join.qq.com/post.html?query=p_102',
+  'https://join.qq.com/post.html?query=p_103',
   'https://join.qq.com/post.html?query=p_104',
+  'https://join.qq.com/post.html?query=p_105',
   'https://careers.tencent.com/',
   'https://zhaopin.meituan.com/web/campus',
   'https://zhaopin.meituan.com/web/social',
@@ -1355,11 +1359,40 @@ async function discoverJobResult(options = {}) {
     matchesCityIntent(options, job) &&
     matchesEligibilityIntent(options, job)
   );
+  let combined = uniqueBy(filtered, item => item.link || item.id);
+  const supplementalStats = [];
+  if (combined.length < limit && SEARCH_PROVIDER !== 'official-sources-only') {
+    const openApiJobs = await searchOpenApiJobs(options);
+    const openApiFiltered = openApiJobs.filter(job =>
+      matchesSearchIntent(options, [job.company, job.role, job.direction, job.city, job.jd]) &&
+      matchesRoleIntent(options, job) &&
+      matchesCityIntent(options, job) &&
+      matchesEligibilityIntent(options, job)
+    );
+    if (openApiFiltered.length) supplementalStats.push({ label: '公开岗位 API', count: openApiFiltered.length, error: '' });
+    combined = uniqueBy(combined.concat(openApiFiltered), item => item.link || item.id);
+
+    if (combined.length < limit) {
+      const searchCandidates = await searchPublicJobs(options);
+      const searchedJobs = [];
+      for (const candidate of searchCandidates.slice(0, Math.max(4, limit - combined.length))) {
+        searchedJobs.push(await crawlCandidate(candidate));
+      }
+      const searchedFiltered = searchedJobs.filter(job =>
+        matchesSearchIntent(options, [job.company, job.role, job.direction, job.city, job.jd]) &&
+        matchesRoleIntent(options, job) &&
+        matchesCityIntent(options, job) &&
+        matchesEligibilityIntent(options, job)
+      );
+      if (searchedFiltered.length) supplementalStats.push({ label: '公开搜索补充', count: searchedFiltered.length, error: '' });
+      combined = uniqueBy(combined.concat(searchedFiltered), item => item.link || item.id);
+    }
+  }
   return {
-    jobs: uniqueBy(filtered, item => item.link || item.id).slice(0, limit),
-    sourceStats: fetched.sourceStats,
-    discoveredCount: jobs.length,
-    eligibleCount: filtered.length,
+    jobs: combined.slice(0, limit),
+    sourceStats: summarizeSourceStats((fetched.sourceStats || []).concat(supplementalStats)),
+    discoveredCount: jobs.length + supplementalStats.reduce((sum, s) => sum + (Number(s.count) || 0), 0),
+    eligibleCount: combined.length,
   };
 }
 
@@ -1415,6 +1448,17 @@ function summarizeJobSources(jobs) {
   (jobs || []).forEach(job => {
     const key = cleanText(job && job.source) || '未知来源';
     map.set(key, (map.get(key) || 0) + 1);
+  });
+  return Array.from(map.entries()).map(([label, count]) => ({ label, count }));
+}
+
+function summarizeSourceStats(stats) {
+  const map = new Map();
+  (stats || []).forEach(stat => {
+    const count = Number(stat && stat.count) || 0;
+    if (count <= 0) return;
+    const label = cleanText(stat && stat.label) || '来源';
+    map.set(label, (map.get(label) || 0) + count);
   });
   return Array.from(map.entries()).map(([label, count]) => ({ label, count }));
 }

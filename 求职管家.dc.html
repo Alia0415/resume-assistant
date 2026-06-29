@@ -659,29 +659,6 @@
               </div>
             </div>
 
-            <sc-if value="{{ hasExperienceSuggestions }}" hint-placeholder-val="{{ false }}">
-            <div style="background:#fff;border:1px solid #d6e3ff;border-radius:14px;padding:20px 22px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
-                <div style="font-size:14px;font-weight:700;color:#2a4a86;">可从经历库补充的素材<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">仅提示真实已有经历，不会自动写入简历</span></div>
-                <div style="font-size:11.5px;color:#7e8aa3;">{{ experienceLibraryStatus }}</div>
-              </div>
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
-                <sc-for list="{{ experienceSuggestionCards }}" as="x" hint-placeholder-count="0">
-                  <div style="border:1px solid #e1eaff;border-radius:12px;padding:14px 15px;background:#fbfcff;">
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;">
-                      <div style="font-size:13px;font-weight:700;color:#2a4a86;line-height:1.5;">{{ x.title }}</div>
-                      <span style="font-size:11px;color:var(--ac);background:var(--ac-soft);border-radius:999px;padding:3px 7px;white-space:nowrap;">{{ x.confidenceLabel }}</span>
-                    </div>
-                    <sc-if value="{{ x.source }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#93a0b8;margin-bottom:7px;">来自：{{ x.source }}</div></sc-if>
-                    <div style="font-size:12.3px;color:#3a485f;line-height:1.65;">{{ x.usableInfo }}</div>
-                    <div style="font-size:12px;color:#5b6b85;line-height:1.6;margin-top:9px;background:#f3f7ff;border-radius:8px;padding:8px 10px;">适配原因：{{ x.whyUseful }}</div>
-                    <div style="font-size:12px;color:#2a4a86;line-height:1.6;margin-top:8px;">建议用法：{{ x.suggestedUse }}</div>
-                  </div>
-                </sc-for>
-              </div>
-            </div>
-            </sc-if>
-
             <sc-if value="{{ hasWeak }}" hint-placeholder-val="{{ false }}">
             <div style="background:#fff;border:1px solid #ebeef4;border-radius:14px;padding:20px;">
               <div style="font-size:13.5px;font-weight:700;margin-bottom:12px;color:#9a6411;">表达偏弱、可加强</div>
@@ -795,6 +772,51 @@
                       </div>
                     </sc-for>
                   </div>
+
+                  <sc-if value="{{ hasRewriteExperienceLibrary }}" hint-placeholder-val="{{ false }}">
+                    <div style="background:#fff;border:1px solid #d6e3ff;border-radius:14px;padding:16px 18px;">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+                        <div style="font-size:13px;font-weight:700;color:#2a4a86;">经历库补充建议<span style="font-size:11.5px;font-weight:400;color:#93a0b8;margin-left:8px;">采纳后才会写入 Word</span></div>
+                        <div style="font-size:11.5px;color:#7e8aa3;">{{ experienceLibraryStatus }}</div>
+                      </div>
+                      <sc-if value="{{ hasExperienceSuggestions }}" hint-placeholder-val="{{ false }}">
+                        <div style="font-size:12px;font-weight:700;color:#2a4a86;margin-bottom:9px;">适合补充到这份简历</div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:11px;margin-bottom:13px;">
+                          <sc-for list="{{ experienceSuggestionCards }}" as="x" hint-placeholder-count="0">
+                            <div style="border:1px solid #e1eaff;border-radius:12px;padding:13px 14px;background:#fbfcff;">
+                              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;">
+                                <div style="font-size:13px;font-weight:700;color:#2a4a86;line-height:1.5;">{{ x.title }}</div>
+                                <span style="font-size:11px;color:var(--ac);background:var(--ac-soft);border-radius:999px;padding:3px 7px;white-space:nowrap;">{{ x.confidenceLabel }}</span>
+                              </div>
+                              <sc-if value="{{ x.source }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#93a0b8;margin-bottom:7px;">来自：{{ x.source }}</div></sc-if>
+                              <div style="font-size:12.3px;color:#3a485f;line-height:1.65;">{{ x.usableInfo }}</div>
+                              <div style="font-size:12px;color:#5b6b85;line-height:1.6;margin-top:9px;background:#f3f7ff;border-radius:8px;padding:8px 10px;">适配原因：{{ x.whyUseful }}</div>
+                              <div style="font-size:12px;color:#2a4a86;line-height:1.6;margin-top:8px;">建议用法：{{ x.suggestedUse }}</div>
+                              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:11px;">
+                                <button onClick="{{ x.addToRewrite }}" style="background:#fff;color:var(--ac);border:1px solid #cfe0ff;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">加入补充说明</button>
+                                <button onClick="{{ x.addAndRewrite }}" style="background:var(--ac);color:#fff;border:none;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">加入并重新生成</button>
+                              </div>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ hasLessUsefulExperiences }}" hint-placeholder-val="{{ false }}">
+                        <div style="font-size:12px;font-weight:700;color:#6b7a96;margin-bottom:9px;">对该 JD 用处不大的经历</div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:11px;">
+                          <sc-for list="{{ lessUsefulExperienceCards }}" as="x" hint-placeholder-count="0">
+                            <div style="border:1px solid #e4eaf3;border-radius:12px;padding:13px 14px;background:#f8fafc;">
+                              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:7px;">
+                                <div style="font-size:12.8px;font-weight:700;color:#3a485f;line-height:1.5;">{{ x.title }}</div>
+                                <span style="font-size:11px;color:#6b7a96;background:#eef1f6;border-radius:999px;padding:3px 7px;white-space:nowrap;">{{ x.confidenceLabel }}</span>
+                              </div>
+                              <sc-if value="{{ x.source }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#93a0b8;margin-bottom:7px;">来自：{{ x.source }}</div></sc-if>
+                              <div style="font-size:12.2px;color:#5b6b85;line-height:1.65;">{{ x.reason }}</div>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-if>
 
                   <sc-if value="{{ hasRewriteQuestions }}" hint-placeholder-val="{{ false }}">
                     <div style="background:#fff8ee;border:1px solid #f5e3c3;border-radius:12px;padding:14px 16px;">
@@ -2574,7 +2596,7 @@ class Component extends DCLogic {
   }
 
   // 修改建议（POST /api/ai/rewrite-resume）
-  async rewriteResume() {
+  async rewriteResume(extraUserNotes) {
     const jobId = this.curJobId();
     const job = this.state.db.jobs.find(j => j.id === jobId);
     if (!job) return this.showToast('请先选择岗位');
@@ -2582,7 +2604,11 @@ class Component extends DCLogic {
     const resumeText = this.getResumeText();
     if (!resumeText.trim()) return this.setState({ aiError: '没有可分析的简历文字。' });
     // 把「补充确认」里整理出的真实补充一起交给 AI，让改写真正用上你提供的信息。
-    const userNotes = (((this.state.db.analyses[jobId] || {}).rewrite || {}).userNotes || '').trim();
+    const savedUserNotes = (((this.state.db.analyses[jobId] || {}).rewrite || {}).userNotes || '').trim();
+    const extraNotes = (typeof extraUserNotes === 'string' && extraUserNotes.trim()) ? extraUserNotes.trim() : '';
+    const userNotes = extraNotes && savedUserNotes.indexOf(extraNotes) < 0
+      ? (savedUserNotes ? (savedUserNotes + '\n\n' + extraNotes) : extraNotes)
+      : savedUserNotes;
     this.setState({ aiLoading: true, aiError: null, loadingMsg: '正在生成修改建议…', matchTab: 'rewrite' });
     try {
       const d = await this.aiCall('/api/ai/rewrite-resume', { resumeText, jdText: job.jd, targetSection: this.state.targetSection || '全部', userNotes });
@@ -2638,7 +2664,49 @@ class Component extends DCLogic {
     });
     this.scheduleSourcePreviewRender();
   }
-  setRewriteUserNotes(v) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) a.rewrite.userNotes = v; }); }
+  ensureRewriteDraft(db, jobId) {
+    const a = this.ensureAnalysis(db, jobId);
+    if (!a.rewrite) a.rewrite = { rewriteSuggestions: [], overallNotes: [], questionsForUser: [], qAnswers: {}, userNotes: '' };
+    if (!a.rewrite.qAnswers) a.rewrite.qAnswers = {};
+    return a.rewrite;
+  }
+  formatExperienceSuggestionNote(item) {
+    const x = (item && typeof item === 'object') ? item : { usableInfo: String(item || '') };
+    const title = String(x.title || x.section || x.name || '可用经历素材').trim();
+    const lines = ['· ' + title];
+    const source = String(x.source || x.experienceSource || '').trim();
+    const usableInfo = String(x.usableInfo || x.info || x.evidence || '').trim();
+    const whyUseful = String(x.whyUseful || x.reason || '').trim();
+    const suggestedUse = String(x.suggestedUse || x.suggestion || '').trim();
+    if (source) lines.push('  来源：' + source);
+    if (usableInfo) lines.push('  可用事实：' + usableInfo);
+    if (whyUseful) lines.push('  适配原因：' + whyUseful);
+    if (suggestedUse) lines.push('  建议用法：' + suggestedUse);
+    return usableInfo ? lines.join('\n') : '';
+  }
+  useExperienceSuggestion(i, regenerate) {
+    const jobId = this.curJobId();
+    const a = this.state.db.analyses[jobId];
+    const list = (a && a.match && Array.isArray(a.match.experienceSuggestions)) ? a.match.experienceSuggestions : [];
+    const note = this.formatExperienceSuggestionNote(list[i]);
+    if (!note) return this.showToast('这条经历没有可用事实，暂不能加入');
+    const MARK = '【来自经历库的可用补充素材】';
+    this.setDb(db => {
+      const rew = this.ensureRewriteDraft(db, jobId);
+      const prev = rew.userNotes || '';
+      if (prev.indexOf(note) >= 0) return;
+      rew.userNotes = prev.trim()
+        ? (prev.replace(/\s+$/, '') + '\n\n' + (prev.indexOf(MARK) >= 0 ? note : (MARK + '\n' + note)))
+        : (MARK + '\n' + note);
+    });
+    if (regenerate) {
+      this.showToast('已加入经历库素材，正在重新生成修改建议');
+      setTimeout(() => this.rewriteResume(note), 0);
+    } else {
+      this.showToast('已加入补充说明，可重新生成修改建议');
+    }
+  }
+  setRewriteUserNotes(v) { const jobId = this.curJobId(); this.setDb(db => { const rew = this.ensureRewriteDraft(db, jobId); rew.userNotes = v; }); }
   setQAnswerChoice(i, val) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) { if (!a.rewrite.qAnswers) a.rewrite.qAnswers = {}; const cur = a.rewrite.qAnswers[i] || {}; cur.choice = (cur.choice === val ? '' : val); a.rewrite.qAnswers[i] = cur; } }); }
   setQAnswerDetail(i, val) { const jobId = this.curJobId(); this.setDb(db => { const a = db.analyses[jobId]; if (a && a.rewrite) { if (!a.rewrite.qAnswers) a.rewrite.qAnswers = {}; const cur = a.rewrite.qAnswers[i] || {}; cur.detail = val; a.rewrite.qAnswers[i] = cur; } }); }
   applyAnswersToNotes() {
@@ -3523,17 +3591,15 @@ class Component extends DCLogic {
     const boardEligibilityText = '已过滤硬性门槛';
     const sourceStats = (board.query && Array.isArray(board.query.sourceStats)) ? board.query.sourceStats : [];
     const returnedSourceStats = (board.query && Array.isArray(board.query.returnedSourceStats)) ? board.query.returnedSourceStats : [];
-    const sourceStatsText = sourceStats.length
-      ? sourceStats.slice(0, 12).map(s => {
-        const count = Number(s.count) || 0;
-        const err = s.error ? ('（' + String(s.error).slice(0, 34) + '）') : '';
-        return (s.label || '来源') + ' ' + count + err;
-      }).join('；')
-      : '使用内置官方来源；可展开下方输入更多企业官网。';
-    const returnedSourceText = returnedSourceStats.length
-      ? '入选来源：' + returnedSourceStats.map(s => (s.label || '来源') + ' ' + (Number(s.count) || 0)).join('；')
+    const visibleSourceStats = sourceStats.filter(s => (Number(s && s.count) || 0) > 0);
+    const visibleReturnedSourceStats = returnedSourceStats.filter(s => (Number(s && s.count) || 0) > 0);
+    const sourceStatsText = visibleSourceStats.length
+      ? visibleSourceStats.slice(0, 12).map(s => (s.label || '来源') + ' ' + (Number(s.count) || 0)).join('；')
+      : '已连接内置官方来源；可展开下方输入更多企业官网。';
+    const returnedSourceText = visibleReturnedSourceStats.length
+      ? '入选来源：' + visibleReturnedSourceStats.map(s => (s.label || '来源') + ' ' + (Number(s.count) || 0)).join('；')
       : '';
-    const boardSourceText = (sourceStats.length ? ('抓取来源：' + sourceStatsText) : sourceStatsText) + (returnedSourceText ? '。' + returnedSourceText : '');
+    const boardSourceText = (visibleSourceStats.length ? ('抓取来源：' + sourceStatsText) : sourceStatsText) + (returnedSourceText ? '。' + returnedSourceText : '');
     const boardItemsRaw = Array.isArray(board.items) ? board.items : [];
     const boardRows = boardItemsRaw.map(item => {
       const match = item.boardMatch || {};
@@ -3705,9 +3771,21 @@ class Component extends DCLogic {
         usableInfo: String(x.usableInfo || x.info || x.evidence || '').slice(0, 260),
         whyUseful: String(x.whyUseful || x.reason || '与岗位要求有关，可作为补充素材。').slice(0, 220),
         suggestedUse: String(x.suggestedUse || x.suggestion || '据实补充到相关经历或作为面试案例准备。').slice(0, 220),
-        confidenceLabel: confidence ? ('可信度 ' + Math.round(confidence * 100) + '%') : '待核实'
+        confidenceLabel: confidence ? ('可信度 ' + Math.round(confidence * 100) + '%') : '待核实',
+        addToRewrite: () => this.useExperienceSuggestion(i, false),
+        addAndRewrite: () => this.useExperienceSuggestion(i, true)
       };
     }).filter(x => x.usableInfo).slice(0, 6) : [];
+    const lessUsefulExperienceCards = mat ? arr(mat.lessUsefulExperiences).map((raw, i) => {
+      const x = (raw && typeof raw === 'object') ? raw : { reason: String(raw || '') };
+      const confidence = this.clamp(Number(x.confidence) || 0, 0, 1);
+      return {
+        title: String(x.title || x.section || x.name || ('暂不建议使用 ' + (i + 1))).slice(0, 60),
+        source: String(x.source || x.experienceSource || '').slice(0, 80),
+        reason: String(x.reason || x.whyLessUseful || x.comment || '与当前 JD 的核心要求关联较弱，暂不建议放入这版简历。').slice(0, 260),
+        confidenceLabel: confidence ? ('判断 ' + Math.round(confidence * 100) + '%') : '参考'
+      };
+    }).filter(x => x.reason).slice(0, 8) : [];
     const experienceLibraryStatus = experienceLibraryCount ? ('经历库 ' + experienceLibraryCount + ' 字') : '未添加经历库';
     // 补充确认问题：结构化成可点选的控件（兼容旧的纯字符串）
     const qAns = (rew && rew.qAnswers) || {};
@@ -3864,6 +3942,8 @@ class Component extends DCLogic {
       matchedPoints, matchedEmpty: hasMatch && matchedPoints.length === 0,
       missingPoints, missingEmpty: hasMatch && missingPoints.length === 0,
       hasExperienceSuggestions: experienceSuggestionCards.length > 0, experienceSuggestionCards, experienceLibraryStatus,
+      hasLessUsefulExperiences: lessUsefulExperienceCards.length > 0, lessUsefulExperienceCards,
+      hasRewriteExperienceLibrary: experienceSuggestionCards.length > 0 || lessUsefulExperienceCards.length > 0,
       hasWeak: weakExpressions.length > 0, weakExpressions,
       hasFocus: suggestedFocus.length > 0, suggestedFocus,
       hasRisks: riskWarnings.length > 0, riskWarnings,

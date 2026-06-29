@@ -355,6 +355,28 @@ function normalizeExperienceSuggestions(items) {
   }).filter(item => item && item.usableInfo).slice(0, 8);
 }
 
+function normalizeLessUsefulExperiences(items) {
+  return (Array.isArray(items) ? items : []).map(item => {
+    if (typeof item === 'string') {
+      const text = item.trim();
+      return text ? {
+        title: '暂不建议使用的经历',
+        source: '',
+        reason: text.slice(0, 260),
+        confidence: 0,
+      } : null;
+    }
+    const title = asText(item && (item.title || item.section || item.name)).slice(0, 80);
+    const reason = asText(item && (item.reason || item.whyLessUseful || item.comment)).slice(0, 320);
+    return {
+      title: title || '暂不建议使用的经历',
+      source: asText(item && (item.source || item.experienceSource)).slice(0, 120),
+      reason,
+      confidence: Math.max(0, Math.min(1, Number(item && item.confidence) || 0)),
+    };
+  }).filter(item => item && item.reason).slice(0, 8);
+}
+
 function normalizeMatchResult(data, references) {
   const out = Object.assign({}, data || {});
   out.matchedPoints = stringArray(out.matchedPoints);
@@ -364,6 +386,7 @@ function normalizeMatchResult(data, references) {
   out.riskWarnings = stringArray(out.riskWarnings);
   out.questionsForUser = stringArray(out.questionsForUser);
   out.experienceSuggestions = normalizeExperienceSuggestions(out.experienceSuggestions);
+  out.lessUsefulExperiences = normalizeLessUsefulExperiences(out.lessUsefulExperiences);
   out.scoreDimensions = normalizeScoreDimensions(out.scoreDimensions);
   out.matchScore = weightedScore(out.scoreDimensions, out.matchScore);
   out.evidenceItems = normalizeEvidenceItems(out.evidenceItems, references);
